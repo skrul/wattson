@@ -77,7 +77,7 @@ export default function WorkoutDetail({ workout }: WorkoutDetailProps) {
 
       {/* Stats grid */}
       <div className="grid grid-cols-3 gap-6">
-        <Stat label="Total Output" value={workout.total_output != null ? Math.round(workout.total_output / 1000) : null} unit="kj" />
+        <Stat label="Total Output" value={workout.total_work != null ? Math.round(workout.total_work / 1000) : null} unit="kj" />
         <Stat label="Distance" value={workout.distance != null ? workout.distance.toFixed(2) : null} unit="mi" />
         <Stat label="Calories" value={workout.calories} unit="kcal" />
 

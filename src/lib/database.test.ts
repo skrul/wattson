@@ -34,7 +34,7 @@ function makeWorkout(id: string, overrides: Partial<Workout> = {}): Workout {
     strive_score: 42.5,
     is_live: 1,
     workout_type: "class",
-    total_output: 250000,
+    total_work: 250000,
     avg_incline: null,
     avg_pace: null,
     source: "api",

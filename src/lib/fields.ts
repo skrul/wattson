@@ -33,7 +33,7 @@ export const FIELD_DEFS: FieldDef[] = [
   { key: "instructor", label: "Instructor", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
   { key: "discipline", label: "Discipline", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
   { key: "duration_seconds", label: "Duration", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
-  { key: "output_watts", label: "Output (watts)", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
+  { key: "total_work", label: "Total Output (kj)", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
   { key: "calories", label: "Calories", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
   { key: "distance", label: "Distance", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
   { key: "avg_heart_rate", label: "Avg Heart Rate", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },

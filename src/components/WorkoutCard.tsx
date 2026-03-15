@@ -36,9 +36,9 @@ export default function WorkoutCard({ workout, isSelected, onClick }: WorkoutCar
         </div>
       </div>
 
-      {workout.total_output != null && workout.total_output > 0 && (
+      {workout.total_work != null && workout.total_work > 0 && (
         <div className="shrink-0 text-right">
-          <span className="text-sm font-semibold">{Math.round(workout.total_output / 1000)}</span>
+          <span className="text-sm font-semibold">{Math.round(workout.total_work / 1000)}</span>
           <span className={`ml-0.5 text-xs ${isSelected ? "text-gray-400" : "text-gray-500"}`}>kj</span>
         </div>
       )}

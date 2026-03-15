@@ -17,7 +17,7 @@ export interface Workout {
   strive_score: number | null;
   is_live: number | null;
   workout_type: string | null;
-  total_output: number | null;
+  total_work: number | null;
   avg_incline: number | null;
   avg_pace: number | null;
   source: "csv" | "api";

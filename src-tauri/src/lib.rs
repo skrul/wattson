@@ -97,6 +97,12 @@ pub fn run() {
             );",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "rename_total_output_to_total_work",
+            sql: "ALTER TABLE workouts RENAME COLUMN total_output TO total_work;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

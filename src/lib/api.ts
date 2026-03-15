@@ -105,7 +105,7 @@ function mapWorkout(w: PelotonWorkout, raw: unknown): Workout {
     strive_score: w.effort_zones?.total_effort_points ?? null,
     is_live: w.ride?.is_live_in_studio_only != null ? (w.ride.is_live_in_studio_only ? 0 : 1) : null,
     workout_type: w.workout_type ?? null,
-    total_output: w.total_work ?? null,
+    total_work: w.total_work ?? null,
     avg_incline: null,
     avg_pace: null,
     source: "api",

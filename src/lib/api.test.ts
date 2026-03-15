@@ -215,7 +215,7 @@ describe("fetchAllWorkouts", () => {
     expect(result.strive_score).toBe(42.5);
     expect(result.is_live).toBe(1); // is_live_in_studio_only=false → 1
     expect(result.workout_type).toBe("class");
-    expect(result.total_output).toBe(250000);
+    expect(result.total_work).toBe(250000);
     expect(result.source).toBe("api");
     expect(result.raw_json).toBeTruthy();
   });

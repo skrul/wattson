@@ -1,5 +1,6 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { Workout, MetricSample, WorkoutFilters } from "../types";
+import type { Workout, MetricSample, WorkoutFilters, FilterCondition } from "../types";
+import { FIELD_MAP } from "./fields";
 
 let db: Database | null = null;
 
@@ -33,43 +34,150 @@ export async function insertWorkouts(workouts: Workout[]): Promise<void> {
   }
 }
 
-const SORTABLE_COLUMNS = new Set<string>([
-  "date", "title", "instructor", "discipline", "duration_seconds",
-  "output_watts", "calories", "distance", "avg_heart_rate",
-]);
+const SORTABLE_COLUMNS = new Set<string>(
+  Object.values(FIELD_MAP).filter((f) => f.sortable).map((f) => f.key),
+);
+
+const FILTERABLE_COLUMNS = new Set<string>(
+  Object.values(FIELD_MAP).filter((f) => f.filterable).map((f) => f.key),
+);
+
+function isConditionComplete(cond: FilterCondition): boolean {
+  if (cond.operator === "is_empty" || cond.operator === "is_not_empty") return true;
+  const field = FIELD_MAP[cond.field];
+  if (field?.type === "enum") return cond.values.length > 0;
+  return cond.value !== "";
+}
+
+function buildConditionClause(
+  cond: FilterCondition,
+  params: unknown[],
+  idx: { val: number },
+): string | null {
+  const field = FIELD_MAP[cond.field];
+  if (!field || !FILTERABLE_COLUMNS.has(cond.field)) return null;
+  if (!isConditionComplete(cond)) return null;
+
+  const col = cond.field;
+
+  switch (cond.operator) {
+    case "is_empty":
+      return `(${col} IS NULL OR ${col} = '')`;
+    case "is_not_empty":
+      return `(${col} IS NOT NULL AND ${col} != '')`;
+    case "equals":
+      if (field.type === "enum" && cond.values.length > 0) {
+        const placeholders = cond.values.map(() => `$${idx.val++}`);
+        params.push(...cond.values);
+        return `${col} IN (${placeholders.join(", ")})`;
+      }
+      if (field.type === "number") {
+        params.push(parseFloat(cond.value));
+      } else if (field.type === "date") {
+        params.push(dateToTimestamp(cond.value));
+      } else {
+        params.push(cond.value);
+      }
+      return `${col} = $${idx.val++}`;
+    case "not_equals":
+      if (field.type === "enum" && cond.values.length > 0) {
+        const placeholders = cond.values.map(() => `$${idx.val++}`);
+        params.push(...cond.values);
+        return `${col} NOT IN (${placeholders.join(", ")})`;
+      }
+      if (field.type === "number") {
+        params.push(parseFloat(cond.value));
+      } else if (field.type === "date") {
+        params.push(dateToTimestamp(cond.value));
+      } else {
+        params.push(cond.value);
+      }
+      return `${col} != $${idx.val++}`;
+    case "contains":
+      params.push(`%${cond.value}%`);
+      return `${col} LIKE $${idx.val++}`;
+    case "not_contains":
+      params.push(`%${cond.value}%`);
+      return `${col} NOT LIKE $${idx.val++}`;
+    case "starts_with":
+      params.push(`${cond.value}%`);
+      return `${col} LIKE $${idx.val++}`;
+    case "ends_with":
+      params.push(`%${cond.value}`);
+      return `${col} LIKE $${idx.val++}`;
+    case "gt":
+      params.push(parseFloat(cond.value));
+      return `${col} > $${idx.val++}`;
+    case "gte":
+      params.push(parseFloat(cond.value));
+      return `${col} >= $${idx.val++}`;
+    case "lt":
+      params.push(parseFloat(cond.value));
+      return `${col} < $${idx.val++}`;
+    case "lte":
+      params.push(parseFloat(cond.value));
+      return `${col} <= $${idx.val++}`;
+    case "before":
+      params.push(dateToTimestamp(cond.value));
+      return `${col} < $${idx.val++}`;
+    case "after":
+      params.push(dateToTimestamp(cond.value));
+      return `${col} > $${idx.val++}`;
+    default:
+      return null;
+  }
+}
+
+function dateToTimestamp(dateStr: string): number {
+  return Math.floor(new Date(dateStr + "T00:00:00").getTime() / 1000);
+}
 
 /** Query workouts with optional filters. */
 export async function queryWorkouts(filters: WorkoutFilters): Promise<Workout[]> {
   const d = await getDb();
-  const conditions: string[] = [];
+  const clauses: string[] = [];
   const params: unknown[] = [];
-  let idx = 1;
+  const idx = { val: 1 };
 
-  if (filters.discipline) {
-    conditions.push(`discipline = $${idx++}`);
-    params.push(filters.discipline);
-  }
-  if (filters.instructor) {
-    conditions.push(`instructor = $${idx++}`);
-    params.push(filters.instructor);
-  }
-  if (filters.minDuration != null) {
-    conditions.push(`duration_seconds >= $${idx++}`);
-    params.push(filters.minDuration);
-  }
-  if (filters.maxDuration != null) {
-    conditions.push(`duration_seconds <= $${idx++}`);
-    params.push(filters.maxDuration);
+  for (const cond of filters.conditions) {
+    const clause = buildConditionClause(cond, params, idx);
+    if (clause) clauses.push(clause);
   }
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  const sortCol = filters.sortBy && SORTABLE_COLUMNS.has(filters.sortBy) ? filters.sortBy : "date";
-  const sortDir = filters.sortOrder === "asc" ? "ASC" : "DESC";
+  if (filters.search) {
+    const searchCols = ["title", "instructor", "discipline", "workout_type"];
+    const orParts = searchCols.map((col) => {
+      params.push(`%${filters.search}%`);
+      return `${col} LIKE $${idx.val++}`;
+    });
+    clauses.push(`(${orParts.join(" OR ")})`);
+  }
+
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+  const sortCol = filters.sort?.field && SORTABLE_COLUMNS.has(filters.sort.field)
+    ? filters.sort.field : "date";
+  const sortDir = filters.sort?.direction === "asc" ? "ASC" : "DESC";
 
   return await d.select<Workout[]>(
     `SELECT * FROM workouts ${where} ORDER BY ${sortCol} ${sortDir}`,
     params,
   );
+}
+
+const DISTINCT_VALUE_COLUMNS = new Set<string>(
+  Object.values(FIELD_MAP).filter((f) => f.type === "enum").map((f) => f.key),
+);
+
+/** Get sorted distinct non-null values for an enum column. */
+export async function getDistinctValues(column: string): Promise<string[]> {
+  if (!DISTINCT_VALUE_COLUMNS.has(column)) {
+    throw new Error(`Column "${column}" is not allowed for distinct values`);
+  }
+  const d = await getDb();
+  const rows = await d.select<Record<string, string>[]>(
+    `SELECT DISTINCT ${column} FROM workouts WHERE ${column} IS NOT NULL AND ${column} != '' ORDER BY ${column} ASC`,
+  );
+  return rows.map((r) => r[column]);
 }
 
 /** Get all existing workout IDs from the database. */

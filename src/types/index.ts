@@ -35,12 +35,32 @@ export interface MetricSample {
   speed: number | null;
 }
 
+export type FieldType = "string" | "number" | "date" | "enum";
+
+export type FilterOperator =
+  | "equals" | "not_equals"
+  | "contains" | "not_contains"
+  | "starts_with" | "ends_with"
+  | "gt" | "gte" | "lt" | "lte"
+  | "before" | "after"
+  | "is_empty" | "is_not_empty";
+
+export interface FilterCondition {
+  id: string;
+  field: string;
+  operator: FilterOperator;
+  value: string;
+  values: string[];
+}
+
+export interface SortSpec {
+  field: string;
+  direction: "asc" | "desc";
+}
+
 /** Filters applied to the workout list. */
 export interface WorkoutFilters {
-  discipline?: string;
-  instructor?: string;
-  minDuration?: number;
-  maxDuration?: number;
-  sortBy?: keyof Workout;
-  sortOrder?: "asc" | "desc";
+  conditions: FilterCondition[];
+  sort: SortSpec;
+  search: string;
 }

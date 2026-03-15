@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from "react";
 import { queryWorkouts } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
+import WorkoutToolbar from "./WorkoutToolbar";
 import type { Workout } from "../types";
 
 type SortableColumn = "date" | "title" | "instructor" | "discipline" | "duration_seconds";
@@ -25,7 +26,7 @@ function formatDate(timestamp: number): string {
 
 /** Sortable, filterable table of all imported workouts. */
 export default function WorkoutList() {
-  const { workouts, filters, setWorkouts, setFilters, isLoading, setLoading } = useWorkoutStore();
+  const { workouts, filters, setWorkouts, setSort, isLoading, setLoading } = useWorkoutStore();
 
   const loadWorkouts = useCallback(async () => {
     setLoading(true);
@@ -44,20 +45,22 @@ export default function WorkoutList() {
   }, [loadWorkouts]);
 
   const handleSort = (col: SortableColumn) => {
-    if (filters.sortBy === col) {
-      setFilters({ sortOrder: filters.sortOrder === "asc" ? "desc" : "asc" });
+    if (filters.sort.field === col) {
+      setSort({ field: col, direction: filters.sort.direction === "asc" ? "desc" : "asc" });
     } else {
-      setFilters({ sortBy: col, sortOrder: col === "date" ? "desc" : "asc" });
+      setSort({ field: col, direction: col === "date" ? "desc" : "asc" });
     }
   };
 
   const sortIndicator = (col: SortableColumn) => {
-    if (filters.sortBy !== col) return "";
-    return filters.sortOrder === "asc" ? " \u25B2" : " \u25BC";
+    if (filters.sort.field !== col) return "";
+    return filters.sort.direction === "asc" ? " ▲" : " ▼";
   };
 
   return (
-    <div className="overflow-x-auto">
+    <div>
+      <WorkoutToolbar />
+      <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead>
           <tr>
@@ -98,6 +101,7 @@ export default function WorkoutList() {
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

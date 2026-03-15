@@ -12,7 +12,7 @@ export async function getDb(): Promise<Database> {
   return db;
 }
 
-/** Insert workouts parsed from CSV or API. */
+/** Insert workouts from the API. */
 export async function insertWorkouts(workouts: Workout[]): Promise<void> {
   const d = await getDb();
   for (const w of workouts) {

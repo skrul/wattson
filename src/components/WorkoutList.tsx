@@ -101,7 +101,7 @@ export default function WorkoutList() {
             ) : workouts.length === 0 ? (
               <tr>
                 <td className="px-4 py-2 text-sm text-gray-400" colSpan={5}>
-                  No workouts yet. Import a CSV or sync with the Peloton API.
+                  No workouts yet. Sync with the Peloton API to get started.
                 </td>
               </tr>
             ) : (

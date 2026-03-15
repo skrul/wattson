@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
-import CsvImport from "./components/CsvImport";
 import ApiSync from "./components/ApiSync";
 import WorkoutList from "./components/WorkoutList";
 import OutputChart from "./components/OutputChart";
 import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
 import { useSessionStore } from "./stores/sessionStore";
 
-type Tab = "workouts" | "charts" | "import" | "sync";
+type Tab = "workouts" | "charts" | "sync";
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>("workouts");
@@ -52,7 +51,7 @@ function App() {
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
         <h1 className="text-xl font-bold">Wattson</h1>
         <nav className="flex gap-2">
-          {(["workouts", "charts", "import", "sync"] as Tab[]).map((tab) => (
+          {(["workouts", "charts", "sync"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -72,8 +71,7 @@ function App() {
       <main className="flex-1 overflow-y-auto p-6">
         {activeTab === "workouts" && <WorkoutList />}
         {activeTab === "charts" && <OutputChart />}
-        {activeTab === "import" && <CsvImport />}
-        {activeTab === "sync" && <ApiSync />}
+{activeTab === "sync" && <ApiSync />}
       </main>
     </div>
   );

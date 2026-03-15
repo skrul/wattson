@@ -216,6 +216,13 @@ export async function hasWorkouts(): Promise<boolean> {
   return (rows[0]?.exists_flag ?? 0) === 1;
 }
 
+/** Get total number of workouts. */
+export async function getWorkoutCount(): Promise<number> {
+  const d = await getDb();
+  const rows = await d.select<{ count: number }[]>("SELECT COUNT(*) as count FROM workouts");
+  return rows[0].count;
+}
+
 /** Delete all user data from the database. */
 export async function deleteAllData(): Promise<void> {
   const d = await getDb();

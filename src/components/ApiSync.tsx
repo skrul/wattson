@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogPanel } from "@headlessui/react";
 import { login } from "../lib/api";
 import { syncWorkouts } from "../lib/sync";
-import { deleteAllData } from "../lib/database";
+import { deleteAllData, getWorkoutCount } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
 
@@ -12,7 +12,22 @@ interface Props {
   onDataDeleted: () => void;
 }
 
-/** Login form and sync controls for the Peloton API. */
+/** Helper to extract fields from UserProfile.raw_json. */
+function parseProfileRaw(rawJson: string) {
+  try {
+    const raw = JSON.parse(rawJson);
+    return {
+      username: (raw.username as string) ?? null,
+      imageUrl: (raw.image_url as string) ?? null,
+      createdAt: typeof raw.created_at === "number" ? raw.created_at : null,
+      cyclingFtp: typeof raw.cycling_ftp === "number" ? raw.cycling_ftp : null,
+    };
+  } catch {
+    return { username: null, imageUrl: null, createdAt: null, cyclingFtp: null };
+  }
+}
+
+/** Profile / account tab: shows user info when logged in, login form when not. */
 export default function ApiSync({ onDataDeleted }: Props) {
   const [email, setEmail] = useState(() => localStorage.getItem(LAST_EMAIL_KEY) ?? "");
   const [password, setPassword] = useState("");
@@ -22,11 +37,19 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<{ fetched: number; total: number } | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [workoutCount, setWorkoutCount] = useState<number | null>(null);
 
   const session = useSessionStore((s) => s.session);
+  const userProfile = useSessionStore((s) => s.userProfile);
   const sessionLogin = useSessionStore((s) => s.login);
   const sessionLogout = useSessionStore((s) => s.logout);
   const setWorkouts = useWorkoutStore((s) => s.setWorkouts);
+
+  useEffect(() => {
+    if (session) {
+      getWorkoutCount().then(setWorkoutCount).catch(() => {});
+    }
+  }, [session]);
 
   const handleLogin = async () => {
     setError("");
@@ -60,6 +83,8 @@ export default function ApiSync({ onDataDeleted }: Props) {
       } else {
         setStatus(`Synced ${count} new workouts.`);
       }
+      const wc = await getWorkoutCount();
+      setWorkoutCount(wc);
     } catch (e) {
       console.error("Sync error:", e);
       setError(e instanceof Error ? e.message : String(e));
@@ -74,6 +99,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
     await sessionLogout();
     setStatus("");
     setError("");
+    setWorkoutCount(null);
   };
 
   const handleDeleteAll = async () => {
@@ -86,82 +112,132 @@ export default function ApiSync({ onDataDeleted }: Props) {
     await sessionLogout();
     setStatus("");
     setError("");
+    setWorkoutCount(null);
   };
 
-  return (
-    <div className="mx-auto max-w-md rounded-lg border border-gray-200 p-6">
-      <h2 className="mb-4 text-lg font-semibold">Peloton API Sync</h2>
-
-      {!session ? (
-        <div className="space-y-4">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleLogin();
-            }}
-            className="space-y-3"
-          >
-            <input
-              type="email"
-              placeholder="Peloton email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              readOnly={!!savedEmail}
-              required
-              className={`w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none${savedEmail ? " bg-gray-100 text-gray-500" : ""}`}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-            >
-              {loading ? "Logging in..." : "Log In"}
-            </button>
-          </form>
-
+  if (!session) {
+    return (
+      <div className="mx-auto max-w-md rounded-lg border border-gray-200 p-6">
+        <h2 className="mb-4 text-lg font-semibold">Log in to Peloton</h2>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleLogin();
+          }}
+          className="space-y-3"
+        >
+          <input
+            type="email"
+            placeholder="Peloton email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            readOnly={!!savedEmail}
+            required
+            className={`w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none${savedEmail ? " bg-gray-100 text-gray-500" : ""}`}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          />
           <button
-            onClick={() => setConfirmDeleteOpen(true)}
-            className="w-full rounded border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            type="submit"
+            disabled={loading}
+            className="w-full rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
           >
-            Delete All Data
+            {loading ? "Logging in..." : "Log In"}
           </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex gap-2">
-            <button
-              onClick={handleSync}
-              disabled={loading}
-              className="flex-1 rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-            >
-              {loading ? "Syncing..." : "Sync Workouts"}
-            </button>
-            <button
-              onClick={handleSignOut}
-              disabled={loading}
-              className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              Sign Out
-            </button>
+        </form>
+        {status && <p className="mt-3 text-sm text-green-600">{status}</p>}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      </div>
+    );
+  }
+
+  const profile = userProfile ? parseProfileRaw(userProfile.raw_json) : null;
+  const memberSince = profile?.createdAt
+    ? new Date(profile.createdAt * 1000).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : null;
+
+  return (
+    <div className="mx-auto max-w-md space-y-6">
+      {/* Profile header */}
+      <div className="flex items-center gap-4">
+        {profile?.imageUrl ? (
+          <img
+            src={profile.imageUrl}
+            alt={profile.username ?? ""}
+            className="h-16 w-16 rounded-full object-cover"
+          />
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-200 text-xl font-bold text-gray-500">
+            {profile?.username?.charAt(0).toUpperCase() ?? "?"}
           </div>
-          {progress && (
-            <p className="text-sm text-gray-500">
-              Fetched {progress.fetched} / {progress.total} workouts...
-            </p>
+        )}
+        <div>
+          <h2 className="text-lg font-semibold">{profile?.username ?? "Peloton User"}</h2>
+          {memberSince && (
+            <p className="text-sm text-gray-500">Member since {memberSince}</p>
           )}
         </div>
-      )}
+      </div>
 
-      {status && <p className="mt-3 text-sm text-green-600">{status}</p>}
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {/* Info grid */}
+      <div className="grid grid-cols-2 gap-3">
+        {profile?.cyclingFtp != null && (
+          <div className="rounded-lg border border-gray-200 p-3">
+            <p className="text-xs font-medium uppercase text-gray-500">FTP</p>
+            <p className="text-lg font-semibold">{profile.cyclingFtp}W</p>
+          </div>
+        )}
+        <div className="rounded-lg border border-gray-200 p-3">
+          <p className="text-xs font-medium uppercase text-gray-500">Total Workouts</p>
+          <p className="text-lg font-semibold">{workoutCount ?? "—"}</p>
+        </div>
+      </div>
+
+      {/* Sync */}
+      <div className="space-y-2">
+        <button
+          onClick={handleSync}
+          disabled={loading}
+          className="w-full rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        >
+          {loading ? "Syncing..." : "Sync Now"}
+        </button>
+        {progress && (
+          <p className="text-sm text-gray-500">
+            Fetched {progress.fetched} / {progress.total} workouts...
+          </p>
+        )}
+        {status && <p className="text-sm text-green-600">{status}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+      </div>
+
+      {/* Actions */}
+      <div className="space-y-2 border-t border-gray-200 pt-4">
+        <button
+          onClick={handleSignOut}
+          disabled={loading}
+          className="w-full rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Log Out
+        </button>
+        <button
+          onClick={() => setConfirmDeleteOpen(true)}
+          disabled={loading}
+          className="w-full rounded border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+        >
+          Delete All Data
+        </button>
+      </div>
 
       {/* Delete All Data confirmation dialog */}
       <Dialog open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)} className="relative z-50">

@@ -9,7 +9,7 @@ import { syncWorkouts } from "./lib/sync";
 import { getUserProfile, hasWorkouts } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
 
-type Tab = "workouts" | "charts" | "sync";
+type Tab = "workouts" | "charts" | "profile";
 
 const AUTO_SYNC_KEY = "wattson:autoSyncOnLaunch";
 
@@ -24,6 +24,7 @@ function App() {
   const loadFromKeychain = useSessionStore((s) => s.loadFromKeychain);
   const loaded = useSessionStore((s) => s.loaded);
   const session = useSessionStore((s) => s.session);
+  const userProfile = useSessionStore((s) => s.userProfile);
 
   useEffect(() => {
     loadFromKeychain();
@@ -74,6 +75,21 @@ function App() {
     }
   };
 
+  function tabLabel(tab: Tab): string {
+    if (tab === "profile") {
+      if (userProfile) {
+        const raw = JSON.parse(userProfile.raw_json);
+        const username = raw.username as string | undefined;
+        if (username) {
+          const first = username.split(/[\s_]+/)[0];
+          return first.charAt(0).toUpperCase() + first.slice(1);
+        }
+      }
+      return "Account";
+    }
+    return tab.charAt(0).toUpperCase() + tab.slice(1);
+  }
+
   return (
     <div className="flex h-screen flex-col bg-white text-gray-900">
       {/* Update banner */}
@@ -94,17 +110,17 @@ function App() {
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
         <h1 className="text-xl font-bold">Wattson</h1>
         <nav className="flex gap-2">
-          {(["workouts", "charts", "sync"] as Tab[]).map((tab) => (
+          {(["workouts", "charts", "profile"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`rounded px-3 py-1.5 text-sm font-medium capitalize ${
+              className={`rounded px-3 py-1.5 text-sm font-medium ${
                 activeTab === tab
                   ? "bg-gray-900 text-white"
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              {tab}
+              {tabLabel(tab)}
             </button>
           ))}
         </nav>
@@ -114,7 +130,7 @@ function App() {
       <main className="flex-1 overflow-y-auto p-6">
         {activeTab === "workouts" && <WorkoutList />}
         {activeTab === "charts" && <OutputChart />}
-        {activeTab === "sync" && <ApiSync onDataDeleted={() => { setDataState("empty"); setShowWizard(true); }} />}
+        {activeTab === "profile" && <ApiSync onDataDeleted={() => { setDataState("empty"); setShowWizard(true); }} />}
       </main>
 
       <SetupWizard open={showWizard} onComplete={() => { setShowWizard(false); setDataState("has_data"); }} />

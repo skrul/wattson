@@ -55,8 +55,10 @@ export async function syncWorkouts(
     }
   }
 
-  if (workouts.length > 0) {
-    await insertWorkouts(workouts);
+  const newWorkouts = workouts.filter((w) => !existingIds.has(w.id));
+
+  if (newWorkouts.length > 0) {
+    await insertWorkouts(newWorkouts);
     const filters = useWorkoutStore.getState().filters;
     const updated = await queryWorkouts(filters);
     useWorkoutStore.getState().setWorkouts(updated);
@@ -71,5 +73,5 @@ export async function syncWorkouts(
     console.error("Failed to fetch user profile:", e);
   }
 
-  return workouts.length;
+  return newWorkouts.length;
 }

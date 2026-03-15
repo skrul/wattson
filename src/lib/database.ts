@@ -207,6 +207,23 @@ export async function getUserProfile(id: string): Promise<UserProfile | null> {
   return rows[0] ?? null;
 }
 
+/** Check whether any workouts exist in the database. */
+export async function hasWorkouts(): Promise<boolean> {
+  const d = await getDb();
+  const rows = await d.select<{ exists_flag: number }[]>(
+    "SELECT EXISTS(SELECT 1 FROM workouts) as exists_flag"
+  );
+  return (rows[0]?.exists_flag ?? 0) === 1;
+}
+
+/** Delete all user data from the database. */
+export async function deleteAllData(): Promise<void> {
+  const d = await getDb();
+  await d.execute("DELETE FROM metrics");
+  await d.execute("DELETE FROM user_profile");
+  await d.execute("DELETE FROM workouts");
+}
+
 /** Insert per-second metric samples for a workout. */
 export async function insertMetrics(_metrics: MetricSample[]): Promise<void> {
   // TODO: implement batch insert

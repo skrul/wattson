@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogPanel } from "@headlessui/react";
 import { login, fetchAllWorkouts, fetchUserProfile } from "../lib/api";
 import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile } from "../lib/database";
@@ -27,12 +27,27 @@ export default function SetupWizard({ open, onComplete }: Props) {
   const sessionLogin = useSessionStore((s) => s.login);
   const { filters, setWorkouts } = useWorkoutStore();
 
+  // Reset wizard state when re-opened
+  useEffect(() => {
+    if (open) {
+      setStep("signin");
+      setEmail("");
+      setPassword("");
+      setError("");
+      setLoading(false);
+      setProgress(null);
+      setSyncedCount(0);
+      setAutoSync(true);
+    }
+  }, [open]);
+
   const handleLogin = async () => {
     setError("");
     setLoading(true);
     try {
       const result = await login(email, password);
       await sessionLogin({ ...result, email, password });
+      localStorage.setItem("wattson:lastEmail", email);
       setStep("downloading");
       startSync(result.userId, result.accessToken);
     } catch (e) {

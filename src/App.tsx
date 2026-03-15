@@ -6,7 +6,7 @@ import SetupWizard from "./components/SetupWizard";
 import ReauthModal from "./components/ReauthModal";
 import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
 import { syncWorkouts } from "./lib/sync";
-import { getUserProfile } from "./lib/database";
+import { getUserProfile, hasWorkouts } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
 
 type Tab = "workouts" | "charts" | "sync";
@@ -17,6 +17,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<Tab>("workouts");
   const [update, setUpdate] = useState<UpdateStatus | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [dataState, setDataState] = useState<"checking" | "empty" | "has_data">("checking");
   const [showWizard, setShowWizard] = useState(false);
   const autoSyncRan = useRef(false);
 
@@ -31,17 +32,25 @@ function App() {
     });
   }, []);
 
-  // Show wizard when no session; load cached profile when session exists
+  // On initial load, determine data state; load cached profile when session exists
   useEffect(() => {
-    if (loaded && !session) {
-      setShowWizard(true);
-    }
-    if (loaded && session) {
+    if (!loaded) return;
+    if (session) {
+      setDataState("has_data");
       getUserProfile(session.userId).then((profile) => {
         if (profile) useSessionStore.getState().setUserProfile(profile);
       }).catch((e) => console.error("Failed to load cached profile:", e));
+    } else if (dataState === "checking") {
+      // Only check DB on first load — sign-out keeps existing dataState
+      hasWorkouts().then((has) => {
+        setDataState(has ? "has_data" : "empty");
+        if (!has) setShowWizard(true);
+      }).catch(() => {
+        setDataState("empty");
+        setShowWizard(true);
+      });
     }
-  }, [loaded, session]);
+  }, [loaded, session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-sync on launch when preference is enabled
   useEffect(() => {
@@ -105,10 +114,10 @@ function App() {
       <main className="flex-1 overflow-y-auto p-6">
         {activeTab === "workouts" && <WorkoutList />}
         {activeTab === "charts" && <OutputChart />}
-        {activeTab === "sync" && <ApiSync />}
+        {activeTab === "sync" && <ApiSync onDataDeleted={() => { setDataState("empty"); setShowWizard(true); }} />}
       </main>
 
-      <SetupWizard open={showWizard} onComplete={() => setShowWizard(false)} />
+      <SetupWizard open={showWizard} onComplete={() => { setShowWizard(false); setDataState("has_data"); }} />
       <ReauthModal />
     </div>
   );

@@ -73,7 +73,10 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
     setMetricsError(null);
 
     Promise.all([
-      fetchWorkoutDetail(workout.id, accessToken),
+      fetchWorkoutDetail(workout.id, accessToken).catch((err) => {
+        console.warn("Failed to fetch workout detail (non-fatal):", err);
+        return null;
+      }),
       fetchPerformanceGraph(workout.id, accessToken),
     ])
       .then(async ([rawDetailJson, perfResult]) => {

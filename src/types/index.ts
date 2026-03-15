@@ -21,6 +21,7 @@ export interface Workout {
   avg_incline: number | null;
   avg_pace: number | null;
   source: "csv" | "api";
+  raw_json: string | null;
 }
 
 /** A single per-second metric sample for a workout. */

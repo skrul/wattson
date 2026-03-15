@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { login, fetchAllWorkouts } from "../lib/api";
-import { insertWorkouts, getLatestWorkoutDate, queryWorkouts } from "../lib/database";
+import { insertWorkouts, getExistingWorkoutIds, queryWorkouts } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
 
@@ -41,12 +41,12 @@ export default function ApiSync() {
     setLoading(true);
     setProgress(null);
     try {
-      const since = await getLatestWorkoutDate();
+      const existingIds = await getExistingWorkoutIds();
       const workouts = await fetchAllWorkouts(
         session.userId,
         session.accessToken,
         (fetched, total) => setProgress({ fetched, total }),
-        since,
+        existingIds,
       );
       if (workouts.length === 0) {
         setStatus("Already up to date.");

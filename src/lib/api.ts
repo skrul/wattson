@@ -58,6 +58,12 @@ interface PelotonWorkout {
   end_time: number;
   fitness_discipline: string;
   is_outdoor: boolean;
+  total_work: number;
+  workout_type: string | null;
+  effort_zones?: {
+    total_effort_points: number;
+    heart_rate_zone_durations: Record<string, number>;
+  } | null;
   ride?: {
     title: string;
     duration: number;
@@ -68,10 +74,9 @@ interface PelotonWorkout {
     fitness_discipline: string;
   };
   is_total_work_personal_record: boolean;
-  total_work: number;
 }
 
-function mapWorkout(w: PelotonWorkout): Workout {
+function mapWorkout(w: PelotonWorkout, raw: unknown): Workout {
   return {
     id: w.id,
     peloton_id: w.id,
@@ -87,27 +92,27 @@ function mapWorkout(w: PelotonWorkout): Workout {
     avg_cadence: null,
     avg_resistance: null,
     avg_speed: null,
-    strive_score: null,
+    strive_score: w.effort_zones?.total_effort_points ?? null,
     is_live: w.ride?.is_live_in_studio_only != null ? (w.ride.is_live_in_studio_only ? 0 : 1) : null,
-    workout_type: null,
-    total_output: null,
+    workout_type: w.workout_type ?? null,
+    total_output: w.total_work ?? null,
     avg_incline: null,
     avg_pace: null,
     source: "api",
+    raw_json: JSON.stringify(raw),
   };
 }
 
 /**
- * Fetch new workouts for a user, stopping when we reach already-synced data.
- * If `since` is provided (unix timestamp), stops paginating once all workouts
- * on a page are older than that date (API returns newest first).
- * Calls onProgress with (fetched, total) after each page.
+ * Fetch workouts for a user, stopping when an entire page consists of
+ * already-known workout IDs.  Duplicates are safe — the DB uses
+ * INSERT OR REPLACE.  Calls onProgress with (fetched, total) after each page.
  */
 export async function fetchAllWorkouts(
   userId: string,
   accessToken: string,
   onProgress?: (fetched: number, total: number) => void,
-  since?: number | null,
+  existingIds?: Set<string>,
 ): Promise<Workout[]> {
   const all: Workout[] = [];
   let page = 0;
@@ -129,18 +134,14 @@ export async function fetchAllWorkouts(
 
     const completed = body.data
       .filter((w) => w.status === "COMPLETE")
-      .map(mapWorkout);
+      .map((w) => mapWorkout(w, w));
 
-    if (since) {
-      const newWorkouts = completed.filter((w) => w.date > since);
-      all.push(...newWorkouts);
-      // If we got fewer new workouts than completed ones, we've hit old data
-      if (newWorkouts.length < completed.length) {
-        onProgress?.(all.length, all.length);
-        break;
-      }
-    } else {
-      all.push(...completed);
+    all.push(...completed);
+
+    // If every workout on this page is already in the DB, stop paginating
+    if (existingIds && completed.length > 0 && completed.every((w) => existingIds.has(w.id))) {
+      onProgress?.(all.length, all.length);
+      break;
     }
 
     onProgress?.(all.length, totalCount);

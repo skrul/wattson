@@ -80,6 +80,12 @@ pub fn run() {
             ALTER TABLE workouts ADD COLUMN avg_pace REAL;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "add_raw_json_column",
+            sql: "ALTER TABLE workouts ADD COLUMN raw_json TEXT;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

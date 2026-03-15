@@ -18,6 +18,7 @@ interface WorkoutState {
   setSort: (sort: SortSpec) => void;
   clearSort: () => void;
   setSearch: (search: string) => void;
+  updateWorkout: (id: string, updates: Partial<Workout>) => void;
 }
 
 const DEFAULT_SORT: SortSpec = { field: "date", direction: "desc" };
@@ -77,5 +78,12 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
   setSearch: (search) =>
     set((state) => ({
       filters: { ...state.filters, search },
+    })),
+
+  updateWorkout: (id, updates) =>
+    set((state) => ({
+      workouts: state.workouts.map((w) =>
+        w.id === id ? { ...w, ...updates } : w,
+      ),
     })),
 }));

@@ -103,6 +103,12 @@ pub fn run() {
             sql: "ALTER TABLE workouts RENAME COLUMN total_output TO total_work;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "rename_output_watts_to_avg_output",
+            sql: "ALTER TABLE workouts RENAME COLUMN output_watts TO avg_output;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

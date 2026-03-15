@@ -1,5 +1,5 @@
 import { fetch } from "@tauri-apps/plugin-http";
-import type { Workout, MetricSample, UserProfile } from "../types";
+import type { Workout, MetricSample, UserProfile, WorkoutMetrics } from "../types";
 
 export class AuthError extends Error {
   constructor(message: string) {
@@ -95,7 +95,7 @@ function mapWorkout(w: PelotonWorkout, raw: unknown): Workout {
     discipline: w.fitness_discipline,
     title: w.ride?.title ?? "Just Work Out",
     instructor: w.ride?.instructor?.name ?? null,
-    output_watts: null,
+    avg_output: null,
     calories: null,
     distance: null,
     avg_heart_rate: null,
@@ -106,8 +106,6 @@ function mapWorkout(w: PelotonWorkout, raw: unknown): Workout {
     is_live: w.ride?.is_live_in_studio_only != null ? (w.ride.is_live_in_studio_only ? 0 : 1) : null,
     workout_type: w.workout_type ?? null,
     total_work: w.total_work ?? null,
-    avg_incline: null,
-    avg_pace: null,
     source: "api",
     raw_json: JSON.stringify(raw),
   };
@@ -199,4 +197,42 @@ export async function fetchMetrics(
 ): Promise<MetricSample[]> {
   // TODO: implement via performance_graph endpoint in a future phase
   return [];
+}
+
+/** Fetch the performance graph for a workout and extract summary metrics. */
+export async function fetchPerformanceGraph(
+  workoutId: string,
+  accessToken: string,
+): Promise<WorkoutMetrics> {
+  const url = `${API_BASE}/api/workout/${workoutId}/performance_graph?every_n=1`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    if (res.status === 401 || res.status === 403) {
+      throw new AuthError(`Fetch performance graph failed (${res.status}): ${text}`);
+    }
+    throw new Error(`Fetch performance graph failed (${res.status}): ${text}`);
+  }
+
+  const data = await res.json();
+
+  const findSummary = (arr: { slug: string; value: number }[] | undefined, slug: string) =>
+    arr?.find((s) => s.slug === slug)?.value ?? null;
+
+  const heartRateMetric = (data.metrics as { slug: string; average_value: number }[] | undefined)
+    ?.find((m) => m.slug === "heart_rate");
+
+  return {
+    calories: findSummary(data.summaries, "calories"),
+    distance: findSummary(data.summaries, "distance"),
+    avg_output: findSummary(data.average_summaries, "avg_output"),
+    avg_cadence: findSummary(data.average_summaries, "avg_cadence"),
+    avg_resistance: findSummary(data.average_summaries, "avg_resistance"),
+    avg_speed: findSummary(data.average_summaries, "avg_speed"),
+    avg_heart_rate: heartRateMetric?.average_value ?? null,
+  };
 }

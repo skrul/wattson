@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { queryWorkouts } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
+import { useSessionStore } from "../stores/sessionStore";
 import WorkoutToolbar from "./WorkoutToolbar";
 import WorkoutCard from "./WorkoutCard";
 import WorkoutDetail from "./WorkoutDetail";
@@ -30,6 +31,7 @@ function formatDate(timestamp: number): string {
 /** Sortable, filterable table of all imported workouts. */
 export default function WorkoutList() {
   const { workouts, selectedWorkoutId, filters, setWorkouts, selectWorkout, setSort, isLoading, setLoading } = useWorkoutStore();
+  const accessToken = useSessionStore((s) => s.session?.accessToken ?? null);
   const [viewMode, setViewMode] = useState<"table" | "detail">("table");
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const cardScrollRef = useRef<HTMLDivElement>(null);
@@ -194,7 +196,7 @@ export default function WorkoutList() {
 
           {/* Detail panel */}
           <div className="flex-1 overflow-auto p-6">
-            <WorkoutDetail workout={selectedWorkout} />
+            <WorkoutDetail workout={selectedWorkout} accessToken={accessToken} />
           </div>
         </div>
       )}

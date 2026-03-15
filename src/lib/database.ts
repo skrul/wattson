@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { Workout, MetricSample, WorkoutFilters, FilterCondition, UserProfile } from "../types";
+import type { Workout, MetricSample, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics } from "../types";
 import { FIELD_MAP } from "./fields";
 
 let db: Database | null = null;
@@ -19,16 +19,16 @@ export async function insertWorkouts(workouts: Workout[]): Promise<void> {
     await d.execute(
       `INSERT OR REPLACE INTO workouts
         (id, peloton_id, date, duration_seconds, discipline, title, instructor,
-         output_watts, calories, distance, avg_heart_rate, avg_cadence,
+         avg_output, calories, distance, avg_heart_rate, avg_cadence,
          avg_resistance, avg_speed, strive_score, is_live, workout_type,
-         total_work, avg_incline, avg_pace, source, raw_json)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+         total_work, source, raw_json)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
       [
         w.id, w.peloton_id, w.date, w.duration_seconds, w.discipline,
-        w.title, w.instructor, w.output_watts, w.calories, w.distance,
+        w.title, w.instructor, w.avg_output, w.calories, w.distance,
         w.avg_heart_rate, w.avg_cadence, w.avg_resistance, w.avg_speed,
         w.strive_score, w.is_live, w.workout_type, w.total_work,
-        w.avg_incline, w.avg_pace, w.source, w.raw_json,
+        w.source, w.raw_json,
       ],
     );
   }
@@ -222,6 +222,19 @@ export async function deleteAllData(): Promise<void> {
   await d.execute("DELETE FROM metrics");
   await d.execute("DELETE FROM user_profile");
   await d.execute("DELETE FROM workouts");
+}
+
+/** Update a workout's summary metrics (fetched from performance_graph). */
+export async function updateWorkoutMetrics(workoutId: string, metrics: WorkoutMetrics): Promise<void> {
+  const d = await getDb();
+  await d.execute(
+    `UPDATE workouts SET calories=$1, distance=$2, avg_output=$3, avg_cadence=$4,
+     avg_resistance=$5, avg_speed=$6, avg_heart_rate=$7 WHERE id=$8`,
+    [
+      metrics.calories, metrics.distance, metrics.avg_output, metrics.avg_cadence,
+      metrics.avg_resistance, metrics.avg_speed, metrics.avg_heart_rate, workoutId,
+    ],
+  );
 }
 
 /** Insert per-second metric samples for a workout. */

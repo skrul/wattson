@@ -7,7 +7,7 @@ export interface Workout {
   discipline: string;
   title: string;
   instructor: string | null;
-  output_watts: number | null;
+  avg_output: number | null;
   calories: number | null;
   distance: number | null;
   avg_heart_rate: number | null;
@@ -18,10 +18,19 @@ export interface Workout {
   is_live: number | null;
   workout_type: string | null;
   total_work: number | null;
-  avg_incline: number | null;
-  avg_pace: number | null;
   source: "csv" | "api";
   raw_json: string | null;
+}
+
+/** Metrics fetched on-demand from the performance_graph endpoint. */
+export interface WorkoutMetrics {
+  calories: number | null;
+  distance: number | null;
+  avg_output: number | null;
+  avg_cadence: number | null;
+  avg_resistance: number | null;
+  avg_speed: number | null;
+  avg_heart_rate: number | null;
 }
 
 /** Cached user profile from /api/me. */

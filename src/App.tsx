@@ -4,6 +4,7 @@ import ApiSync from "./components/ApiSync";
 import WorkoutList from "./components/WorkoutList";
 import OutputChart from "./components/OutputChart";
 import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
+import { useSessionStore } from "./stores/sessionStore";
 
 type Tab = "workouts" | "charts" | "import" | "sync";
 
@@ -12,7 +13,10 @@ function App() {
   const [update, setUpdate] = useState<UpdateStatus | null>(null);
   const [updating, setUpdating] = useState(false);
 
+  const loadFromKeychain = useSessionStore((s) => s.loadFromKeychain);
+
   useEffect(() => {
+    loadFromKeychain();
     checkForUpdate().then((status) => {
       if (status.available) setUpdate(status);
     });

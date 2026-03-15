@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Workout } from "../types";
-import { fetchPerformanceGraph } from "../lib/api";
+import { fetchWorkoutDetail, fetchPerformanceGraph } from "../lib/api";
 import { updateWorkoutMetrics } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 
@@ -72,11 +72,19 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
     setLoadingMetrics(true);
     setMetricsError(null);
 
-    fetchPerformanceGraph(workout.id, accessToken)
-      .then(async (metrics) => {
+    Promise.all([
+      fetchWorkoutDetail(workout.id, accessToken),
+      fetchPerformanceGraph(workout.id, accessToken),
+    ])
+      .then(async ([rawDetailJson, perfResult]) => {
         if (cancelled) return;
-        await updateWorkoutMetrics(workout.id, metrics);
-        updateWorkout(workout.id, metrics);
+        const { rawJson: rawPerfJson, ...metrics } = perfResult;
+        await updateWorkoutMetrics(workout.id, metrics, rawDetailJson, rawPerfJson);
+        updateWorkout(workout.id, {
+          ...metrics,
+          raw_detail_json: rawDetailJson,
+          raw_performance_graph_json: rawPerfJson,
+        });
       })
       .catch((err) => {
         if (cancelled) return;

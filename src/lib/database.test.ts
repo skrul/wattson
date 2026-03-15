@@ -37,6 +37,8 @@ function makeWorkout(id: string, overrides: Partial<Workout> = {}): Workout {
     total_work: 250000,
     source: "api",
     raw_json: "{}",
+    raw_detail_json: null,
+    raw_performance_graph_json: null,
     ...overrides,
   };
 }

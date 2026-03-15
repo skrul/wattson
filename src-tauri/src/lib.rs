@@ -1,10 +1,10 @@
 use tauri_plugin_sql::{Builder as SqlBuilder, Migration, MigrationKind};
 
 #[tauri::command]
-fn save_credentials(user_id: String, access_token: String) -> Result<(), String> {
+fn save_credentials(user_id: String, access_token: String, email: String, password: String) -> Result<(), String> {
     let entry = keyring::Entry::new("com.wattson.app", "peloton").map_err(|e| e.to_string())?;
     let json =
-        serde_json::json!({ "user_id": user_id, "access_token": access_token }).to_string();
+        serde_json::json!({ "user_id": user_id, "access_token": access_token, "email": email, "password": password }).to_string();
     entry.set_password(&json).map_err(|e| e.to_string())
 }
 

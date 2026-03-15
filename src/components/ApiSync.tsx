@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { login, fetchAllWorkouts } from "../lib/api";
-import { insertWorkouts, getExistingWorkoutIds, queryWorkouts } from "../lib/database";
+import { login } from "../lib/api";
+import { syncWorkouts } from "../lib/sync";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
 
@@ -13,7 +13,6 @@ export default function ApiSync() {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<{ fetched: number; total: number } | null>(null);
 
-  const { filters, setWorkouts } = useWorkoutStore();
   const session = useSessionStore((s) => s.session);
   const sessionLogin = useSessionStore((s) => s.login);
   const sessionLogout = useSessionStore((s) => s.logout);
@@ -24,7 +23,7 @@ export default function ApiSync() {
     setLoading(true);
     try {
       const result = await login(email, password);
-      await sessionLogin(result);
+      await sessionLogin({ ...result, email, password });
       setPassword("");
       setStatus("Logged in successfully.");
     } catch (e) {
@@ -41,21 +40,13 @@ export default function ApiSync() {
     setLoading(true);
     setProgress(null);
     try {
-      const existingIds = await getExistingWorkoutIds();
-      const workouts = await fetchAllWorkouts(
-        session.userId,
-        session.accessToken,
+      const count = await syncWorkouts(
         (fetched, total) => setProgress({ fetched, total }),
-        existingIds,
       );
-      if (workouts.length === 0) {
+      if (count === 0) {
         setStatus("Already up to date.");
       } else {
-        setStatus(`Saving ${workouts.length} new workouts...`);
-        await insertWorkouts(workouts);
-        const updated = await queryWorkouts(filters);
-        setWorkouts(updated);
-        setStatus(`Synced ${workouts.length} new workouts.`);
+        setStatus(`Synced ${count} new workouts.`);
       }
     } catch (e) {
       console.error("Sync error:", e);

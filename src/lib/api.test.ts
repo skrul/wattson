@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchAllWorkouts } from "./api";
+import { fetchAllWorkouts, AuthError } from "./api";
 
 // Mock @tauri-apps/plugin-http
 const mockFetch = vi.fn();
@@ -156,12 +156,28 @@ describe("fetchAllWorkouts", () => {
     expect(onProgress).toHaveBeenNthCalledWith(2, 3, 3); // after page 1: 3 fetched, 3 total
   });
 
-  it("throws on API error", async () => {
+  it("throws AuthError on 401", async () => {
     mockFetch.mockResolvedValueOnce(makeErrorResponse(401, "Unauthorized"));
 
     await expect(
       fetchAllWorkouts("user1", "token1"),
-    ).rejects.toThrow("Fetch workouts failed (401): Unauthorized");
+    ).rejects.toThrow(AuthError);
+  });
+
+  it("throws AuthError on 403", async () => {
+    mockFetch.mockResolvedValueOnce(makeErrorResponse(403, "Forbidden"));
+
+    await expect(
+      fetchAllWorkouts("user1", "token1"),
+    ).rejects.toThrow(AuthError);
+  });
+
+  it("throws plain Error on 500", async () => {
+    mockFetch.mockResolvedValueOnce(makeErrorResponse(500, "Server Error"));
+
+    const promise = fetchAllWorkouts("user1", "token1");
+    await expect(promise).rejects.toThrow("Fetch workouts failed (500): Server Error");
+    await expect(promise).rejects.not.toBeInstanceOf(AuthError);
   });
 
   it("maps workout fields correctly", async () => {

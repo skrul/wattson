@@ -1,6 +1,13 @@
 import { fetch } from "@tauri-apps/plugin-http";
 import type { Workout, MetricSample } from "../types";
 
+export class AuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AuthError";
+  }
+}
+
 const AUTH_URL = "https://auth.onepeloton.com/oauth/token";
 const API_BASE = "https://api.onepeloton.com";
 const CLIENT_ID = "mgsmWCD0A8Qn6uz6mmqI6qeBNHH9IPwS";
@@ -27,6 +34,9 @@ export async function login(
   });
 
   if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("Incorrect email or password.");
+    }
     const text = await res.text();
     throw new Error(`Login failed (${res.status}): ${text}`);
   }
@@ -126,7 +136,11 @@ export async function fetchAllWorkouts(
     });
 
     if (!res.ok) {
-      throw new Error(`Fetch workouts failed (${res.status}): ${await res.text()}`);
+      const text = await res.text();
+      if (res.status === 401 || res.status === 403) {
+        throw new AuthError(`Fetch workouts failed (${res.status}): ${text}`);
+      }
+      throw new Error(`Fetch workouts failed (${res.status}): ${text}`);
     }
 
     const body: PelotonWorkoutResponse = await res.json();

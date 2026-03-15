@@ -4,6 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 interface Session {
   userId: string;
   accessToken: string;
+  email: string;
+  password: string;
 }
 
 interface SessionState {
@@ -13,9 +15,10 @@ interface SessionState {
   loadFromKeychain: () => Promise<void>;
   login: (session: Session) => Promise<void>;
   logout: () => Promise<void>;
+  updateCredentials: (accessToken: string, password: string) => Promise<void>;
 }
 
-export const useSessionStore = create<SessionState>((set) => ({
+export const useSessionStore = create<SessionState>((set, get) => ({
   session: null,
   loaded: false,
 
@@ -23,8 +26,18 @@ export const useSessionStore = create<SessionState>((set) => ({
     try {
       const creds = await invoke("load_credentials");
       if (creds) {
-        const { user_id, access_token } = creds as { user_id: string; access_token: string };
-        set({ session: { userId: user_id, accessToken: access_token }, loaded: true });
+        const { user_id, access_token, email, password } = creds as {
+          user_id: string;
+          access_token: string;
+          email?: string;
+          password?: string;
+        };
+        if (!email || !password) {
+          // Legacy keychain entry without email/password — force re-login
+          set({ session: null, loaded: true });
+        } else {
+          set({ session: { userId: user_id, accessToken: access_token, email, password }, loaded: true });
+        }
       } else {
         set({ loaded: true });
       }
@@ -36,11 +49,29 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   login: async (session) => {
     set({ session });
-    await invoke("save_credentials", { userId: session.userId, accessToken: session.accessToken });
+    await invoke("save_credentials", {
+      userId: session.userId,
+      accessToken: session.accessToken,
+      email: session.email,
+      password: session.password,
+    });
   },
 
   logout: async () => {
     await invoke("delete_credentials").catch((e) => console.error("Failed to delete credentials:", e));
     set({ session: null });
+  },
+
+  updateCredentials: async (accessToken, password) => {
+    const current = get().session;
+    if (!current) return;
+    const updated = { ...current, accessToken, password };
+    set({ session: updated });
+    await invoke("save_credentials", {
+      userId: updated.userId,
+      accessToken: updated.accessToken,
+      email: updated.email,
+      password: updated.password,
+    });
   },
 }));

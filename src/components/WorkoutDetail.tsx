@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { Workout } from "../types";
 import { fetchWorkoutDetail, fetchPerformanceGraph } from "../lib/api";
 import { updateWorkoutMetrics } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
+import RideDetailChart from "./RideDetailChart";
 
 interface WorkoutDetailProps {
   workout: Workout | null;
@@ -57,16 +58,30 @@ function Stat({ label, value, unit, loading }: StatProps) {
   );
 }
 
+/** Extract FTP from workout detail's ftp_info.ftp (FTP at time of ride). */
+function parseWorkoutFtp(rawDetailJson: string | null | undefined): number | null {
+  if (!rawDetailJson) return null;
+  try {
+    const raw = JSON.parse(rawDetailJson);
+    const ftp = raw?.ftp_info?.ftp;
+    return typeof ftp === "number" ? ftp : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Detail view for a single workout with stats. */
 export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailProps) {
   const updateWorkout = useWorkoutStore((s) => s.updateWorkout);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [metricsError, setMetricsError] = useState<string | null>(null);
 
+  const ftp = useMemo(() => parseWorkoutFtp(workout?.raw_detail_json), [workout?.raw_detail_json]);
+
   useEffect(() => {
     if (!workout || !accessToken) return;
-    // Use calories as a proxy for "metrics already fetched"
-    if (workout.calories != null) return;
+    // Skip fetch if we already have both metrics and performance graph data
+    if (workout.calories != null && workout.raw_performance_graph_json != null) return;
 
     let cancelled = false;
     setLoadingMetrics(true);
@@ -148,6 +163,11 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
         <Stat label="Avg Heart Rate" value={workout.avg_heart_rate} unit="bpm" loading={showLoading} />
         <Stat label="Strive Score" value={workout.strive_score != null ? workout.strive_score.toFixed(1) : null} />
       </div>
+
+      {/* Power chart for cycling workouts */}
+      {workout.discipline === "cycling" && workout.raw_performance_graph_json && (
+        <RideDetailChart workout={workout} ftp={ftp} />
+      )}
     </div>
   );
 }

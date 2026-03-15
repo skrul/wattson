@@ -16,6 +16,13 @@
         { "url": "https://auth.onepeloton.com/**" },
         { "url": "https://api.onepeloton.com/**" }
       ]
+    },
+    "dialog:default",
+    "dialog:allow-save",
+    "fs:default",
+    {
+      "identifier": "fs:allow-write",
+      "allow": [{ "path": "$DOWNLOAD/**" }, { "path": "$DESKTOP/**" }, { "path": "$HOME/**" }]
     }
   ]
 }

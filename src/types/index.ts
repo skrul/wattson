@@ -35,6 +35,16 @@ export interface WorkoutMetrics {
   avg_heart_rate: number | null;
 }
 
+/** Per-second time series data parsed from raw_performance_graph_json. */
+export interface PerformanceTimeSeries {
+  seconds: number[];
+  output: number[];
+  cadence: number[];
+  resistance: number[];
+  heartRate: number[];
+  speed: number[];
+}
+
 /** Cached user profile from /api/me. */
 export interface UserProfile {
   id: string;

@@ -1,4 +1,5 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { queryWorkouts } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import WorkoutToolbar from "./WorkoutToolbar";
@@ -27,6 +28,14 @@ function formatDate(timestamp: number): string {
 /** Sortable, filterable table of all imported workouts. */
 export default function WorkoutList() {
   const { workouts, filters, setWorkouts, setSort, isLoading, setLoading } = useWorkoutStore();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: workouts.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 37,
+    overscan: 10,
+  });
 
   const loadWorkouts = useCallback(async () => {
     setLoading(true);
@@ -57,50 +66,72 @@ export default function WorkoutList() {
     return filters.sort.direction === "asc" ? " ▲" : " ▼";
   };
 
+  const virtualItems = virtualizer.getVirtualItems();
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
+  const paddingBottom =
+    virtualItems.length > 0
+      ? virtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
+      : 0;
+
   return (
-    <div>
+    <div className="flex flex-col h-full">
       <WorkoutToolbar />
-      <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead>
-          <tr>
-            {COLUMNS.map(({ key, label }) => (
-              <th
-                key={key}
-                onClick={() => handleSort(key)}
-                className="cursor-pointer select-none px-4 py-2 text-left text-sm font-medium text-gray-500 hover:text-gray-900"
-              >
-                {label}{sortIndicator(key)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {isLoading ? (
+      <div ref={scrollRef} className="flex-1 overflow-auto min-h-0">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="sticky top-0 bg-white z-10">
             <tr>
-              <td className="px-4 py-2 text-sm text-gray-400" colSpan={5}>
-                Loading...
-              </td>
+              {COLUMNS.map(({ key, label }) => (
+                <th
+                  key={key}
+                  onClick={() => handleSort(key)}
+                  className="cursor-pointer select-none px-4 py-2 text-left text-sm font-medium text-gray-500 hover:text-gray-900"
+                >
+                  {label}{sortIndicator(key)}
+                </th>
+              ))}
             </tr>
-          ) : workouts.length === 0 ? (
-            <tr>
-              <td className="px-4 py-2 text-sm text-gray-400" colSpan={5}>
-                No workouts yet. Import a CSV or sync with the Peloton API.
-              </td>
-            </tr>
-          ) : (
-            workouts.map((w: Workout) => (
-              <tr key={w.id} className="hover:bg-gray-50">
-                <td className="whitespace-nowrap px-4 py-2 text-sm">{formatDate(w.date)}</td>
-                <td className="px-4 py-2 text-sm">{w.title}</td>
-                <td className="px-4 py-2 text-sm">{w.instructor ?? "—"}</td>
-                <td className="px-4 py-2 text-sm capitalize">{w.discipline}</td>
-                <td className="whitespace-nowrap px-4 py-2 text-sm">{formatDuration(w.duration_seconds)}</td>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {isLoading ? (
+              <tr>
+                <td className="px-4 py-2 text-sm text-gray-400" colSpan={5}>
+                  Loading...
+                </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : workouts.length === 0 ? (
+              <tr>
+                <td className="px-4 py-2 text-sm text-gray-400" colSpan={5}>
+                  No workouts yet. Import a CSV or sync with the Peloton API.
+                </td>
+              </tr>
+            ) : (
+              <>
+                {paddingTop > 0 && (
+                  <tr>
+                    <td style={{ height: paddingTop, padding: 0, border: "none" }} colSpan={5} />
+                  </tr>
+                )}
+                {virtualItems.map((virtualRow) => {
+                  const w: Workout = workouts[virtualRow.index];
+                  return (
+                    <tr key={w.id} className="hover:bg-gray-50">
+                      <td className="whitespace-nowrap px-4 py-2 text-sm">{formatDate(w.date)}</td>
+                      <td className="px-4 py-2 text-sm">{w.title}</td>
+                      <td className="px-4 py-2 text-sm">{w.instructor ?? "—"}</td>
+                      <td className="px-4 py-2 text-sm capitalize">{w.discipline}</td>
+                      <td className="whitespace-nowrap px-4 py-2 text-sm">{formatDuration(w.duration_seconds)}</td>
+                    </tr>
+                  );
+                })}
+                {paddingBottom > 0 && (
+                  <tr>
+                    <td style={{ height: paddingBottom, padding: 0, border: "none" }} colSpan={5} />
+                  </tr>
+                )}
+              </>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

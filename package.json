@@ -13,6 +13,7 @@
   "dependencies": {
     "@headlessui/react": "^2.2.9",
     "@observablehq/plot": "^0.6",
+    "@tanstack/react-virtual": "^3.13.22",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-http": "^2",
     "@tauri-apps/plugin-opener": "^2",

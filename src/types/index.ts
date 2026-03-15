@@ -20,6 +20,8 @@ export interface Workout {
   total_work: number | null;
   source: "csv" | "api";
   raw_json: string | null;
+  raw_detail_json: string | null;
+  raw_performance_graph_json: string | null;
 }
 
 /** Metrics fetched on-demand from the performance_graph endpoint. */

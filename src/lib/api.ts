@@ -108,6 +108,8 @@ function mapWorkout(w: PelotonWorkout, raw: unknown): Workout {
     total_work: w.total_work ?? null,
     source: "api",
     raw_json: JSON.stringify(raw),
+    raw_detail_json: null,
+    raw_performance_graph_json: null,
   };
 }
 
@@ -199,11 +201,34 @@ export async function fetchMetrics(
   return [];
 }
 
+/** Fetch workout detail from /api/workout/{id}. Returns the raw JSON. */
+export async function fetchWorkoutDetail(
+  workoutId: string,
+  accessToken: string,
+): Promise<string> {
+  const url = `${API_BASE}/api/workout/${workoutId}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    if (res.status === 401 || res.status === 403) {
+      throw new AuthError(`Fetch workout detail failed (${res.status}): ${text}`);
+    }
+    throw new Error(`Fetch workout detail failed (${res.status}): ${text}`);
+  }
+
+  const data = await res.json();
+  return JSON.stringify(data);
+}
+
 /** Fetch the performance graph for a workout and extract summary metrics. */
 export async function fetchPerformanceGraph(
   workoutId: string,
   accessToken: string,
-): Promise<WorkoutMetrics> {
+): Promise<WorkoutMetrics & { rawJson: string }> {
   const url = `${API_BASE}/api/workout/${workoutId}/performance_graph?every_n=1`;
   const res = await fetch(url, {
     method: "GET",
@@ -234,5 +259,6 @@ export async function fetchPerformanceGraph(
     avg_resistance: findSummary(data.average_summaries, "avg_resistance"),
     avg_speed: findSummary(data.average_summaries, "avg_speed"),
     avg_heart_rate: heartRateMetric?.average_value ?? null,
+    rawJson: JSON.stringify(data),
   };
 }

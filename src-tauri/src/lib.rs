@@ -86,6 +86,17 @@ pub fn run() {
             sql: "ALTER TABLE workouts ADD COLUMN raw_json TEXT;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "create_user_profile_table",
+            sql: "CREATE TABLE user_profile (
+                id TEXT PRIMARY KEY,
+                first_name TEXT,
+                total_workouts INTEGER,
+                raw_json TEXT
+            );",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

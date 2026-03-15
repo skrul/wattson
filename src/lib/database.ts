@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { Workout, MetricSample, WorkoutFilters, FilterCondition } from "../types";
+import type { Workout, MetricSample, WorkoutFilters, FilterCondition, UserProfile } from "../types";
 import { FIELD_MAP } from "./fields";
 
 let db: Database | null = null;
@@ -185,6 +185,26 @@ export async function getExistingWorkoutIds(): Promise<Set<string>> {
   const d = await getDb();
   const rows = await d.select<{ id: string }[]>("SELECT id FROM workouts");
   return new Set(rows.map((r) => r.id));
+}
+
+/** Insert or replace a user profile. */
+export async function upsertUserProfile(profile: UserProfile): Promise<void> {
+  const d = await getDb();
+  await d.execute(
+    `INSERT OR REPLACE INTO user_profile (id, first_name, total_workouts, raw_json)
+     VALUES ($1, $2, $3, $4)`,
+    [profile.id, profile.first_name, profile.total_workouts, profile.raw_json],
+  );
+}
+
+/** Get a cached user profile by ID. */
+export async function getUserProfile(id: string): Promise<UserProfile | null> {
+  const d = await getDb();
+  const rows = await d.select<UserProfile[]>(
+    "SELECT * FROM user_profile WHERE id = $1",
+    [id],
+  );
+  return rows[0] ?? null;
 }
 
 /** Insert per-second metric samples for a workout. */

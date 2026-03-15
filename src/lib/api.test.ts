@@ -220,6 +220,53 @@ describe("fetchAllWorkouts", () => {
     expect(result.raw_json).toBeTruthy();
   });
 
+  it("uses knownTotal as progress denominator instead of body.total", async () => {
+    const page0 = [makePelotonWorkout("w1"), makePelotonWorkout("w2")];
+    const page1 = [makePelotonWorkout("w3")];
+
+    mockFetch.mockResolvedValueOnce(
+      makePageResponse(page0, { total: 3, page: 0, pageCount: 2 }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      makePageResponse(page1, { total: 3, page: 1, pageCount: 2 }),
+    );
+
+    const onProgress = vi.fn();
+    await fetchAllWorkouts("user1", "token1", onProgress, undefined, 500);
+
+    expect(onProgress).toHaveBeenCalledTimes(2);
+    expect(onProgress).toHaveBeenNthCalledWith(1, 2, 500); // knownTotal used instead of 3
+    expect(onProgress).toHaveBeenNthCalledWith(2, 3, 500);
+  });
+
+  it("uses knownTotal in early-stop progress report", async () => {
+    const page0 = [makePelotonWorkout("old1"), makePelotonWorkout("old2")];
+
+    mockFetch.mockResolvedValueOnce(
+      makePageResponse(page0, { total: 10, page: 0, pageCount: 5 }),
+    );
+
+    const existing = new Set(["old1", "old2"]);
+    const onProgress = vi.fn();
+    await fetchAllWorkouts("user1", "token1", onProgress, existing, 500);
+
+    expect(onProgress).toHaveBeenCalledTimes(1);
+    expect(onProgress).toHaveBeenCalledWith(2, 500); // knownTotal, not all.length
+  });
+
+  it("falls back to body.total when knownTotal is undefined", async () => {
+    const page0 = [makePelotonWorkout("w1")];
+
+    mockFetch.mockResolvedValueOnce(
+      makePageResponse(page0, { total: 42, page: 0, pageCount: 1 }),
+    );
+
+    const onProgress = vi.fn();
+    await fetchAllWorkouts("user1", "token1", onProgress, undefined, undefined);
+
+    expect(onProgress).toHaveBeenCalledWith(1, 42);
+  });
+
   it("uses duration fallback when no ride", async () => {
     const workout = makePelotonWorkout("w1", {
       start_time: 1000,

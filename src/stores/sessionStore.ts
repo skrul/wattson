@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import type { UserProfile } from "../types";
 
 interface Session {
   userId: string;
@@ -11,16 +12,19 @@ interface Session {
 interface SessionState {
   session: Session | null;
   loaded: boolean;
+  userProfile: UserProfile | null;
 
   loadFromKeychain: () => Promise<void>;
   login: (session: Session) => Promise<void>;
   logout: () => Promise<void>;
   updateCredentials: (accessToken: string, password: string) => Promise<void>;
+  setUserProfile: (profile: UserProfile | null) => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
   session: null,
   loaded: false,
+  userProfile: null,
 
   loadFromKeychain: async () => {
     try {
@@ -59,7 +63,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   logout: async () => {
     await invoke("delete_credentials").catch((e) => console.error("Failed to delete credentials:", e));
-    set({ session: null });
+    set({ session: null, userProfile: null });
   },
 
   updateCredentials: async (accessToken, password) => {
@@ -74,4 +78,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       password: updated.password,
     });
   },
+
+  setUserProfile: (profile) => set({ userProfile: profile }),
 }));

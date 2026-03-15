@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Dialog, DialogPanel } from "@headlessui/react";
-import { login, fetchAllWorkouts } from "../lib/api";
-import { insertWorkouts, getExistingWorkoutIds, queryWorkouts } from "../lib/database";
+import { login, fetchAllWorkouts, fetchUserProfile } from "../lib/api";
+import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
 
@@ -46,18 +46,38 @@ export default function SetupWizard({ open, onComplete }: Props) {
     setLoading(true);
     setProgress(null);
     try {
+      // Fetch profile first to get total_workouts for accurate progress
+      let knownTotal: number | undefined;
+      try {
+        const profile = await fetchUserProfile(accessToken);
+        knownTotal = profile.total_workouts ?? undefined;
+      } catch (e) {
+        console.error("Failed to fetch profile before sync:", e);
+      }
+
       const existingIds = await getExistingWorkoutIds();
       const workouts = await fetchAllWorkouts(
         userId,
         accessToken,
         (fetched, total) => setProgress({ fetched, total }),
         existingIds,
+        knownTotal,
       );
       if (workouts.length > 0) {
         await insertWorkouts(workouts);
       }
       const updated = await queryWorkouts(filters);
       setWorkouts(updated);
+
+      // Fetch and cache user profile
+      try {
+        const profile = await fetchUserProfile(accessToken);
+        await upsertUserProfile(profile);
+        useSessionStore.getState().setUserProfile(profile);
+      } catch (e) {
+        console.error("Failed to fetch user profile:", e);
+      }
+
       setSyncedCount(workouts.length);
       setStep("success");
     } catch (e) {

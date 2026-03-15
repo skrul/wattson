@@ -1,5 +1,5 @@
 import { fetch } from "@tauri-apps/plugin-http";
-import type { Workout, MetricSample } from "../types";
+import type { Workout, MetricSample, UserProfile } from "../types";
 
 export class AuthError extends Error {
   constructor(message: string) {
@@ -123,6 +123,7 @@ export async function fetchAllWorkouts(
   accessToken: string,
   onProgress?: (fetched: number, total: number) => void,
   existingIds?: Set<string>,
+  knownTotal?: number,
 ): Promise<Workout[]> {
   const all: Workout[] = [];
   let page = 0;
@@ -154,17 +155,41 @@ export async function fetchAllWorkouts(
 
     // If every workout on this page is already in the DB, stop paginating
     if (existingIds && completed.length > 0 && completed.every((w) => existingIds.has(w.id))) {
-      onProgress?.(all.length, all.length);
+      onProgress?.(all.length, knownTotal ?? all.length);
       break;
     }
 
-    onProgress?.(all.length, totalCount);
+    onProgress?.(all.length, knownTotal ?? totalCount);
 
     if (page >= body.page_count - 1) break;
     page++;
   }
 
   return all;
+}
+
+/** Fetch the current user's profile from /api/me. */
+export async function fetchUserProfile(accessToken: string): Promise<UserProfile> {
+  const res = await fetch(`${API_BASE}/api/me`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    if (res.status === 401 || res.status === 403) {
+      throw new AuthError(`Fetch profile failed (${res.status}): ${text}`);
+    }
+    throw new Error(`Fetch profile failed (${res.status}): ${text}`);
+  }
+
+  const data = await res.json();
+  return {
+    id: data.id,
+    first_name: data.first_name ?? null,
+    total_workouts: data.total_workouts ?? null,
+    raw_json: JSON.stringify(data),
+  };
 }
 
 /** Fetch per-second performance metrics for a single workout. */

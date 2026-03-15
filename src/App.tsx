@@ -6,6 +6,7 @@ import SetupWizard from "./components/SetupWizard";
 import ReauthModal from "./components/ReauthModal";
 import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
 import { syncWorkouts } from "./lib/sync";
+import { getUserProfile } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
 
 type Tab = "workouts" | "charts" | "sync";
@@ -30,10 +31,15 @@ function App() {
     });
   }, []);
 
-  // Show wizard when no session
+  // Show wizard when no session; load cached profile when session exists
   useEffect(() => {
     if (loaded && !session) {
       setShowWizard(true);
+    }
+    if (loaded && session) {
+      getUserProfile(session.userId).then((profile) => {
+        if (profile) useSessionStore.getState().setUserProfile(profile);
+      }).catch((e) => console.error("Failed to load cached profile:", e));
     }
   }, [loaded, session]);
 

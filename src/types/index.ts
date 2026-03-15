@@ -24,6 +24,14 @@ export interface Workout {
   raw_json: string | null;
 }
 
+/** Cached user profile from /api/me. */
+export interface UserProfile {
+  id: string;
+  first_name: string | null;
+  total_workouts: number | null;
+  raw_json: string;
+}
+
 /** A single per-second metric sample for a workout. */
 export interface MetricSample {
   workout_id: string;

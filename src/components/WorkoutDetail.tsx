@@ -266,7 +266,7 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
       )}
 
       {currentTab === "compare" && hasCompare && (
-        <CompareTab workouts={sameClassWorkouts} currentId={workout.id} />
+        <CompareTab workouts={sameClassWorkouts} currentId={workout.id} accessToken={accessToken} />
       )}
     </div>
   );

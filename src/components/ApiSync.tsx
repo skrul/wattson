@@ -3,6 +3,7 @@ import { Dialog, DialogPanel } from "@headlessui/react";
 import { login } from "../lib/api";
 import { syncWorkouts } from "../lib/sync";
 import { deleteAllData, getWorkoutCount } from "../lib/database";
+import { clearCache } from "../lib/enrichmentCache";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { useEnrichmentStore } from "../stores/enrichmentStore";
@@ -37,7 +38,8 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<{ fetched: number; total: number } | null>(null);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState("");
   const [workoutCount, setWorkoutCount] = useState<number | null>(null);
 
   const session = useSessionStore((s) => s.session);
@@ -112,8 +114,8 @@ export default function ApiSync({ onDataDeleted }: Props) {
     setWorkoutCount(null);
   };
 
-  const handleDeleteAll = async () => {
-    setConfirmDeleteOpen(false);
+  const handleReset = async () => {
+    setConfirmResetOpen(false);
     await disableDetailedMode();
     await deleteAllData();
     setWorkouts([]);
@@ -124,6 +126,12 @@ export default function ApiSync({ onDataDeleted }: Props) {
     setStatus("");
     setError("");
     setWorkoutCount(null);
+  };
+
+  const handleClearCache = async () => {
+    await clearCache();
+    setCacheStatus("Cache cleared.");
+    setTimeout(() => setCacheStatus(""), 3000);
   };
 
   if (!session) {
@@ -297,35 +305,44 @@ export default function ApiSync({ onDataDeleted }: Props) {
           Log Out
         </button>
         <button
-          onClick={() => setConfirmDeleteOpen(true)}
+          onClick={() => setConfirmResetOpen(true)}
           disabled={loading}
           className="w-full rounded border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
         >
-          Delete All Data
+          Reset Workouts
         </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleClearCache}
+            className="text-xs text-gray-400 underline hover:text-gray-600"
+          >
+            Clear Cache
+          </button>
+          {cacheStatus && <span className="text-xs text-green-600">{cacheStatus}</span>}
+        </div>
       </div>
 
-      {/* Delete All Data confirmation dialog */}
-      <Dialog open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)} className="relative z-50">
+      {/* Reset Workouts confirmation dialog */}
+      <Dialog open={confirmResetOpen} onClose={() => setConfirmResetOpen(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
           <DialogPanel className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900">Delete All Data?</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Reset Workouts?</h3>
             <p className="mt-2 text-sm text-gray-600">
-              This will permanently delete all your cached workouts and profile data. You will need to log in and sync again to restore your data.
+              This will delete all workouts and profile data, then log you out. Your enrichment cache is preserved, so re-syncing with detailed mode will repopulate instantly.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
-                onClick={() => setConfirmDeleteOpen(false)}
+                onClick={() => setConfirmResetOpen(false)}
                 className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
-                onClick={handleDeleteAll}
+                onClick={handleReset}
                 className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
               >
-                Delete All Data
+                Reset Workouts
               </button>
             </div>
           </DialogPanel>

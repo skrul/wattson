@@ -26,6 +26,12 @@ async function getCached(key: string): Promise<string | null> {
   return rows[0]?.raw_json ?? null;
 }
 
+/** Delete all entries from the enrichment cache. */
+export async function clearCache(): Promise<void> {
+  const db = await getCache();
+  await db.execute("DELETE FROM cache");
+}
+
 async function setCache(key: string, rawJson: string): Promise<void> {
   const db = await getCache();
   await db.execute(

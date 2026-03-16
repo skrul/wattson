@@ -94,100 +94,101 @@ export default function ChartBuilder() {
         </div>
       </div>
 
-      {/* Name input */}
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Chart Name</label>
-        <input
-          type="text"
-          value={draft.name}
-          onChange={(e) => updateDraft({ name: e.target.value })}
-          placeholder="e.g., Cycling Output Over Time"
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-        />
-      </div>
-
-      {/* Chart type */}
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Chart Type</label>
-        <div className="flex gap-4">
-          {(["line", "dot", "bar"] as ChartMarkType[]).map((type) => (
-            <label key={type} className="flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="mark_type"
-                checked={draft.mark_type === type}
-                onChange={() => updateDraft({ mark_type: type })}
-                className="text-blue-600"
-              />
-              <span className="capitalize">{type}</span>
-            </label>
-          ))}
+      {/* Name + Chart type row */}
+      <div className="flex gap-4">
+        <div className="flex-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">Chart Name</label>
+          <input
+            type="text"
+            value={draft.name}
+            onChange={(e) => updateDraft({ name: e.target.value })}
+            placeholder="e.g., Cycling Output Over Time"
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Chart Type</label>
+          <div className="flex gap-4 py-2">
+            {(["line", "dot", "bar"] as ChartMarkType[]).map((type) => (
+              <label key={type} className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="mark_type"
+                  checked={draft.mark_type === type}
+                  onChange={() => updateDraft({ mark_type: type })}
+                  className="text-blue-600"
+                />
+                <span className="capitalize">{type}</span>
+              </label>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Y-axis fields */}
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Y-Axis Fields {draft.y_fields.length > 0 && `(${draft.y_fields.length}/2)`}
-        </label>
-        <div className="space-y-2">
-          {draft.y_fields.map((yf: YAxisField, i: number) => {
-            const fieldDef = NUMERIC_FIELDS.find((f) => f.key === yf.field);
-            return (
-              <div key={yf.field} className="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2">
-                <span className="flex-1 text-sm">{fieldDef?.label ?? yf.field}</span>
-                <button
-                  onClick={() => toggleSide(i)}
-                  className="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100"
-                >
-                  {yf.side === "left" ? "Left axis" : "Right axis"}
-                </button>
-                <button
-                  onClick={() => removeYField(i)}
-                  className="text-gray-400 hover:text-red-500"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 4l8 8M12 4l-8 8" />
-                  </svg>
-                </button>
-              </div>
-            );
-          })}
+      {/* Y-axis fields + Group by row */}
+      <div className="flex gap-4">
+        <div className="flex-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Y-Axis Fields {draft.y_fields.length > 0 && `(${draft.y_fields.length}/2)`}
+          </label>
+          <div className="space-y-2">
+            {draft.y_fields.map((yf: YAxisField, i: number) => {
+              const fieldDef = NUMERIC_FIELDS.find((f) => f.key === yf.field);
+              return (
+                <div key={yf.field} className="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2">
+                  <span className="flex-1 text-sm">{fieldDef?.label ?? yf.field}</span>
+                  <button
+                    onClick={() => toggleSide(i)}
+                    className="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100"
+                  >
+                    {yf.side === "left" ? "Left axis" : "Right axis"}
+                  </button>
+                  <button
+                    onClick={() => removeYField(i)}
+                    className="text-gray-400 hover:text-red-500"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M4 4l8 8M12 4l-8 8" />
+                    </svg>
+                  </button>
+                </div>
+              );
+            })}
 
-          {draft.y_fields.length < 2 && (
-            <select
-              value=""
-              onChange={(e) => {
-                if (e.target.value) addYField(e.target.value);
-              }}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm text-gray-500 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="">Add a Y-axis field...</option>
-              {availableFields.map((f) => (
-                <option key={f.key} value={f.key}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-          )}
+            {draft.y_fields.length < 2 && (
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) addYField(e.target.value);
+                }}
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm text-gray-500 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="">Add a Y-axis field...</option>
+                {availableFields.map((f) => (
+                  <option key={f.key} value={f.key}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Group by */}
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Group By (color)</label>
-        <select
-          value={draft.group_by ?? ""}
-          onChange={(e) => updateDraft({ group_by: e.target.value || null })}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-        >
-          <option value="">None</option>
-          {ENUM_FIELDS.map((f) => (
-            <option key={f.key} value={f.key}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+        <div className="w-48 shrink-0">
+          <label className="mb-1 block text-sm font-medium text-gray-700">Group By (color)</label>
+          <select
+            value={draft.group_by ?? ""}
+            onChange={(e) => updateDraft({ group_by: e.target.value || null })}
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          >
+            <option value="">None</option>
+            {ENUM_FIELDS.map((f) => (
+              <option key={f.key} value={f.key}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Filters */}

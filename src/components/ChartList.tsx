@@ -31,7 +31,9 @@ function ChartCard({ chart }: { chart: ChartDefinition }) {
             </svg>
           </button>
           <button
-            onClick={() => removeChart(chart.id)}
+            onClick={() => {
+              if (window.confirm(`Delete "${chart.name || "Untitled"}"?`)) removeChart(chart.id);
+            }}
             className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
             title="Delete"
           >

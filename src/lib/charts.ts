@@ -252,6 +252,7 @@ interface WorkoutPoint {
 /** Fields whose raw DB values need scaling for display. */
 const FIELD_DISPLAY_SCALE: Record<string, number> = {
   total_work: 1 / 1000, // joules → kj
+  duration_seconds: 1 / 60, // seconds → minutes
 };
 
 function scaleValue(field: string, value: number): number {
@@ -410,18 +411,19 @@ export function renderDualAxisChart(
   const leftDomain = [leftExtent[0], leftExtent[1]];
   const tickCount = 6;
   const leftStep = (leftDomain[1] - leftDomain[0]) / (tickCount - 1);
+  const maxDate = data.reduce((max, d) => (d.date > max ? d.date : max), data[0].date);
   const rightTicks = Array.from({ length: tickCount }, (_, i) => {
     const leftVal = leftDomain[0] + i * leftStep;
-    return { y: leftVal, label: Math.round(leftToRight(leftVal)).toString() };
+    return { x: maxDate, y: leftVal, label: Math.round(leftToRight(leftVal)).toString() };
   });
 
   marks.push(
     Plot.text(rightTicks, {
-      x: () => null,
+      x: "x",
       y: "y",
       text: "label",
       textAnchor: "start",
-      dx: width - 65,
+      dx: 8,
       fontSize: 10,
       fill: rightColor,
     }),

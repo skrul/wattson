@@ -46,8 +46,10 @@ async function runBackfillLoop() {
     }
 
     const workoutId = ids[0];
+    let wasCacheHit = false;
     try {
       const result = await cachedFetchPerformanceGraph(workoutId, session.accessToken);
+      wasCacheHit = result.cacheHit;
       await updateWorkoutMetrics(workoutId, result, null, result.rawJson);
       await useEnrichmentStore.getState().refreshCounts();
     } catch (e) {
@@ -62,8 +64,10 @@ async function runBackfillLoop() {
 
     if (abortBackfill) break;
 
-    // Rate limit: 2 seconds between requests
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Only rate limit when we actually hit the API
+    if (!wasCacheHit) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
   }
 
   if (abortBackfill) {

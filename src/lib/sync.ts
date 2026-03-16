@@ -1,8 +1,9 @@
-import { login, fetchAllWorkouts, fetchUserProfile, AuthError } from "./api";
-import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile } from "./database";
+import { login, fetchAllWorkouts, fetchUserProfile, fetchPerformanceGraph, AuthError } from "./api";
+import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile, updateWorkoutMetrics } from "./database";
 import { useSessionStore } from "../stores/sessionStore";
 import { useReauthStore } from "../stores/reauthStore";
 import { useWorkoutStore } from "../stores/workoutStore";
+import { useEnrichmentStore } from "../stores/enrichmentStore";
 
 /**
  * Sync workouts with retry logic for expired tokens.
@@ -59,6 +60,21 @@ export async function syncWorkouts(
 
   if (newWorkouts.length > 0) {
     await insertWorkouts(newWorkouts);
+
+    // Inline enrichment: if detailed mode is on, fetch performance_graph for each new workout
+    const enrichmentMode = useEnrichmentStore.getState().mode;
+    if (enrichmentMode === "detailed") {
+      for (const w of newWorkouts) {
+        try {
+          const result = await fetchPerformanceGraph(w.id, activeToken);
+          await updateWorkoutMetrics(w.id, result, null, result.rawJson);
+        } catch (e) {
+          console.error(`Inline enrichment failed for workout ${w.id}:`, e);
+        }
+      }
+      await useEnrichmentStore.getState().refreshCounts();
+    }
+
     const filters = useWorkoutStore.getState().filters;
     const updated = await queryWorkouts(filters);
     useWorkoutStore.getState().setWorkouts(updated);

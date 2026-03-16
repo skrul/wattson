@@ -5,6 +5,7 @@ import { syncWorkouts } from "../lib/sync";
 import { deleteAllData, getWorkoutCount } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
+import { useEnrichmentStore } from "../stores/enrichmentStore";
 
 const LAST_EMAIL_KEY = "wattson:lastEmail";
 
@@ -44,6 +45,15 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const sessionLogin = useSessionStore((s) => s.login);
   const sessionLogout = useSessionStore((s) => s.logout);
   const setWorkouts = useWorkoutStore((s) => s.setWorkouts);
+
+  const enrichmentMode = useEnrichmentStore((s) => s.mode);
+  const backfillStatus = useEnrichmentStore((s) => s.backfillStatus);
+  const enrichedCount = useEnrichmentStore((s) => s.enrichedCount);
+  const totalCount = useEnrichmentStore((s) => s.totalCount);
+  const enableDetailedMode = useEnrichmentStore((s) => s.enableDetailedMode);
+  const disableDetailedMode = useEnrichmentStore((s) => s.disableDetailedMode);
+  const startBackfill = useEnrichmentStore((s) => s.startBackfill);
+  const pauseBackfill = useEnrichmentStore((s) => s.pauseBackfill);
 
   useEffect(() => {
     if (session) {
@@ -104,6 +114,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
 
   const handleDeleteAll = async () => {
     setConfirmDeleteOpen(false);
+    await disableDetailedMode();
     await deleteAllData();
     setWorkouts([]);
     localStorage.removeItem(LAST_EMAIL_KEY);
@@ -201,6 +212,61 @@ export default function ApiSync({ onDataDeleted }: Props) {
           <p className="text-xs font-medium uppercase text-gray-500">Total Workouts</p>
           <p className="text-lg font-semibold">{workoutCount ?? "—"}</p>
         </div>
+      </div>
+
+      {/* Detailed Metrics */}
+      <div className="space-y-3 rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Detailed Metrics</p>
+            <p className="text-xs text-gray-500">
+              Fetch per-workout performance data (calories, distance, output, etc.)
+            </p>
+          </div>
+          <button
+            onClick={() => enrichmentMode === "detailed" ? disableDetailedMode() : enableDetailedMode()}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+              enrichmentMode === "detailed" ? "bg-blue-600" : "bg-gray-200"
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                enrichmentMode === "detailed" ? "translate-x-5" : "translate-x-0"
+              }`}
+            />
+          </button>
+        </div>
+
+        {enrichmentMode === "detailed" && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600">
+                {backfillStatus === "complete"
+                  ? "All workouts enriched"
+                  : backfillStatus === "running"
+                    ? "Enriching workouts..."
+                    : "Enrichment paused"}
+              </span>
+              <span className="text-gray-500">
+                {enrichedCount} / {totalCount}
+              </span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+              <div
+                className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                style={{ width: totalCount > 0 ? `${(enrichedCount / totalCount) * 100}%` : "0%" }}
+              />
+            </div>
+            {backfillStatus !== "complete" && (
+              <button
+                onClick={() => backfillStatus === "running" ? pauseBackfill() : startBackfill()}
+                className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                {backfillStatus === "running" ? "Pause" : "Resume"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sync */}

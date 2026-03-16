@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { FIELD_DEFS } from "../lib/fields";
+import { useEnrichmentStore } from "../stores/enrichmentStore";
 import { queryWorkouts, chartFiltersToWorkoutFilters } from "../lib/database";
 import { useChartStore } from "../stores/chartStore";
 import type { Workout, ChartMarkType, YAxisField, YAxisSide, FilterCondition } from "../types";
@@ -12,6 +13,7 @@ const ENUM_FIELDS = FIELD_DEFS.filter((f) => f.type === "enum");
 
 export default function ChartBuilder() {
   const { draft, updateDraft, saveDraft, backToList } = useChartStore();
+  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
   const [previewWorkouts, setPreviewWorkouts] = useState<Workout[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -164,11 +166,14 @@ export default function ChartBuilder() {
                 className="w-full rounded border border-gray-300 px-3 py-2 text-sm text-gray-500 focus:border-blue-500 focus:outline-none"
               >
                 <option value="">Add a Y-axis field...</option>
-                {availableFields.map((f) => (
-                  <option key={f.key} value={f.key}>
-                    {f.label}
-                  </option>
-                ))}
+                {availableFields.map((f) => {
+                  const disabled = f.requiresDetail && !enrichmentComplete;
+                  return (
+                    <option key={f.key} value={f.key} disabled={disabled}>
+                      {f.label}{disabled ? " (detailed mode)" : ""}
+                    </option>
+                  );
+                })}
               </select>
             )}
           </div>

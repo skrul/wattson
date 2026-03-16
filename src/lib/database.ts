@@ -356,6 +356,45 @@ export async function getWorkoutsByRideId(rideId: string): Promise<Workout[]> {
   );
 }
 
+// --- Settings ---
+
+/** Read a value from the settings table. */
+export async function getSetting(key: string): Promise<string | null> {
+  const d = await getDb();
+  const rows = await d.select<{ value: string }[]>(
+    "SELECT value FROM settings WHERE key = $1",
+    [key],
+  );
+  return rows[0]?.value ?? null;
+}
+
+/** Insert or update a value in the settings table. */
+export async function setSetting(key: string, value: string): Promise<void> {
+  const d = await getDb();
+  await d.execute(
+    "INSERT OR REPLACE INTO settings (key, value) VALUES ($1, $2)",
+    [key, value],
+  );
+}
+
+/** Get IDs of workouts that have not been enriched with performance graph data. */
+export async function getUnenrichedWorkoutIds(): Promise<string[]> {
+  const d = await getDb();
+  const rows = await d.select<{ id: string }[]>(
+    "SELECT id FROM workouts WHERE raw_performance_graph_json IS NULL ORDER BY date DESC",
+  );
+  return rows.map((r) => r.id);
+}
+
+/** Get counts of enriched vs total workouts. */
+export async function getEnrichmentCounts(): Promise<{ enriched: number; total: number }> {
+  const d = await getDb();
+  const rows = await d.select<{ total: number; enriched: number }[]>(
+    "SELECT COUNT(*) as total, COUNT(raw_performance_graph_json) as enriched FROM workouts",
+  );
+  return { enriched: rows[0].enriched, total: rows[0].total };
+}
+
 /** Wrap chart filter conditions into a WorkoutFilters for querying. */
 export function chartFiltersToWorkoutFilters(conditions: FilterCondition[]): WorkoutFilters {
   return {

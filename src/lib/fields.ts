@@ -11,6 +11,8 @@ export interface FieldDef {
   displayValue?: (raw: string) => string;
   /** Extra SQL WHERE clause for distinct-value queries (e.g. "workout_type = 'class'"). */
   distinctFilter?: string;
+  /** True if this field requires detailed enrichment (performance_graph data). */
+  requiresDetail?: boolean;
 }
 
 const STRING_OPS: FilterOperator[] = [
@@ -38,13 +40,13 @@ export const FIELD_DEFS: FieldDef[] = [
   { key: "discipline", label: "Discipline", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
   { key: "duration_seconds", label: "Duration", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true, displayValue: (v) => `${Math.round(Number(v) / 60)} min`, distinctFilter: "workout_type = 'class'" },
   { key: "total_work", label: "Total Output (kj)", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
-  { key: "avg_output", label: "Avg Output (watts)", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
-  { key: "calories", label: "Calories", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
-  { key: "distance", label: "Distance", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
-  { key: "avg_heart_rate", label: "Avg Heart Rate", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
-  { key: "avg_cadence", label: "Avg Cadence", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
-  { key: "avg_resistance", label: "Avg Resistance", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
-  { key: "avg_speed", label: "Avg Speed", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
+  { key: "avg_output", label: "Avg Output (watts)", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true, requiresDetail: true },
+  { key: "calories", label: "Calories", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true, requiresDetail: true },
+  { key: "distance", label: "Distance", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true, requiresDetail: true },
+  { key: "avg_heart_rate", label: "Avg Heart Rate", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true, requiresDetail: true },
+  { key: "avg_cadence", label: "Avg Cadence", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true, requiresDetail: true },
+  { key: "avg_resistance", label: "Avg Resistance", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true, requiresDetail: true },
+  { key: "avg_speed", label: "Avg Speed", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true, requiresDetail: true },
   { key: "strive_score", label: "Strive Score", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
   { key: "workout_type", label: "Workout Type", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
   { key: "is_live", label: "Live/On-Demand", type: "enum", operators: ENUM_OPS, filterable: true, sortable: false },
@@ -54,6 +56,10 @@ export const FIELD_DEFS: FieldDef[] = [
 
 export const FIELD_MAP: Record<string, FieldDef> = Object.fromEntries(
   FIELD_DEFS.map((f) => [f.key, f]),
+);
+
+export const DETAIL_FIELD_KEYS: Set<string> = new Set(
+  FIELD_DEFS.filter((f) => f.requiresDetail).map((f) => f.key),
 );
 
 export const OPERATOR_LABELS: Record<FilterOperator, string> = {

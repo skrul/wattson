@@ -164,6 +164,12 @@ pub fn run() {
             CREATE INDEX idx_workouts_ride_id ON workouts(ride_id);",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 14,
+            description: "create_settings_table",
+            sql: "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

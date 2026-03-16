@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { FIELD_DEFS, FIELD_MAP } from "../lib/fields";
 import { useWorkoutStore } from "../stores/workoutStore";
+import { useEnrichmentStore } from "../stores/enrichmentStore";
 
 export default function SortChip() {
   const { filters, setSort, clearSort } = useWorkoutStore();
   const sort = filters.sort;
   const field = FIELD_MAP[sort.field];
   const arrow = sort.direction === "asc" ? "↑" : "↓";
+  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
   const sortableFields = FIELD_DEFS.filter((f) => f.sortable);
 
   const [open, setOpen] = useState(false);
@@ -50,11 +52,14 @@ export default function SortChip() {
                 }
                 className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
               >
-                {sortableFields.map((f) => (
-                  <option key={f.key} value={f.key}>
-                    {f.label}
-                  </option>
-                ))}
+                {sortableFields.map((f) => {
+                  const disabled = f.requiresDetail && !enrichmentComplete;
+                  return (
+                    <option key={f.key} value={f.key} disabled={disabled}>
+                      {f.label}{disabled ? " (detailed mode)" : ""}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 

@@ -6,7 +6,7 @@ import SetupWizard from "./components/SetupWizard";
 import ReauthModal from "./components/ReauthModal";
 import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
 import { syncWorkouts } from "./lib/sync";
-import { getUserProfile, hasWorkouts, backfillClassTypes } from "./lib/database";
+import { getUserProfile, hasWorkouts } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
 import { useEnrichmentStore } from "./stores/enrichmentStore";
 
@@ -32,7 +32,6 @@ function App() {
     checkForUpdate().then((status) => {
       if (status.available) setUpdate(status);
     });
-    backfillClassTypes().catch((e) => console.error("Class type backfill failed:", e));
     useEnrichmentStore.getState().loadState().catch((e) => console.error("Enrichment state load failed:", e));
   }, []);
 

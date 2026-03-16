@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseClassType, parseClassSubtype, PARSE_VERSION } from "./classType";
-
-describe("PARSE_VERSION", () => {
-  it("is a positive integer", () => {
-    expect(PARSE_VERSION).toBe(3);
-  });
-});
+import { parseClassType, parseClassSubtype } from "./classType";
 
 describe("parseClassType", () => {
   // --- null / empty input ---

@@ -16,7 +16,7 @@ Tauri was chosen over alternatives (React web app, Chrome extension) for the fol
 
 - **CORS is not a problem.** HTTP requests in a Tauri app originate from Rust at the OS level, not from a browser sandbox. We can call `api.onepeloton.com` directly with no proxy, no Cloudflare Worker, no CORS configuration.
 - **SQLite instead of IndexedDB.** Tauri's SQL plugin gives us a proper local relational database. Querying years of per-second ride metrics is fast and expressive. IndexedDB (the browser alternative) is awkward for complex queries.
-- **Native filesystem.** Exporting graphs or CSVs writes directly to the user's Downloads folder. No download-prompt friction.
+- **Native filesystem.** Exporting graphs writes directly to the user's Downloads folder. No download-prompt friction.
 - **Cross-platform.** macOS, Windows, and Linux — all from one codebase.
 - **Code signing is already handled.** The maintainer is an enrolled Apple Developer (notarization is free with the existing membership). Windows signing can be deferred initially since the target audience (Peloton data enthusiasts) can handle a SmartScreen "More info → Run anyway" prompt.
 
@@ -39,15 +39,7 @@ Tauri was chosen over alternatives (React web app, Chrome extension) for the fol
 
 ---
 
-## Data Sources
-
-### 1. CSV Import (MVP, zero infrastructure required)
-
-Peloton lets every user export their full workout history as a CSV from their profile settings. This is the primary data ingestion path for the MVP. Users drag and drop the CSV into the app.
-
-The CSV contains summary data per workout: date, duration, output, calories, distance, heart rate averages, instructor, discipline, etc.
-
-### 2. Live API Sync (secondary)
+## Data Source
 
 Peloton's unofficial REST API (`api.onepeloton.com`) is what their own web app uses. It is undocumented but stable and widely used by the third-party community.
 
@@ -77,7 +69,7 @@ CREATE TABLE workouts (
   avg_resistance REAL,
   avg_speed REAL,
   strive_score REAL,
-  source TEXT                    -- 'csv' or 'api'
+  source TEXT                    -- 'api'
 );
 
 CREATE TABLE metrics (
@@ -101,8 +93,7 @@ CREATE INDEX idx_metrics_workout ON metrics(workout_id);
 
 ## Core Features (MVP)
 
-1. **CSV import** — drag and drop Peloton export CSV, parse and store in SQLite
-2. **API sync** — authenticate with Peloton, sync workout history, incremental updates
+1. **API sync** — authenticate with Peloton, sync workout history, incremental updates
 3. **Workout list** — sortable/filterable table (by date, duration, output, instructor, discipline)
 4. **Filtered views** — e.g., "show only 30-minute cycling rides, sorted by output descending"
 5. **Output-over-time chart** — line/dot plot of output across all rides of a given duration

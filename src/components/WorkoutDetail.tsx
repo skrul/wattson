@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import type { Workout } from "../types";
 import { cachedFetchWorkoutDetail, cachedFetchPerformanceGraph, cachedFetchRideDetails } from "../lib/enrichmentCache";
 import { updateWorkoutMetrics, updateRideDetails, getWorkoutsByRideId } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import RideDetailChart from "./RideDetailChart";
 import CompareTab from "./CompareTab";
+import { parsePerformanceGraph, renderMetricChart, type CompareMetric } from "../lib/charts";
 
 type DetailTab = "summary" | "share" | "compare";
 
@@ -83,10 +84,33 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
 
   const ftp = useMemo(() => parseWorkoutFtp(workout?.raw_detail_json), [workout?.raw_detail_json]);
 
+  const timeSeries = useMemo(
+    () => workout?.raw_performance_graph_json ? parsePerformanceGraph(workout.raw_performance_graph_json) : null,
+    [workout?.raw_performance_graph_json],
+  );
+
+  const metricChartsRef = useRef<HTMLDivElement>(null);
+
   // Reset tab when workout changes
   useEffect(() => {
     setActiveTab("summary");
   }, [workout?.id]);
+
+  // Render per-metric charts in Summary tab
+  useEffect(() => {
+    const el = metricChartsRef.current;
+    if (!el || !timeSeries || activeTab !== "summary") return;
+    el.innerHTML = "";
+
+    const metrics: CompareMetric[] = ["heartRate", "output", "cadence", "resistance", "speed"];
+    for (const metric of metrics) {
+      const values = timeSeries[metric];
+      if (!values || values.length === 0) continue;
+
+      const chart = renderMetricChart(timeSeries, metric, el.clientWidth || 600, 200);
+      el.appendChild(chart);
+    }
+  }, [timeSeries, activeTab]);
 
   // Query for other attempts at the same class (by Peloton ride ID)
   useEffect(() => {
@@ -258,6 +282,10 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
           <Stat label="Avg Heart Rate" value={workout.avg_heart_rate} unit="bpm" loading={showLoading} />
           <Stat label="Strive Score" value={workout.strive_score != null ? workout.strive_score.toFixed(1) : null} />
         </div>
+
+        {timeSeries && (
+          <div ref={metricChartsRef} className="mt-6 flex flex-col gap-4" />
+        )}
         </>
       )}
 

@@ -692,6 +692,106 @@ export function renderCompareChart(
   return container;
 }
 
+/**
+ * Render a single-ride, single-metric time-series chart with crosshair + floating tooltip.
+ */
+export function renderMetricChart(
+  timeSeries: PerformanceTimeSeries,
+  metric: CompareMetric,
+  width = 800,
+  height = 200,
+): HTMLElement {
+  const values = timeSeries[metric];
+  if (values.length === 0) {
+    return Plot.plot({ width, height, marks: [] }) as unknown as HTMLElement;
+  }
+
+  const data = values.map((v, i) => ({ second: i, value: v }));
+  const maxSecond = values.length - 1;
+  const tickInterval = maxSecond <= 600 ? 60 : maxSecond <= 1800 ? 300 : 600;
+  const metricInfo = COMPARE_METRICS.find((m) => m.key === metric);
+  const metricLabel = metricInfo?.label ?? metric;
+  const metricUnit = metricInfo?.label.match(/\(([^)]+)\)/)?.[1] ?? "";
+
+  const fmtTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const marks: Plot.Markish[] = [
+    Plot.lineY(data, { x: "second", y: "value", stroke: "#2563eb", strokeWidth: 1.5 }),
+    Plot.ruleX(data, Plot.pointerX({ x: "second", stroke: "#888", strokeDasharray: "4 3", strokeWidth: 1 })),
+    Plot.dot(data, Plot.pointerX({ x: "second", y: "value", stroke: "#2563eb", fill: "white", r: 4, strokeWidth: 2 })),
+  ];
+
+  const plot = Plot.plot({
+    width,
+    height,
+    x: {
+      label: null,
+      ticks: Array.from({ length: Math.floor(maxSecond / tickInterval) + 1 }, (_, i) => i * tickInterval),
+      tickFormat: (d: number) => `${Math.floor(d / 60)}m`,
+    },
+    y: { label: metricLabel, grid: true },
+    marks,
+  });
+
+  // Build forward x scale: second -> SVG pixel x
+  const xInfo = plot.scale("x");
+  const xRange = xInfo?.range ? Array.from(xInfo.range) as number[] : [0, width];
+  const xDomain = xInfo?.domain ? Array.from(xInfo.domain) as number[] : [0, maxSecond];
+  const secondToPixel = scaleLinear()
+    .domain(xDomain as [number, number])
+    .range(xRange as [number, number]);
+
+  const container = document.createElement("div");
+  container.style.position = "relative";
+  container.appendChild(plot);
+
+  const tooltip = document.createElement("div");
+  tooltip.style.cssText =
+    "position:absolute;display:none;pointer-events:none;" +
+    "background:white;border:1px solid #ddd;border-radius:6px;" +
+    "padding:6px 10px;font-size:13px;font-family:system-ui,sans-serif;" +
+    "box-shadow:0 2px 8px rgba(0,0,0,.15);white-space:nowrap;z-index:10;" +
+    "transform:translateX(-50%);";
+  container.appendChild(tooltip);
+
+  // The y-axis range gives us the pixel bounds of the plot area within the SVG.
+  // range[0] is the bottom of the plot area (Plot uses screen coords: top < bottom).
+  const yInfo = plot.scale("y");
+  const plotAreaBottom = yInfo?.range ? (Array.from(yInfo.range) as number[])[0] : height;
+
+  plot.addEventListener("input", () => {
+    const datum = (plot as unknown as { value: Record<string, unknown> | null }).value;
+    if (!datum || datum.second == null) {
+      tooltip.style.display = "none";
+      return;
+    }
+
+    const second = Number(datum.second);
+    const val = second >= 0 && second < values.length ? values[second] : null;
+    if (val == null) {
+      tooltip.style.display = "none";
+      return;
+    }
+
+    tooltip.innerHTML = `<span style="font-weight:600">${fmtTime(second)}</span> &mdash; <b>${val}</b>${metricUnit ? ` ${metricUnit}` : ""}`;
+    tooltip.style.display = "block";
+
+    const pixelX = secondToPixel(second);
+    const svgEl = plot.tagName.toLowerCase() === "svg" ? plot : plot.querySelector("svg");
+    const svgOffsetLeft = svgEl ? (svgEl as HTMLElement).offsetLeft ?? 0 : 0;
+    const svgOffsetTop = svgEl ? (svgEl as HTMLElement).offsetTop ?? 0 : 0;
+
+    tooltip.style.left = `${svgOffsetLeft + pixelX}px`;
+    tooltip.style.top = `${svgOffsetTop + plotAreaBottom - 4}px`;
+  });
+
+  return container;
+}
+
 /** Render a custom chart, choosing single or dual axis. */
 export function renderCustomChart(
   workouts: Workout[],

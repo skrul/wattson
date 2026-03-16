@@ -28,8 +28,17 @@ function useClickOutside(ref: React.RefObject<HTMLElement | null>, onClose: () =
   }, [ref, onClose]);
 }
 
-function ChartFilterChip({ condition, defaultOpen = false }: { condition: FilterCondition; defaultOpen?: boolean }) {
-  const { updateDraftFilter, removeDraftFilter } = useChartStore();
+function FilterChip({
+  condition,
+  defaultOpen = false,
+  onUpdate,
+  onRemove,
+}: {
+  condition: FilterCondition;
+  defaultOpen?: boolean;
+  onUpdate: (id: string, updates: Partial<FilterCondition>) => void;
+  onRemove: (id: string) => void;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   const containerRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
@@ -67,20 +76,20 @@ function ChartFilterChip({ condition, defaultOpen = false }: { condition: Filter
             <OperatorSelect
               operators={field.operators}
               value={condition.operator}
-              onChange={(op) => updateDraftFilter(condition.id, { operator: op })}
+              onChange={(op) => onUpdate(condition.id, { operator: op })}
             />
 
             {!isUnaryOp(condition.operator) && field.type === "number" && (
               <NumberInput
                 value={condition.value}
-                onChange={(v) => updateDraftFilter(condition.id, { value: v })}
+                onChange={(v) => onUpdate(condition.id, { value: v })}
               />
             )}
 
             {!isUnaryOp(condition.operator) && field.type === "string" && (
               <TextInput
                 value={condition.value}
-                onChange={(v) => updateDraftFilter(condition.id, { value: v })}
+                onChange={(v) => onUpdate(condition.id, { value: v })}
               />
             )}
 
@@ -89,15 +98,15 @@ function ChartFilterChip({ condition, defaultOpen = false }: { condition: Filter
                 operator={condition.operator}
                 value={condition.value}
                 values={condition.values}
-                onChangeValue={(v) => updateDraftFilter(condition.id, { value: v })}
-                onChangeValues={(values) => updateDraftFilter(condition.id, { values })}
+                onChangeValue={(v) => onUpdate(condition.id, { value: v })}
+                onChangeValues={(values) => onUpdate(condition.id, { values })}
               />
             )}
 
             {!isUnaryOp(condition.operator) && field.type === "date" && condition.operator !== "last_n_days" && condition.operator !== "between" && (
               <DateInput
                 value={condition.value}
-                onChange={(v) => updateDraftFilter(condition.id, { value: v })}
+                onChange={(v) => onUpdate(condition.id, { value: v })}
               />
             )}
 
@@ -105,12 +114,12 @@ function ChartFilterChip({ condition, defaultOpen = false }: { condition: Filter
               <EnumMultiSelect
                 fieldKey={condition.field}
                 selectedValues={condition.values}
-                onChange={(values) => updateDraftFilter(condition.id, { values })}
+                onChange={(values) => onUpdate(condition.id, { values })}
               />
             )}
 
             <button
-              onClick={() => removeDraftFilter(condition.id)}
+              onClick={() => onRemove(condition.id)}
               className="w-full rounded border border-red-200 px-2 py-1 text-sm text-red-600 hover:bg-red-50"
             >
               Delete filter
@@ -122,13 +131,21 @@ function ChartFilterChip({ condition, defaultOpen = false }: { condition: Filter
   );
 }
 
-export default function ChartFilterBar() {
-  const { draft, addDraftFilter } = useChartStore();
+/** Generic filter bar — accepts filters and callbacks, no store dependency. */
+export function FilterBar({
+  filters,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: {
+  filters: FilterCondition[];
+  onAdd: (condition: FilterCondition) => void;
+  onUpdate: (id: string, updates: Partial<FilterCondition>) => void;
+  onRemove: (id: string) => void;
+}) {
   const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
   const [search, setSearch] = useState("");
   const [newFilterId, setNewFilterId] = useState<string | null>(null);
-
-  if (!draft) return null;
 
   const filterableFields = FIELD_DEFS.filter((f) => f.filterable);
   const filtered = search
@@ -147,7 +164,7 @@ export default function ChartFilterBar() {
       value: "",
       values: [],
     };
-    addDraftFilter(condition);
+    onAdd(condition);
     setNewFilterId(condition.id);
     setSearch("");
     close();
@@ -156,8 +173,14 @@ export default function ChartFilterBar() {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="text-xs font-medium text-gray-500">Filters:</span>
-      {draft.filters.map((c) => (
-        <ChartFilterChip key={c.id} condition={c} defaultOpen={c.id === newFilterId} />
+      {filters.map((c) => (
+        <FilterChip
+          key={c.id}
+          condition={c}
+          defaultOpen={c.id === newFilterId}
+          onUpdate={onUpdate}
+          onRemove={onRemove}
+        />
       ))}
 
       <Popover className="relative">
@@ -217,5 +240,21 @@ export default function ChartFilterBar() {
         )}
       </Popover>
     </div>
+  );
+}
+
+/** Chart builder filter bar — connects FilterBar to the chart store's draft. */
+export default function ChartFilterBar() {
+  const { draft, addDraftFilter, updateDraftFilter, removeDraftFilter } = useChartStore();
+
+  if (!draft) return null;
+
+  return (
+    <FilterBar
+      filters={draft.filters}
+      onAdd={addDraftFilter}
+      onUpdate={updateDraftFilter}
+      onRemove={removeDraftFilter}
+    />
   );
 }

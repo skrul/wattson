@@ -252,11 +252,16 @@ export function EnumMultiSelect({
   onChange: (values: string[]) => void;
 }) {
   const [options, setOptions] = useState<string[]>([]);
-  const displayValue = FIELD_MAP[fieldKey]?.displayValue ?? ((v: string) => v);
+  const field = FIELD_MAP[fieldKey];
+  const displayValue = field?.displayValue ?? ((v: string) => v);
 
   useEffect(() => {
-    getDistinctValues(fieldKey).then(setOptions).catch(() => setOptions([]));
-  }, [fieldKey]);
+    if (field?.staticValues) {
+      setOptions(field.staticValues);
+    } else {
+      getDistinctValues(fieldKey).then(setOptions).catch(() => setOptions([]));
+    }
+  }, [fieldKey, field]);
 
   const toggle = (val: string) => {
     if (selectedValues.includes(val)) {

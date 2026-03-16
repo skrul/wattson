@@ -24,6 +24,7 @@ interface ChartState {
   removeDraftFilter: (id: string) => void;
   saveDraft: () => Promise<void>;
   removeChart: (id: string) => Promise<void>;
+  customizeTemplate: (template: ChartDefinition, viewerFilters: FilterCondition[]) => void;
   backToList: () => void;
 }
 
@@ -114,6 +115,19 @@ export const useChartStore = create<ChartState>((set, get) => ({
     await deleteChartDefinition(id);
     const charts = await getAllChartDefinitions();
     set({ charts, view: "list", activeChart: null });
+  },
+
+  customizeTemplate: (template, viewerFilters) => {
+    const now = Date.now();
+    const draft: ChartDefinition = {
+      ...template,
+      id: crypto.randomUUID(),
+      name: template.name,
+      filters: [...viewerFilters],
+      created_at: now,
+      updated_at: now,
+    };
+    set({ view: "builder", draft, activeChart: null });
   },
 
   backToList: () => {

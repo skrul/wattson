@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useChartStore } from "../stores/chartStore";
 import { FIELD_MAP } from "../lib/fields";
+import { CHART_TEMPLATES } from "../lib/chartTemplates";
 import type { ChartDefinition } from "../types";
 import { isConditionActive } from "./FilterEditors";
 
@@ -61,6 +62,33 @@ function ChartCard({ chart }: { chart: ChartDefinition }) {
   );
 }
 
+function TemplateCard({ chart }: { chart: ChartDefinition }) {
+  const { viewChart } = useChartStore();
+
+  const yLabels = chart.y_fields
+    .map((f) => FIELD_MAP[f.field]?.label ?? f.field)
+    .join(", ");
+
+  return (
+    <div
+      onClick={() => viewChart(chart)}
+      className="cursor-pointer rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md"
+    >
+      <h3 className="mb-2 font-medium text-gray-900">{chart.name}</h3>
+      <div className="space-y-1 text-xs text-gray-500">
+        <div className="flex items-center gap-2">
+          <span className="capitalize">{chart.mark_type}</span>
+          <span>·</span>
+          <span>{yLabels}</span>
+        </div>
+        {chart.group_by && (
+          <div>Grouped by {FIELD_MAP[chart.group_by]?.label ?? chart.group_by}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ChartList() {
   const { charts, loadCharts, createNew } = useChartStore();
 
@@ -83,25 +111,25 @@ export default function ChartList() {
         </button>
       </div>
 
-      {charts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 py-16 text-center">
-          <svg className="mb-3 h-10 w-10 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M3 3v18h18M7 14l4-4 4 4 4-6" />
-          </svg>
-          <p className="text-sm text-gray-500">No charts yet</p>
-          <p className="mt-1 text-xs text-gray-400">Create your first chart to visualize workout data</p>
-          <button
-            onClick={createNew}
-            className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            New Chart
-          </button>
-        </div>
-      ) : (
+      {/* Templates */}
+      <div className="mb-6">
+        <h3 className="mb-3 text-sm font-medium text-gray-500">Templates</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {charts.map((chart) => (
-            <ChartCard key={chart.id} chart={chart} />
+          {CHART_TEMPLATES.map((t) => (
+            <TemplateCard key={t.id} chart={t} />
           ))}
+        </div>
+      </div>
+
+      {/* Custom charts */}
+      {charts.length > 0 && (
+        <div>
+          <h3 className="mb-3 text-sm font-medium text-gray-500">My Charts</h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {charts.map((chart) => (
+              <ChartCard key={chart.id} chart={chart} />
+            ))}
+          </div>
         </div>
       )}
     </div>

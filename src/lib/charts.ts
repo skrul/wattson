@@ -320,7 +320,11 @@ const MAX_X_TICKS = 20;
 function workoutXConfig(data: WorkoutPoint[]): Record<string, unknown> {
   const domain = data.map((d) => d.label);
   const n = domain.length;
-  const cfg: Record<string, unknown> = { label: null, domain };
+  const cfg: Record<string, unknown> = {
+    label: null,
+    domain,
+    tickFormat: (d: string) => d.replace(/ #\d+$/, ""),
+  };
   if (n > MAX_X_TICKS) {
     const step = Math.ceil(n / MAX_X_TICKS);
     cfg.ticks = domain.filter((_, i) => i % step === 0);

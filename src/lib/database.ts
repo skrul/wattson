@@ -63,6 +63,10 @@ function buildConditionClause(
   if (!field || !FILTERABLE_COLUMNS.has(cond.field)) return null;
   if (!isConditionComplete(cond)) return null;
 
+  if (field.buildClause) {
+    return field.buildClause(cond, params, idx);
+  }
+
   const col = cond.field;
 
   switch (cond.operator) {
@@ -183,7 +187,7 @@ export async function queryWorkouts(filters: WorkoutFilters): Promise<Workout[]>
 }
 
 const DISTINCT_VALUE_COLUMNS = new Set<string>(
-  Object.values(FIELD_MAP).filter((f) => f.type === "enum").map((f) => f.key),
+  Object.values(FIELD_MAP).filter((f) => f.type === "enum" && !f.staticValues).map((f) => f.key),
 );
 
 /** Get sorted distinct non-null values for an enum column. */

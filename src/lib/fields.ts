@@ -1,4 +1,4 @@
-import type { FieldType, FilterOperator } from "../types";
+import type { FieldType, FilterCondition, FilterOperator } from "../types";
 
 export interface FieldDef {
   key: string;
@@ -13,6 +13,10 @@ export interface FieldDef {
   distinctFilter?: string;
   /** True if this field requires detailed enrichment (performance_graph data). */
   requiresDetail?: boolean;
+  /** Fixed set of values for virtual enum fields (bypasses DB distinct query). */
+  staticValues?: string[];
+  /** Custom SQL clause builder for virtual fields that don't map to a column. */
+  buildClause?: (cond: FilterCondition, params: unknown[], idx: { val: number }) => string | null;
 }
 
 const STRING_OPS: FilterOperator[] = [
@@ -52,6 +56,28 @@ export const FIELD_DEFS: FieldDef[] = [
   { key: "is_live", label: "Live/On-Demand", type: "enum", operators: ENUM_OPS, filterable: true, sortable: false },
   { key: "class_type", label: "Class Type", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
   { key: "class_subtype", label: "Class Subtype", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
+  {
+    key: "is_repeat",
+    label: "Repeated Ride",
+    type: "enum",
+    operators: ENUM_OPS,
+    filterable: true,
+    sortable: false,
+    staticValues: ["Yes", "No"],
+    buildClause: (cond) => {
+      if (cond.operator === "is_empty" || cond.operator === "is_not_empty") return null;
+      const sub = "(SELECT ride_id FROM workouts WHERE ride_id IS NOT NULL GROUP BY ride_id HAVING COUNT(*) > 1)";
+      const wantRepeated =
+        (cond.operator === "equals" && cond.values.includes("Yes") && !cond.values.includes("No")) ||
+        (cond.operator === "not_equals" && cond.values.includes("No") && !cond.values.includes("Yes"));
+      const wantNotRepeated =
+        (cond.operator === "equals" && cond.values.includes("No") && !cond.values.includes("Yes")) ||
+        (cond.operator === "not_equals" && cond.values.includes("Yes") && !cond.values.includes("No"));
+      if (wantRepeated) return `ride_id IN ${sub}`;
+      if (wantNotRepeated) return `(ride_id IS NULL OR ride_id NOT IN ${sub})`;
+      return null;
+    },
+  },
 ];
 
 export const FIELD_MAP: Record<string, FieldDef> = Object.fromEntries(

@@ -11,6 +11,12 @@ export interface PowerZone {
   color: string;
 }
 
+export interface InstructorCue {
+  startSecond: number;
+  endSecond: number;
+  zone: number;
+}
+
 export const POWER_ZONES: PowerZone[] = [
   { zone: "Z1", minPct: 0, maxPct: 0.55, color: "#6baed6" },
   { zone: "Z2", minPct: 0.55, maxPct: 0.75, color: "#31b5c4" },
@@ -53,6 +59,38 @@ export function parsePerformanceGraph(rawJson: string): PerformanceTimeSeries | 
   }
 }
 
+/**
+ * Parse instructor_cues from raw ride details JSON.
+ * Returns cue intervals for power zone segments, or null if none found.
+ */
+export function parseInstructorCues(rawRideDetailsJson: string): InstructorCue[] | null {
+  try {
+    const data = JSON.parse(rawRideDetailsJson);
+    const cues = data.instructor_cues;
+    if (!Array.isArray(cues)) return null;
+
+    // Cue offsets are relative to the ride video start, but performance data
+    // starts at the pedaling offset. Subtract it so cues align with the chart.
+    const pedalingOffset: number = data.ride?.pedaling_start_offset ?? 0;
+
+    const parsed: InstructorCue[] = [];
+    for (const cue of cues) {
+      if (cue.segment_type !== "power_zone") continue;
+      const zone = cue.metrics?.[0]?.upper;
+      if (zone == null || !cue.offsets) continue;
+      parsed.push({
+        startSecond: cue.offsets.start - pedalingOffset,
+        endSecond: cue.offsets.end - pedalingOffset,
+        zone,
+      });
+    }
+
+    return parsed.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 interface ChartOptions {
   width?: number;
   height?: number;
@@ -66,6 +104,7 @@ export function renderRideDetailChart(
   timeSeries: PerformanceTimeSeries,
   ftp: number | null,
   options: ChartOptions = {},
+  cues?: InstructorCue[] | null,
 ): SVGElement | HTMLElement {
   const { width = 800, height = 300 } = options;
 
@@ -118,6 +157,53 @@ export function renderRideDetailChart(
         fill: "#666",
       }),
     );
+  }
+
+  // Class plan overlay (instructor cues)
+  if (ftp != null && cues && cues.length > 0) {
+    const cueSegments = cues.map((c) => {
+      const pz = POWER_ZONES[c.zone - 1];
+      if (!pz) return null;
+      const yVal = ((pz.minPct + pz.maxPct) / 2) * ftp;
+      return { x1: c.startSecond, x2: c.endSecond, y: yVal, zone: c.zone, duration: c.endSecond - c.startSecond };
+    }).filter((s): s is NonNullable<typeof s> => s != null);
+
+    // Horizontal line segments
+    marks.push(
+      Plot.link(cueSegments, {
+        x1: "x1",
+        x2: "x2",
+        y1: "y",
+        y2: "y",
+        stroke: "#333",
+        strokeOpacity: 0.5,
+        strokeWidth: 2,
+      }),
+    );
+
+    // Vertical connectors between adjacent cues
+    const verticals: { x: number; y1: number; y2: number }[] = [];
+    for (let i = 0; i < cueSegments.length - 1; i++) {
+      const curr = cueSegments[i];
+      const next = cueSegments[i + 1];
+      if (curr.y !== next.y) {
+        verticals.push({ x: next.x1, y1: curr.y, y2: next.y });
+      }
+    }
+
+    if (verticals.length > 0) {
+      marks.push(
+        Plot.link(verticals, {
+          x1: "x",
+          x2: "x",
+          y1: "y1",
+          y2: "y2",
+          stroke: "#333",
+          strokeOpacity: 0.5,
+          strokeWidth: 2,
+        }),
+      );
+    }
   }
 
   // Output line

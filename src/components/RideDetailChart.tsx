@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo } from "react";
 import type { Workout } from "../types";
-import { parsePerformanceGraph, renderRideDetailChart } from "../lib/charts";
+import { parsePerformanceGraph, parseInstructorCues, renderRideDetailChart } from "../lib/charts";
 import ExportButton from "./ExportButton";
 
 interface RideDetailChartProps {
@@ -50,17 +50,22 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
     return parsePerformanceGraph(workout.raw_performance_graph_json);
   }, [workout.raw_performance_graph_json]);
 
+  const cues = useMemo(() => {
+    if (!workout.raw_ride_details_json) return null;
+    return parseInstructorCues(workout.raw_ride_details_json);
+  }, [workout.raw_ride_details_json]);
+
   useEffect(() => {
     if (!chartRef.current || !timeSeries) return;
 
     const el = chartRef.current;
     const chart = renderRideDetailChart(timeSeries, ftp, {
       width: el.clientWidth || 800,
-    });
+    }, cues);
     el.replaceChildren(chart);
 
     return () => { el.replaceChildren(); };
-  }, [timeSeries, ftp]);
+  }, [timeSeries, ftp, cues]);
 
   if (!timeSeries) return null;
 
@@ -75,6 +80,7 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
           workout={workout}
           ftp={ftp}
           timeSeries={timeSeries}
+          cues={cues}
         />
       </div>
 

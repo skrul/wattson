@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
-import { renderRideDetailChart } from "../lib/charts";
+import { renderRideDetailChart, type InstructorCue } from "../lib/charts";
 import { svgToImage } from "../lib/exportUtils";
 import type { Workout, PerformanceTimeSeries } from "../types";
 
@@ -10,6 +10,7 @@ interface ExportButtonProps {
   workout: Workout;
   ftp: number | null;
   timeSeries: PerformanceTimeSeries;
+  cues?: InstructorCue[] | null;
 }
 
 const EXPORT_WIDTH = 1200;
@@ -38,12 +39,13 @@ async function renderExportPng(
   workout: Workout,
   ftp: number | null,
   timeSeries: PerformanceTimeSeries,
+  cues?: InstructorCue[] | null,
 ): Promise<Blob> {
   // Render chart SVG at export width
   const chartEl = renderRideDetailChart(timeSeries, ftp, {
     width: CHART_WIDTH,
     height: CHART_HEIGHT,
-  });
+  }, cues);
   const chartImg = await svgToImage(chartEl);
 
   // Build stats list
@@ -133,13 +135,13 @@ async function renderExportPng(
   });
 }
 
-export default function ExportButton({ filename, workout, ftp, timeSeries }: ExportButtonProps) {
+export default function ExportButton({ filename, workout, ftp, timeSeries, cues }: ExportButtonProps) {
   const [status, setStatus] = useState<"idle" | "copying" | "copied" | "error">("idle");
 
   async function handleCopy() {
     setStatus("copying");
     try {
-      const blobPromise = renderExportPng(workout, ftp, timeSeries);
+      const blobPromise = renderExportPng(workout, ftp, timeSeries, cues);
       await navigator.clipboard.write([
         new ClipboardItem({ "image/png": blobPromise }),
       ]);
@@ -159,7 +161,7 @@ export default function ExportButton({ filename, workout, ftp, timeSeries }: Exp
         filters: [{ name: "PNG Image", extensions: ["png"] }],
       });
       if (!filePath) return; // user cancelled
-      const blob = await renderExportPng(workout, ftp, timeSeries);
+      const blob = await renderExportPng(workout, ftp, timeSeries, cues);
       const bytes = new Uint8Array(await blob.arrayBuffer());
       await writeFile(filePath, bytes);
     } catch (err) {

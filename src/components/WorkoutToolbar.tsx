@@ -79,7 +79,7 @@ function SearchInput() {
 }
 
 export default function WorkoutToolbar() {
-  const { filters } = useWorkoutStore();
+  const { filters, workouts } = useWorkoutStore();
   const [newFilterId, setNewFilterId] = useState<string | null>(null);
 
   const handleFilterCreated = useCallback((id: string) => {
@@ -104,7 +104,8 @@ export default function WorkoutToolbar() {
 
       <AddFilterButton onFilterCreated={handleFilterCreated} />
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex items-center gap-2">
+        <span className="text-xs text-gray-400">{workouts.length} workouts</span>
         <SearchInput />
       </div>
     </div>

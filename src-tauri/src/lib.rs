@@ -150,6 +150,12 @@ pub fn run() {
             sql: "ALTER TABLE workouts ADD COLUMN class_subtype TEXT;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 12,
+            description: "drop_metrics_table",
+            sql: "DROP TABLE IF EXISTS metrics;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

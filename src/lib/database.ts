@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { Workout, MetricSample, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics, ChartDefinition, ChartDefinitionRow } from "../types";
+import type { Workout, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics, ChartDefinition, ChartDefinitionRow } from "../types";
 import { FIELD_MAP } from "./fields";
 import { parseClassType, parseClassSubtype, PARSE_VERSION } from "./classType";
 
@@ -64,6 +64,7 @@ function buildConditionClause(
   if (!isConditionComplete(cond)) return null;
 
   const col = cond.field;
+  const scale = field.queryScale ?? 1;
 
   switch (cond.operator) {
     case "is_empty":
@@ -77,7 +78,7 @@ function buildConditionClause(
         return `${col} IN (${placeholders.join(", ")})`;
       }
       if (field.type === "number") {
-        params.push(parseFloat(cond.value));
+        params.push(parseFloat(cond.value) * scale);
       } else if (field.type === "date") {
         params.push(dateToTimestamp(cond.value));
       } else {
@@ -91,7 +92,7 @@ function buildConditionClause(
         return `${col} NOT IN (${placeholders.join(", ")})`;
       }
       if (field.type === "number") {
-        params.push(parseFloat(cond.value));
+        params.push(parseFloat(cond.value) * scale);
       } else if (field.type === "date") {
         params.push(dateToTimestamp(cond.value));
       } else {
@@ -111,16 +112,16 @@ function buildConditionClause(
       params.push(`%${cond.value}`);
       return `${col} LIKE $${idx.val++}`;
     case "gt":
-      params.push(parseFloat(cond.value));
+      params.push(parseFloat(cond.value) * scale);
       return `${col} > $${idx.val++}`;
     case "gte":
-      params.push(parseFloat(cond.value));
+      params.push(parseFloat(cond.value) * scale);
       return `${col} >= $${idx.val++}`;
     case "lt":
-      params.push(parseFloat(cond.value));
+      params.push(parseFloat(cond.value) * scale);
       return `${col} < $${idx.val++}`;
     case "lte":
-      params.push(parseFloat(cond.value));
+      params.push(parseFloat(cond.value) * scale);
       return `${col} <= $${idx.val++}`;
     case "before":
       params.push(dateToTimestamp(cond.value));
@@ -244,7 +245,6 @@ export async function getWorkoutCount(): Promise<number> {
 /** Delete all user data from the database. */
 export async function deleteAllData(): Promise<void> {
   const d = await getDb();
-  await d.execute("DELETE FROM metrics");
   await d.execute("DELETE FROM user_profile");
   await d.execute("DELETE FROM workouts");
 }
@@ -294,17 +294,6 @@ export async function backfillClassTypes(): Promise<void> {
       [classType, classSubtype, PARSE_VERSION, row.id],
     );
   }
-}
-
-/** Insert per-second metric samples for a workout. */
-export async function insertMetrics(_metrics: MetricSample[]): Promise<void> {
-  // TODO: implement batch insert
-}
-
-/** Fetch per-second metrics for a specific workout. */
-export async function getMetrics(_workoutId: string): Promise<MetricSample[]> {
-  // TODO: implement query
-  return [];
 }
 
 // --- Chart definitions ---

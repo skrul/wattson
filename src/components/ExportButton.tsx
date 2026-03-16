@@ -42,7 +42,7 @@ async function renderExportPng(
   cues?: InstructorCue[] | null,
 ): Promise<Blob> {
   // Render chart SVG at export width
-  const chartEl = renderRideDetailChart(timeSeries, ftp, {
+  const chartEl = renderRideDetailChart(timeSeries, ftp || null, {
     width: CHART_WIDTH,
     height: CHART_HEIGHT,
   }, cues);
@@ -57,7 +57,7 @@ async function renderExportPng(
   if (workout.avg_cadence != null) stats.push(["Avg Cadence", `${workout.avg_cadence} rpm`]);
   if (workout.avg_resistance != null) stats.push(["Avg Resistance", `${workout.avg_resistance}%`]);
   if (workout.avg_heart_rate != null) stats.push(["Avg HR", `${workout.avg_heart_rate} bpm`]);
-  if (ftp != null) stats.push(["FTP", `${ftp} w`]);
+  if (ftp) stats.push(["FTP", `${ftp} w`]);
 
   // Layout measurements
   const headerHeight = 60;

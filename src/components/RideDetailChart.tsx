@@ -59,7 +59,7 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
     if (!chartRef.current || !timeSeries) return;
 
     const el = chartRef.current;
-    const chart = renderRideDetailChart(timeSeries, ftp, {
+    const chart = renderRideDetailChart(timeSeries, ftp || null, {
       width: el.clientWidth || 800,
     }, cues);
     el.replaceChildren(chart);
@@ -106,7 +106,7 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
           <FooterStat label="Avg Cadence" value={workout.avg_cadence} unit="rpm" />
           <FooterStat label="Avg Resistance" value={workout.avg_resistance != null ? `${workout.avg_resistance}%` : null} />
           <FooterStat label="Avg HR" value={workout.avg_heart_rate} unit="bpm" />
-          {ftp != null && <FooterStat label="FTP" value={ftp} unit="w" />}
+          {ftp ? <FooterStat label="FTP" value={ftp} unit="w" /> : null}
         </div>
       </div>
     </div>

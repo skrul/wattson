@@ -57,17 +57,6 @@ export interface UserProfile {
   raw_json: string;
 }
 
-/** A single per-second metric sample for a workout. */
-export interface MetricSample {
-  workout_id: string;
-  second: number;
-  output: number | null;
-  cadence: number | null;
-  resistance: number | null;
-  heart_rate: number | null;
-  speed: number | null;
-}
-
 export type FieldType = "string" | "number" | "date" | "enum";
 
 export type FilterOperator =

@@ -1,5 +1,5 @@
 import { fetch } from "@tauri-apps/plugin-http";
-import type { Workout, MetricSample, UserProfile, WorkoutMetrics } from "../types";
+import type { Workout, UserProfile, WorkoutMetrics } from "../types";
 import { parseClassType, parseClassSubtype, PARSE_VERSION } from "./classType";
 
 export class AuthError extends Error {
@@ -196,15 +196,6 @@ export async function fetchUserProfile(accessToken: string): Promise<UserProfile
     total_workouts: data.total_workouts ?? null,
     raw_json: JSON.stringify(data),
   };
-}
-
-/** Fetch per-second performance metrics for a single workout. */
-export async function fetchMetrics(
-  _workoutId: string,
-  _accessToken: string,
-): Promise<MetricSample[]> {
-  // TODO: implement via performance_graph endpoint in a future phase
-  return [];
 }
 
 /** Fetch workout detail from /api/workout/{id}. Returns the raw JSON. */

@@ -191,7 +191,7 @@ describe("fetchAllWorkouts", () => {
         heart_rate_zone_durations: {},
       },
       ride: {
-        title: "30 min Pop Ride",
+        title: "30 min Climb Ride",
         duration: 1800,
         is_live_in_studio_only: false,
         instructor: { name: "Cody Rigsby" },
@@ -210,7 +210,7 @@ describe("fetchAllWorkouts", () => {
     expect(result.date).toBe(1700000000);
     expect(result.duration_seconds).toBe(1800);
     expect(result.discipline).toBe("cycling");
-    expect(result.title).toBe("30 min Pop Ride");
+    expect(result.title).toBe("30 min Climb Ride");
     expect(result.instructor).toBe("Cody Rigsby");
     expect(result.strive_score).toBe(42.5);
     expect(result.is_live).toBe(1); // is_live_in_studio_only=false → 1
@@ -218,6 +218,9 @@ describe("fetchAllWorkouts", () => {
     expect(result.total_work).toBe(250000);
     expect(result.source).toBe("api");
     expect(result.raw_json).toBeTruthy();
+    expect(result.class_type).toBe("Climb");
+    expect(result.class_subtype).toBeNull();
+    expect(result.class_type_version).toBe(3);
   });
 
   it("uses knownTotal as progress denominator instead of body.total", async () => {

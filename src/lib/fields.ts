@@ -44,6 +44,8 @@ export const FIELD_DEFS: FieldDef[] = [
   { key: "strive_score", label: "Strive Score", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
   { key: "workout_type", label: "Workout Type", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
   { key: "is_live", label: "Live/On-Demand", type: "enum", operators: ENUM_OPS, filterable: true, sortable: false },
+  { key: "class_type", label: "Class Type", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
+  { key: "class_subtype", label: "Class Subtype", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
 ];
 
 export const FIELD_MAP: Record<string, FieldDef> = Object.fromEntries(

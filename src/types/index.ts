@@ -23,6 +23,9 @@ export interface Workout {
   raw_detail_json: string | null;
   raw_performance_graph_json: string | null;
   raw_ride_details_json: string | null;
+  class_type: string | null;
+  class_subtype: string | null;
+  class_type_version: number | null;
 }
 
 /** Metrics fetched on-demand from the performance_graph endpoint. */

@@ -6,7 +6,7 @@ import SetupWizard from "./components/SetupWizard";
 import ReauthModal from "./components/ReauthModal";
 import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
 import { syncWorkouts } from "./lib/sync";
-import { getUserProfile, hasWorkouts } from "./lib/database";
+import { getUserProfile, hasWorkouts, backfillClassTypes } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
 
 type Tab = "workouts" | "charts" | "profile";
@@ -31,6 +31,7 @@ function App() {
     checkForUpdate().then((status) => {
       if (status.available) setUpdate(status);
     });
+    backfillClassTypes().catch((e) => console.error("Class type backfill failed:", e));
   }, []);
 
   // On initial load, determine data state; load cached profile when session exists

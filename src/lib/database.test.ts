@@ -40,6 +40,9 @@ function makeWorkout(id: string, overrides: Partial<Workout> = {}): Workout {
     raw_detail_json: null,
     raw_performance_graph_json: null,
     raw_ride_details_json: null,
+    class_type: "Ride",
+    class_subtype: null,
+    class_type_version: 3,
     ...overrides,
   };
 }
@@ -440,8 +443,10 @@ describe("queryWorkouts", () => {
     expect(sql).toContain("instructor LIKE $2");
     expect(sql).toContain("discipline LIKE $3");
     expect(sql).toContain("workout_type LIKE $4");
+    expect(sql).toContain("class_type LIKE $5");
+    expect(sql).toContain("class_subtype LIKE $6");
     expect(sql).toContain(" OR ");
-    expect(params).toEqual(["%cool%", "%cool%", "%cool%", "%cool%"]);
+    expect(params).toEqual(["%cool%", "%cool%", "%cool%", "%cool%", "%cool%", "%cool%"]);
   });
 
   it("combines search with filter conditions", async () => {
@@ -459,7 +464,7 @@ describe("queryWorkouts", () => {
     expect(sql).toContain("discipline IN ($1)");
     expect(sql).toContain("AND");
     expect(sql).toContain("title LIKE $2");
-    expect(params).toEqual(["cycling", "%cool%", "%cool%", "%cool%", "%cool%"]);
+    expect(params).toEqual(["cycling", "%cool%", "%cool%", "%cool%", "%cool%", "%cool%", "%cool%"]);
   });
 
   it("ignores empty search string", async () => {

@@ -536,6 +536,7 @@ export function renderCompareChart(
   width = 800,
   height = 300,
 ): SVGElement | HTMLElement {
+  // Long (tidy) data for the line marks
   const data: { second: number; value: number; label: string }[] = [];
   for (const ride of rides) {
     const values = ride.timeSeries[metric];
@@ -553,7 +554,46 @@ export function renderCompareChart(
 
   const metricLabel = COMPARE_METRICS.find((m) => m.key === metric)?.label ?? metric;
 
-  return Plot.plot({
+  // Build wide dataset: one row per second with a column per ride label.
+  // This lets a single Plot.tip show all rides' values at the hovered second.
+  const rideLabels = rides.map((r) => r.label);
+  const maxLen = Math.max(...rides.map((r) => r.timeSeries[metric].length));
+  const wideData: Record<string, unknown>[] = [];
+  for (let s = 0; s < maxLen; s++) {
+    const row: Record<string, unknown> = { second: s };
+    for (const ride of rides) {
+      const vals = ride.timeSeries[metric];
+      if (s < vals.length) row[ride.label] = vals[s];
+    }
+    wideData.push(row);
+  }
+
+  const fmtTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const marks: Plot.Markish[] = [
+    // Ride lines
+    Plot.lineY(data, {
+      x: "second",
+      y: "value",
+      stroke: "label",
+      strokeWidth: 1.5,
+    }),
+    // Vertical crosshair rule
+    Plot.ruleX(wideData, Plot.pointerX({ x: "second", stroke: "#888", strokeDasharray: "4 3", strokeWidth: 1 })),
+    // Highlight dots on each line at the hovered second
+    ...rideLabels.map((label) =>
+      Plot.dot(
+        data.filter((d) => d.label === label),
+        Plot.pointerX({ x: "second", y: "value", stroke: "label", fill: "white", r: 4, strokeWidth: 2 }),
+      ),
+    ),
+  ];
+
+  const plot = Plot.plot({
     width,
     height,
     x: {
@@ -569,15 +609,87 @@ export function renderCompareChart(
       grid: true,
     },
     color: { legend: true },
-    marks: [
-      Plot.lineY(data, {
-        x: "second",
-        y: "value",
-        stroke: "label",
-        strokeWidth: 1.5,
-      }),
-    ],
+    marks,
   });
+
+  // Resolve line colors from the plot's color scale
+  const colorInfo = plot.scale("color");
+  const colorMap = new Map<string, string>();
+  if (colorInfo?.domain && colorInfo?.range) {
+    const domain = Array.from(colorInfo.domain);
+    const range = Array.from(colorInfo.range);
+    for (let i = 0; i < domain.length; i++) {
+      colorMap.set(String(domain[i]), String(range[i % range.length]));
+    }
+  }
+
+  // Build forward x scale: second → SVG pixel x
+  const xInfo = plot.scale("x");
+  const xRange = xInfo?.range ? Array.from(xInfo.range) as number[] : [0, width];
+  const xDomain = xInfo?.domain ? Array.from(xInfo.domain) as number[] : [0, maxSecond];
+  const secondToPixel = scaleLinear()
+    .domain(xDomain as [number, number])
+    .range(xRange as [number, number]);
+
+  // Container with relative positioning so tooltip can float
+  const container = document.createElement("div");
+  container.style.position = "relative";
+  container.appendChild(plot);
+
+  const tooltip = document.createElement("div");
+  tooltip.style.cssText =
+    "position:absolute;display:none;pointer-events:none;" +
+    "background:white;border:1px solid #ddd;border-radius:6px;" +
+    "padding:8px 12px;font-size:13px;font-family:system-ui,sans-serif;" +
+    "box-shadow:0 2px 8px rgba(0,0,0,.15);white-space:nowrap;z-index:10;" +
+    "transform:translateX(-50%);";
+  container.appendChild(tooltip);
+
+  // Listen for Plot's "input" event fired by pointerX marks
+  plot.addEventListener("input", () => {
+    const datum = (plot as unknown as { value: Record<string, unknown> | null }).value;
+    if (!datum || datum.second == null) {
+      tooltip.style.display = "none";
+      return;
+    }
+
+    const second = Number(datum.second);
+    const row = second >= 0 && second < maxLen ? wideData[second] : null;
+    if (!row) {
+      tooltip.style.display = "none";
+      return;
+    }
+
+    let html = `<div style="font-weight:600;margin-bottom:4px">${fmtTime(second)}</div>`;
+    for (const label of rideLabels) {
+      const val = row[label];
+      if (val == null) continue;
+      const color = colorMap.get(label) ?? "#999";
+      html +=
+        `<div style="display:flex;align-items:center;gap:5px">` +
+        `<span style="display:inline-block;width:10px;height:10px;background:${color};border-radius:2px;flex-shrink:0"></span>` +
+        `<span>${label}: <b>${val}</b></span></div>`;
+    }
+    tooltip.innerHTML = html;
+    tooltip.style.display = "block";
+
+    // Position: horizontally at the crosshair x, vertically at chart bottom
+    const pixelX = secondToPixel(second);
+
+    // Find the SVG to compute its offset within the container
+    const svgEl = plot.tagName.toLowerCase() === "svg"
+      ? plot
+      : plot.querySelector("svg");
+    const svgOffsetLeft = svgEl ? (svgEl as HTMLElement).offsetLeft ?? 0 : 0;
+    const svgBottom = svgEl
+      ? ((svgEl as HTMLElement).offsetTop ?? 0) + ((svgEl as HTMLElement).offsetHeight ?? height)
+      : height;
+
+    tooltip.style.left = `${svgOffsetLeft + pixelX}px`;
+    tooltip.style.top = `${svgBottom + 4}px`;
+  });
+
+  return container;
 }
 
 /** Render a custom chart, choosing single or dual axis. */

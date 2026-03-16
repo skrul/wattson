@@ -8,6 +8,7 @@ import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
 import { syncWorkouts } from "./lib/sync";
 import { getUserProfile, hasWorkouts, backfillClassTypes } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
+import { useEnrichmentStore } from "./stores/enrichmentStore";
 
 type Tab = "workouts" | "charts" | "profile";
 
@@ -32,6 +33,7 @@ function App() {
       if (status.available) setUpdate(status);
     });
     backfillClassTypes().catch((e) => console.error("Class type backfill failed:", e));
+    useEnrichmentStore.getState().loadState().catch((e) => console.error("Enrichment state load failed:", e));
   }, []);
 
   // On initial load, determine data state; load cached profile when session exists
@@ -65,6 +67,16 @@ function App() {
       console.error("Auto-sync failed:", e);
     });
   }, [loaded, session]);
+
+  // Auto-resume enrichment backfill when session is available and mode is detailed
+  const enrichmentMode = useEnrichmentStore((s) => s.mode);
+  const backfillStatus = useEnrichmentStore((s) => s.backfillStatus);
+  useEffect(() => {
+    if (!loaded || !session) return;
+    if (enrichmentMode === "detailed" && backfillStatus === "paused") {
+      useEnrichmentStore.getState().startBackfill();
+    }
+  }, [loaded, session, enrichmentMode, backfillStatus]);
 
   const handleUpdate = async () => {
     setUpdating(true);

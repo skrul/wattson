@@ -170,6 +170,12 @@ pub fn run() {
             sql: "ALTER TABLE chart_definitions ADD COLUMN x_axis_mode TEXT NOT NULL DEFAULT 'date';",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 15,
+            description: "create_settings_table",
+            sql: "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

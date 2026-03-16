@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { FIELD_DEFS } from "../lib/fields";
 import { useWorkoutStore } from "../stores/workoutStore";
+import { useEnrichmentStore } from "../stores/enrichmentStore";
 import type { FilterCondition } from "../types";
 
 export default function AddFilterButton({
@@ -10,6 +11,7 @@ export default function AddFilterButton({
   onFilterCreated: (id: string) => void;
 }) {
   const { addCondition } = useWorkoutStore();
+  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
   const [search, setSearch] = useState("");
 
   const filterableFields = FIELD_DEFS.filter((f) => f.filterable);
@@ -62,24 +64,35 @@ export default function AddFilterButton({
               />
             </div>
             <div className="max-h-64 overflow-y-auto py-1">
-              {filtered.map((f) => (
-                <button
-                  key={f.key}
-                  onClick={() => handleSelect(f.key, close)}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  <span className="w-4 text-xs text-gray-400">
-                    {f.type === "number"
-                      ? "#"
-                      : f.type === "enum"
-                        ? "⊙"
-                        : f.type === "date"
-                          ? "◷"
-                          : "T"}
-                  </span>
-                  {f.label}
-                </button>
-              ))}
+              {filtered.map((f) => {
+                const disabled = f.requiresDetail && !enrichmentComplete;
+                return (
+                  <button
+                    key={f.key}
+                    onClick={() => !disabled && handleSelect(f.key, close)}
+                    disabled={disabled}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${
+                      disabled
+                        ? "cursor-not-allowed text-gray-300"
+                        : "text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span className={`w-4 text-xs ${disabled ? "text-gray-300" : "text-gray-400"}`}>
+                      {f.type === "number"
+                        ? "#"
+                        : f.type === "enum"
+                          ? "⊙"
+                          : f.type === "date"
+                            ? "◷"
+                            : "T"}
+                    </span>
+                    {f.label}
+                    {disabled && (
+                      <span className="ml-auto text-xs text-gray-300">Detailed</span>
+                    )}
+                  </button>
+                );
+              })}
               {filtered.length === 0 && (
                 <p className="px-3 py-2 text-xs text-gray-400">No matching fields</p>
               )}

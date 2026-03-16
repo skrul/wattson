@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { Workout, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics, ChartDefinition, ChartDefinitionRow } from "../types";
+import type { Workout, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics, ChartDefinition, ChartDefinitionRow, ChartXAxisMode } from "../types";
 import { FIELD_MAP } from "./fields";
 import { parseClassType, parseClassSubtype, PARSE_VERSION } from "./classType";
 
@@ -307,6 +307,7 @@ function rowToChart(row: ChartDefinitionRow): ChartDefinition {
     y_fields: JSON.parse(row.y_fields_json),
     group_by: row.group_by,
     filters: JSON.parse(row.filters_json),
+    x_axis_mode: (row.x_axis_mode ?? "date") as ChartXAxisMode,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -326,8 +327,8 @@ export async function saveChartDefinition(chart: ChartDefinition): Promise<void>
   const d = await getDb();
   await d.execute(
     `INSERT OR REPLACE INTO chart_definitions
-      (id, name, mark_type, y_fields_json, group_by, filters_json, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      (id, name, mark_type, y_fields_json, group_by, filters_json, x_axis_mode, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
     [
       chart.id,
       chart.name,
@@ -335,6 +336,7 @@ export async function saveChartDefinition(chart: ChartDefinition): Promise<void>
       JSON.stringify(chart.y_fields),
       chart.group_by,
       JSON.stringify(chart.filters),
+      chart.x_axis_mode,
       chart.created_at,
       chart.updated_at,
     ],

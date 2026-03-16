@@ -164,6 +164,12 @@ pub fn run() {
             CREATE INDEX idx_workouts_ride_id ON workouts(ride_id);",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 14,
+            description: "add_x_axis_mode_to_chart_definitions",
+            sql: "ALTER TABLE chart_definitions ADD COLUMN x_axis_mode TEXT NOT NULL DEFAULT 'date';",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

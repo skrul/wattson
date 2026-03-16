@@ -24,10 +24,6 @@ export default function ChartPlot({ chart, workouts, width, height = 400 }: Char
     const w = width ?? (el.clientWidth || 800);
     const svg = renderCustomChart(workouts, chart, w, height);
     el.replaceChildren(svg);
-
-    return () => {
-      el.replaceChildren();
-    };
   }, [chart, workouts, width, height]);
 
   if (chart.y_fields.length === 0) {

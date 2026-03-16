@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import ApiSync from "./components/ApiSync";
 import WorkoutList from "./components/WorkoutList";
 import OutputChart from "./components/OutputChart";
+import InsightsTab from "./components/InsightsTab";
 import SetupWizard from "./components/SetupWizard";
 import ReauthModal from "./components/ReauthModal";
 import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
@@ -9,13 +10,13 @@ import { syncWorkouts } from "./lib/sync";
 import { getUserProfile, hasWorkouts } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
 import { useEnrichmentStore } from "./stores/enrichmentStore";
-
-type Tab = "workouts" | "charts" | "profile";
+import { useNavigationStore, type Tab } from "./stores/navigationStore";
 
 const AUTO_SYNC_KEY = "wattson:autoSyncOnLaunch";
 
 function App() {
-  const [activeTab, setActiveTab] = useState<Tab>("workouts");
+  const activeTab = useNavigationStore((s) => s.activeTab);
+  const setActiveTab = useNavigationStore((s) => s.setActiveTab);
   const [update, setUpdate] = useState<UpdateStatus | null>(null);
   const [updating, setUpdating] = useState(false);
   const [dataState, setDataState] = useState<"checking" | "empty" | "has_data">("checking");
@@ -122,7 +123,7 @@ function App() {
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
         <h1 className="text-xl font-bold">Wattson</h1>
         <nav className="flex gap-2">
-          {(["workouts", "charts", "profile"] as Tab[]).map((tab) => (
+          {(["workouts", "insights", "charts", "profile"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -138,12 +139,19 @@ function App() {
         </nav>
       </header>
 
-      {/* Content */}
-      <main className="flex-1 overflow-y-auto p-6">
-        {activeTab === "workouts" && <WorkoutList />}
-        {activeTab === "charts" && <OutputChart />}
-        {activeTab === "profile" && <ApiSync onDataDeleted={() => { setDataState("empty"); setShowWizard(true); }} />}
-      </main>
+      {/* Content — all tabs stay mounted to preserve scroll position and avoid re-fetching */}
+      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "workouts" ? "" : "hidden"}`}>
+        <WorkoutList />
+      </div>
+      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "charts" ? "" : "hidden"}`}>
+        <OutputChart />
+      </div>
+      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "insights" ? "" : "hidden"}`}>
+        <InsightsTab />
+      </div>
+      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "profile" ? "" : "hidden"}`}>
+        <ApiSync onDataDeleted={() => { setDataState("empty"); setShowWizard(true); }} />
+      </div>
 
       <SetupWizard open={showWizard} onComplete={() => { setShowWizard(false); setDataState("has_data"); }} />
       <ReauthModal />

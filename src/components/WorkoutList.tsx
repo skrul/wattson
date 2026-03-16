@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { queryWorkouts } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
+import { useNavigationStore } from "../stores/navigationStore";
 import { isConditionActive } from "./FilterEditors";
 import WorkoutToolbar from "./WorkoutToolbar";
 import WorkoutCard from "./WorkoutCard";
@@ -46,12 +47,40 @@ export default function WorkoutList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveFilterKey, setWorkouts, setLoading]);
 
+  // Consume pending workout navigation from Insights tab
+  const pendingWorkoutNav = useNavigationStore((s) => s.pendingWorkoutNav);
+  useEffect(() => {
+    const nav = useNavigationStore.getState().consumePendingWorkoutNav();
+    if (nav) {
+      const store = useWorkoutStore.getState();
+      store.setFilters({
+        conditions: nav.conditions,
+        sort: nav.sort,
+        search: "",
+      });
+      // Clear selection; auto-select will pick the first result after query loads
+      store.selectWorkout(nav.workoutId || null);
+      if (!nav.workoutId) {
+        store.setWorkouts([]);
+      }
+    }
+  }, [pendingWorkoutNav]);
+
   // Auto-select first workout when none is selected
   useEffect(() => {
     if (!selectedWorkoutId && workouts.length > 0) {
       selectWorkout(workouts[0].id);
     }
   }, [selectedWorkoutId, workouts, selectWorkout]);
+
+  // Scroll virtualizer to selected workout
+  useEffect(() => {
+    if (!selectedWorkoutId) return;
+    const idx = workouts.findIndex((w) => w.id === selectedWorkoutId);
+    if (idx >= 0) {
+      cardVirtualizer.scrollToIndex(idx, { align: "auto" });
+    }
+  }, [selectedWorkoutId, workouts, cardVirtualizer]);
 
   const selectedWorkout = workouts.find((w) => w.id === selectedWorkoutId) ?? null;
 
@@ -87,6 +116,7 @@ export default function WorkoutList() {
                       workout={w}
                       isSelected={w.id === selectedWorkoutId}
                       onClick={() => selectWorkout(w.id)}
+                      sortField={filters.sort.field}
                     />
                   </div>
                 );

@@ -104,6 +104,20 @@ export default function WorkoutToolbar() {
 
       <AddFilterButton onFilterCreated={handleFilterCreated} />
 
+      {(filters.conditions.length > 0 ||
+        filters.sort.field !== "date" ||
+        filters.sort.direction !== "desc") && (
+        <button
+          onClick={() => {
+            useWorkoutStore.getState().clearConditions();
+            useWorkoutStore.getState().clearSort();
+          }}
+          className="rounded px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+        >
+          Reset
+        </button>
+      )}
+
       <div className="ml-auto flex items-center gap-2">
         <span className="text-xs text-gray-400">{workouts.length} workouts</span>
         <SearchInput />

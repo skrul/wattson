@@ -390,3 +390,173 @@ export function chartFiltersToWorkoutFilters(conditions: FilterCondition[]): Wor
     search: "",
   };
 }
+
+// --- Insights queries ---
+
+export interface DisciplineCount {
+  discipline: string;
+  count: number;
+}
+
+export interface DurationCount {
+  duration_seconds: number;
+  count: number;
+}
+
+export interface ClassTypeCount {
+  class_type: string;
+  count: number;
+}
+
+export interface InstructorCount {
+  instructor: string;
+  count: number;
+}
+
+export interface RepeatedRide {
+  ride_id: string;
+  title: string;
+  instructor: string | null;
+  count: number;
+  workout_id: string;
+}
+
+/** Count workouts per discipline, ordered by count DESC. */
+export async function getDisciplineCounts(): Promise<DisciplineCount[]> {
+  const d = await getDb();
+  return d.select<DisciplineCount[]>(
+    `SELECT discipline, COUNT(*) as count FROM workouts
+     WHERE discipline IS NOT NULL AND discipline != ''
+     GROUP BY discipline ORDER BY count DESC`,
+  );
+}
+
+/** Count workouts per duration for a given discipline, ordered by count DESC. */
+export async function getDurationCounts(discipline: string): Promise<DurationCount[]> {
+  const d = await getDb();
+  return d.select<DurationCount[]>(
+    `SELECT duration_seconds, COUNT(*) as count FROM workouts
+     WHERE discipline = $1 AND duration_seconds IS NOT NULL
+     GROUP BY duration_seconds ORDER BY count DESC`,
+    [discipline],
+  );
+}
+
+/** Count workouts per class_type for a given discipline, ordered by count DESC. */
+export async function getClassTypeCounts(discipline: string): Promise<ClassTypeCount[]> {
+  const d = await getDb();
+  return d.select<ClassTypeCount[]>(
+    `SELECT class_type, COUNT(*) as count FROM workouts
+     WHERE discipline = $1 AND class_type IS NOT NULL AND class_type != ''
+     GROUP BY class_type ORDER BY count DESC`,
+    [discipline],
+  );
+}
+
+const METRIC_ALLOWLIST = new Set([
+  "total_work", "avg_output", "calories", "distance",
+  "avg_heart_rate", "avg_cadence", "avg_speed", "strive_score",
+]);
+
+/** Count workouts per class_subtype for a given discipline and class_type, ordered by count DESC. */
+export async function getClassSubtypeCounts(discipline: string, classType: string): Promise<ClassSubtypeCount[]> {
+  const d = await getDb();
+  return d.select<ClassSubtypeCount[]>(
+    `SELECT class_subtype, COUNT(*) as count FROM workouts
+     WHERE discipline = $1 AND class_type = $2 AND class_subtype IS NOT NULL AND class_subtype != ''
+     GROUP BY class_subtype ORDER BY count DESC`,
+    [discipline, classType],
+  );
+}
+
+export interface ClassSubtypeCount {
+  class_subtype: string;
+  count: number;
+}
+
+export interface TopWorkoutFilters {
+  discipline?: string;
+  classType?: string;
+  classSubtype?: string;
+  durationSeconds?: number;
+}
+
+/** Get top N workouts by a given metric, with optional filters. */
+export async function getTopWorkouts(
+  metric: string,
+  limit: number,
+  filters?: TopWorkoutFilters,
+): Promise<Workout[]> {
+  if (!METRIC_ALLOWLIST.has(metric)) {
+    throw new Error(`Metric "${metric}" is not allowed`);
+  }
+  const clauses = [`${metric} IS NOT NULL`];
+  const params: unknown[] = [];
+  let idx = 1;
+
+  if (filters?.discipline) {
+    clauses.push(`discipline = $${idx++}`);
+    params.push(filters.discipline);
+  }
+  if (filters?.classType) {
+    clauses.push(`class_type = $${idx++}`);
+    params.push(filters.classType);
+  }
+  if (filters?.classSubtype) {
+    clauses.push(`class_subtype = $${idx++}`);
+    params.push(filters.classSubtype);
+  }
+  if (filters?.durationSeconds != null) {
+    clauses.push(`duration_seconds = $${idx++}`);
+    params.push(filters.durationSeconds);
+  }
+
+  params.push(limit);
+  const d = await getDb();
+  return d.select<Workout[]>(
+    `SELECT * FROM workouts WHERE ${clauses.join(" AND ")}
+     ORDER BY ${metric} DESC LIMIT $${idx}`,
+    params,
+  );
+}
+
+/** Top instructors by workout count. */
+export async function getTopInstructors(limit: number): Promise<InstructorCount[]> {
+  const d = await getDb();
+  return d.select<InstructorCount[]>(
+    `SELECT instructor, COUNT(*) as count FROM workouts
+     WHERE instructor IS NOT NULL AND instructor != ''
+     GROUP BY instructor ORDER BY count DESC LIMIT $1`,
+    [limit],
+  );
+}
+
+/** Top class types by workout count. */
+export async function getTopClassTypes(limit: number): Promise<ClassTypeCount[]> {
+  const d = await getDb();
+  return d.select<ClassTypeCount[]>(
+    `SELECT class_type, COUNT(*) as count FROM workouts
+     WHERE class_type IS NOT NULL AND class_type != ''
+     GROUP BY class_type ORDER BY count DESC LIMIT $1`,
+    [limit],
+  );
+}
+
+/** Most repeated rides (same ride_id taken multiple times), with most recent workout ID. */
+export async function getMostRepeatedRides(limit: number): Promise<RepeatedRide[]> {
+  const d = await getDb();
+  return d.select<RepeatedRide[]>(
+    `SELECT w.ride_id, w.title, w.instructor, g.count, w.id as workout_id
+     FROM workouts w
+     INNER JOIN (
+       SELECT ride_id, COUNT(*) as count, MAX(date) as max_date
+       FROM workouts
+       WHERE ride_id IS NOT NULL AND ride_id != ''
+       GROUP BY ride_id
+       HAVING count > 1
+     ) g ON w.ride_id = g.ride_id AND w.date = g.max_date
+     ORDER BY g.count DESC, g.max_date DESC
+     LIMIT $1`,
+    [limit],
+  );
+}

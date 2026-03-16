@@ -21,14 +21,16 @@ export async function insertWorkouts(workouts: Workout[]): Promise<void> {
         (id, peloton_id, date, duration_seconds, discipline, title, instructor,
          avg_output, calories, distance, avg_heart_rate, avg_cadence,
          avg_resistance, avg_speed, strive_score, is_live, workout_type,
-         total_work, source, raw_json, raw_detail_json, raw_performance_graph_json)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+         total_work, source, raw_json, raw_detail_json, raw_performance_graph_json,
+         raw_ride_details_json)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
       [
         w.id, w.peloton_id, w.date, w.duration_seconds, w.discipline,
         w.title, w.instructor, w.avg_output, w.calories, w.distance,
         w.avg_heart_rate, w.avg_cadence, w.avg_resistance, w.avg_speed,
         w.strive_score, w.is_live, w.workout_type, w.total_work,
         w.source, w.raw_json, w.raw_detail_json, w.raw_performance_graph_json,
+        w.raw_ride_details_json,
       ],
     );
   }
@@ -248,6 +250,15 @@ export async function updateWorkoutMetrics(
       metrics.avg_resistance, metrics.avg_speed, metrics.avg_heart_rate,
       rawDetailJson, rawPerformanceGraphJson, workoutId,
     ],
+  );
+}
+
+/** Update a workout's cached ride details JSON. */
+export async function updateRideDetails(workoutId: string, rawJson: string): Promise<void> {
+  const d = await getDb();
+  await d.execute(
+    `UPDATE workouts SET raw_ride_details_json=$1 WHERE id=$2`,
+    [rawJson, workoutId],
   );
 }
 

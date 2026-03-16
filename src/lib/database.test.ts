@@ -39,6 +39,7 @@ function makeWorkout(id: string, overrides: Partial<Workout> = {}): Workout {
     raw_json: "{}",
     raw_detail_json: null,
     raw_performance_graph_json: null,
+    raw_ride_details_json: null,
     ...overrides,
   };
 }

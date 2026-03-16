@@ -59,7 +59,7 @@ function App() {
   useEffect(() => {
     if (!loaded || !session || autoSyncRan.current) return;
     const pref = localStorage.getItem(AUTO_SYNC_KEY);
-    if (pref !== "true") return;
+    if (pref === "false") return;
     autoSyncRan.current = true;
 
     syncWorkouts().catch((e) => {

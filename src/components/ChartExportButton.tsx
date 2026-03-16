@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { renderCustomChart } from "../lib/charts";
@@ -6,6 +5,7 @@ import { svgToImage } from "../lib/exportUtils";
 import { FIELD_MAP } from "../lib/fields";
 import type { ChartDefinition, Workout } from "../types";
 import { isConditionActive, valueSummary } from "./FilterEditors";
+import ShareMenu from "./ShareMenu";
 
 const EXPORT_WIDTH = 1200;
 const SCALE = 2;
@@ -108,57 +108,26 @@ interface ChartExportButtonProps {
 }
 
 export default function ChartExportButton({ chart, workouts }: ChartExportButtonProps) {
-  const [status, setStatus] = useState<"idle" | "copying" | "copied" | "error">("idle");
+  if (workouts.length === 0 || chart.y_fields.length === 0) return null;
 
   async function handleCopy() {
-    setStatus("copying");
-    try {
-      const blobPromise = renderChartExportPng(chart, workouts);
-      await navigator.clipboard.write([
-        new ClipboardItem({ "image/png": blobPromise }),
-      ]);
-      setStatus("copied");
-      setTimeout(() => setStatus("idle"), 2000);
-    } catch (err) {
-      console.error("Copy failed:", err);
-      setStatus("error");
-      setTimeout(() => setStatus("idle"), 2000);
-    }
+    const blobPromise = renderChartExportPng(chart, workouts);
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": blobPromise }),
+    ]);
   }
 
   async function handleSave() {
-    try {
-      const filename = (chart.name || "chart").replace(/[^a-zA-Z0-9]/g, "-");
-      const filePath = await save({
-        defaultPath: `${filename}.png`,
-        filters: [{ name: "PNG Image", extensions: ["png"] }],
-      });
-      if (!filePath) return;
-      const blob = await renderChartExportPng(chart, workouts);
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      await writeFile(filePath, bytes);
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
+    const filename = (chart.name || "chart").replace(/[^a-zA-Z0-9]/g, "-");
+    const filePath = await save({
+      defaultPath: `${filename}.png`,
+      filters: [{ name: "PNG Image", extensions: ["png"] }],
+    });
+    if (!filePath) return;
+    const blob = await renderChartExportPng(chart, workouts);
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    await writeFile(filePath, bytes);
   }
 
-  if (workouts.length === 0 || chart.y_fields.length === 0) return null;
-
-  return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={handleCopy}
-        disabled={status === "copying"}
-        className="rounded bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
-      >
-        {status === "copied" ? "Copied!" : status === "error" ? "Failed" : "Copy to Clipboard"}
-      </button>
-      <button
-        onClick={handleSave}
-        className="rounded bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200"
-      >
-        Save as PNG
-      </button>
-    </div>
-  );
+  return <ShareMenu onCopy={handleCopy} onSave={handleSave} />;
 }

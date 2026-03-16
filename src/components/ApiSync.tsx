@@ -9,6 +9,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useEnrichmentStore } from "../stores/enrichmentStore";
 
 const LAST_EMAIL_KEY = "wattson:lastEmail";
+const AUTO_SYNC_KEY = "wattson:autoSyncOnLaunch";
 
 interface Props {
   onDataDeleted: () => void;
@@ -41,6 +42,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [cacheStatus, setCacheStatus] = useState("");
   const [workoutCount, setWorkoutCount] = useState<number | null>(null);
+  const [autoSync, setAutoSync] = useState(() => localStorage.getItem(AUTO_SYNC_KEY) !== "false");
 
   const session = useSessionStore((s) => s.session);
   const userProfile = useSessionStore((s) => s.userProfile);
@@ -238,6 +240,18 @@ export default function ApiSync({ onDataDeleted }: Props) {
         )}
         {status && <p className="text-sm text-green-600">{status}</p>}
         {error && <p className="text-sm text-red-600">{error}</p>}
+        <label className="flex items-center gap-2 text-sm text-gray-600">
+          <input
+            type="checkbox"
+            checked={autoSync}
+            onChange={(e) => {
+              setAutoSync(e.target.checked);
+              localStorage.setItem(AUTO_SYNC_KEY, e.target.checked ? "true" : "false");
+            }}
+            className="rounded border-gray-300"
+          />
+          Sync automatically on launch
+        </label>
       </div>
 
       {/* Detailed Metrics */}

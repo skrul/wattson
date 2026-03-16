@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { renderRideDetailChart, type InstructorCue } from "../lib/charts";
 import { svgToImage } from "../lib/exportUtils";
 import type { Workout, PerformanceTimeSeries } from "../types";
+import ShareMenu from "./ShareMenu";
 
 interface ExportButtonProps {
   filename: string;
@@ -45,6 +45,7 @@ async function renderExportPng(
   const chartEl = renderRideDetailChart(timeSeries, ftp || null, {
     width: CHART_WIDTH,
     height: CHART_HEIGHT,
+    durationSeconds: workout.duration_seconds ?? undefined,
   }, cues);
   const chartImg = await svgToImage(chartEl);
 
@@ -136,54 +137,23 @@ async function renderExportPng(
 }
 
 export default function ExportButton({ filename, workout, ftp, timeSeries, cues }: ExportButtonProps) {
-  const [status, setStatus] = useState<"idle" | "copying" | "copied" | "error">("idle");
-
   async function handleCopy() {
-    setStatus("copying");
-    try {
-      const blobPromise = renderExportPng(workout, ftp, timeSeries, cues);
-      await navigator.clipboard.write([
-        new ClipboardItem({ "image/png": blobPromise }),
-      ]);
-      setStatus("copied");
-      setTimeout(() => setStatus("idle"), 2000);
-    } catch (err) {
-      console.error("Copy failed:", err);
-      setStatus("error");
-      setTimeout(() => setStatus("idle"), 2000);
-    }
+    const blobPromise = renderExportPng(workout, ftp, timeSeries, cues);
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": blobPromise }),
+    ]);
   }
 
   async function handleSave() {
-    try {
-      const filePath = await save({
-        defaultPath: `${filename}.png`,
-        filters: [{ name: "PNG Image", extensions: ["png"] }],
-      });
-      if (!filePath) return; // user cancelled
-      const blob = await renderExportPng(workout, ftp, timeSeries, cues);
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      await writeFile(filePath, bytes);
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
+    const filePath = await save({
+      defaultPath: `${filename}.png`,
+      filters: [{ name: "PNG Image", extensions: ["png"] }],
+    });
+    if (!filePath) return;
+    const blob = await renderExportPng(workout, ftp, timeSeries, cues);
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    await writeFile(filePath, bytes);
   }
 
-  return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={handleCopy}
-        disabled={status === "copying"}
-        className="rounded bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
-      >
-        {status === "copied" ? "Copied!" : status === "error" ? "Failed" : "Copy to Clipboard"}
-      </button>
-      <button
-        onClick={handleSave}
-        className="rounded bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200"
-      >
-        Save as PNG
-      </button>
-    </div>
-  );
+  return <ShareMenu onCopy={handleCopy} onSave={handleSave} />;
 }

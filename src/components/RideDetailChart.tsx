@@ -61,6 +61,7 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
     const el = chartRef.current;
     const chart = renderRideDetailChart(timeSeries, ftp || null, {
       width: el.clientWidth || 800,
+      durationSeconds: workout.duration_seconds ?? undefined,
     }, cues);
     el.replaceChildren(chart);
 

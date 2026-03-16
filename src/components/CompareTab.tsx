@@ -12,6 +12,7 @@ import {
   COMPARE_METRICS,
   type CompareMetric,
 } from "../lib/charts";
+import ShareMenu from "./ShareMenu";
 
 interface CompareTabProps {
   workouts: Workout[];
@@ -44,8 +45,9 @@ async function renderCompareExportPng(
   chartRides: { label: string; timeSeries: import("../types").PerformanceTimeSeries }[],
   metric: CompareMetric,
   title: string,
+  durationSeconds?: number,
 ): Promise<Blob> {
-  const chartEl = renderCompareChart(chartRides, metric, CHART_WIDTH, CHART_HEIGHT);
+  const chartEl = renderCompareChart(chartRides, metric, CHART_WIDTH, CHART_HEIGHT, durationSeconds);
   const chartImg = await svgToImage(chartEl);
 
   const metricLabel = COMPARE_METRICS.find((m) => m.key === metric)?.label ?? metric;
@@ -172,7 +174,6 @@ export default function CompareTab({ workouts: initialWorkouts, currentId, acces
   const [fetchProgress, setFetchProgress] = useState<{ done: number; total: number } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => defaultSelection(workouts, currentId));
   const [metric, setMetric] = useState<CompareMetric>("output");
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copying" | "copied" | "error">("idle");
   const chartRef = useRef<HTMLDivElement>(null);
 
   // Keep selectedIds in sync when workouts list changes (new rides loaded)
@@ -252,7 +253,8 @@ export default function CompareTab({ workouts: initialWorkouts, currentId, acces
     if (!el) return;
     el.innerHTML = "";
     if (chartRides.length === 0) return;
-    const chart = renderCompareChart(chartRides, metric, el.clientWidth || 800, 300);
+    const duration = workouts[0]?.duration_seconds ?? undefined;
+    const chart = renderCompareChart(chartRides, metric, el.clientWidth || 800, 300, duration);
     el.appendChild(chart);
   }, [chartRides, metric]);
 
@@ -278,39 +280,25 @@ export default function CompareTab({ workouts: initialWorkouts, currentId, acces
   }
 
   const rideTitle = workouts[0]?.title ?? "Compare";
+  const duration = workouts[0]?.duration_seconds ?? undefined;
 
   async function handleCopy() {
-    if (chartRides.length === 0) return;
-    setCopyStatus("copying");
-    try {
-      const blobPromise = renderCompareExportPng(chartRides, metric, rideTitle);
-      await navigator.clipboard.write([
-        new ClipboardItem({ "image/png": blobPromise }),
-      ]);
-      setCopyStatus("copied");
-      setTimeout(() => setCopyStatus("idle"), 2000);
-    } catch (err) {
-      console.error("Copy failed:", err);
-      setCopyStatus("error");
-      setTimeout(() => setCopyStatus("idle"), 2000);
-    }
+    const blobPromise = renderCompareExportPng(chartRides, metric, rideTitle, duration);
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": blobPromise }),
+    ]);
   }
 
   async function handleSave() {
-    if (chartRides.length === 0) return;
-    try {
-      const filename = rideTitle.replace(/[^a-zA-Z0-9]/g, "-");
-      const filePath = await save({
-        defaultPath: `${filename}-compare.png`,
-        filters: [{ name: "PNG Image", extensions: ["png"] }],
-      });
-      if (!filePath) return;
-      const blob = await renderCompareExportPng(chartRides, metric, rideTitle);
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      await writeFile(filePath, bytes);
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
+    const filename = rideTitle.replace(/[^a-zA-Z0-9]/g, "-");
+    const filePath = await save({
+      defaultPath: `${filename}-compare.png`,
+      filters: [{ name: "PNG Image", extensions: ["png"] }],
+    });
+    if (!filePath) return;
+    const blob = await renderCompareExportPng(chartRides, metric, rideTitle, duration);
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    await writeFile(filePath, bytes);
   }
 
   return (
@@ -343,19 +331,7 @@ export default function CompareTab({ workouts: initialWorkouts, currentId, acces
         {chartRides.length > 0 && (
           <>
             <div className="mx-1 h-4 border-l border-gray-300" />
-            <button
-              onClick={handleCopy}
-              disabled={copyStatus === "copying"}
-              className="rounded bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
-            >
-              {copyStatus === "copied" ? "Copied!" : copyStatus === "error" ? "Failed" : "Copy to Clipboard"}
-            </button>
-            <button
-              onClick={handleSave}
-              className="rounded bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200"
-            >
-              Save as PNG
-            </button>
+            <ShareMenu onCopy={handleCopy} onSave={handleSave} />
           </>
         )}
       </div>

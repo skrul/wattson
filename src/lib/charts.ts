@@ -94,6 +94,7 @@ export function parseInstructorCues(rawRideDetailsJson: string): InstructorCue[]
 interface ChartOptions {
   width?: number;
   height?: number;
+  durationSeconds?: number;
 }
 
 /**
@@ -217,7 +218,10 @@ export function renderRideDetailChart(
   );
 
   const totalSeconds = timeSeries.seconds.length;
-  const tickInterval = totalSeconds <= 600 ? 60 : totalSeconds <= 1800 ? 300 : 600;
+  const xMax = options.durationSeconds ?? totalSeconds;
+  const tickInterval = xMax <= 600 ? 60 : xMax <= 1800 ? 300 : 600;
+  const ticks = Array.from({ length: Math.floor(xMax / tickInterval) + 1 }, (_, i) => i * tickInterval);
+  if (xMax % tickInterval !== 0) ticks.push(xMax);
 
   return Plot.plot({
     width,
@@ -225,7 +229,8 @@ export function renderRideDetailChart(
     marginRight: 36,
     x: {
       label: null,
-      ticks: Array.from({ length: Math.floor(totalSeconds / tickInterval) + 1 }, (_, i) => i * tickInterval),
+      domain: [0, xMax],
+      ticks,
       tickFormat: (d: number) => {
         const m = Math.floor(d / 60);
         return `${m}m`;
@@ -535,6 +540,7 @@ export function renderCompareChart(
   metric: CompareMetric,
   width = 800,
   height = 300,
+  durationSeconds?: number,
 ): SVGElement | HTMLElement {
   // Long (tidy) data for the line marks
   const data: { second: number; value: number; label: string }[] = [];
@@ -550,7 +556,13 @@ export function renderCompareChart(
   }
 
   const maxSecond = Math.max(...data.map((d) => d.second));
-  const tickInterval = maxSecond <= 600 ? 60 : maxSecond <= 1800 ? 300 : 600;
+  const xMax = durationSeconds ?? maxSecond;
+  const tickInterval = xMax <= 600 ? 60 : xMax <= 1800 ? 300 : 600;
+  const compareTicks = Array.from(
+    { length: Math.floor(xMax / tickInterval) + 1 },
+    (_, i) => i * tickInterval,
+  );
+  if (xMax % tickInterval !== 0) compareTicks.push(xMax);
 
   const metricLabel = COMPARE_METRICS.find((m) => m.key === metric)?.label ?? metric;
 
@@ -598,10 +610,8 @@ export function renderCompareChart(
     height,
     x: {
       label: null,
-      ticks: Array.from(
-        { length: Math.floor(maxSecond / tickInterval) + 1 },
-        (_, i) => i * tickInterval,
-      ),
+      domain: [0, xMax],
+      ticks: compareTicks,
       tickFormat: (d: number) => `${Math.floor(d / 60)}m`,
     },
     y: {
@@ -700,6 +710,7 @@ export function renderMetricChart(
   metric: CompareMetric,
   width = 800,
   height = 200,
+  durationSeconds?: number,
 ): HTMLElement {
   const values = timeSeries[metric];
   if (values.length === 0) {
@@ -708,7 +719,10 @@ export function renderMetricChart(
 
   const data = values.map((v, i) => ({ second: i, value: v }));
   const maxSecond = values.length - 1;
-  const tickInterval = maxSecond <= 600 ? 60 : maxSecond <= 1800 ? 300 : 600;
+  const xMax = durationSeconds ?? maxSecond;
+  const tickInterval = xMax <= 600 ? 60 : xMax <= 1800 ? 300 : 600;
+  const metricTicks = Array.from({ length: Math.floor(xMax / tickInterval) + 1 }, (_, i) => i * tickInterval);
+  if (xMax % tickInterval !== 0) metricTicks.push(xMax);
   const metricInfo = COMPARE_METRICS.find((m) => m.key === metric);
   const metricLabel = metricInfo?.label ?? metric;
   const metricUnit = metricInfo?.label.match(/\(([^)]+)\)/)?.[1] ?? "";
@@ -730,7 +744,8 @@ export function renderMetricChart(
     height,
     x: {
       label: null,
-      ticks: Array.from({ length: Math.floor(maxSecond / tickInterval) + 1 }, (_, i) => i * tickInterval),
+      domain: [0, xMax],
+      ticks: metricTicks,
       tickFormat: (d: number) => `${Math.floor(d / 60)}m`,
     },
     y: { label: metricLabel, grid: true },

@@ -1,14 +1,18 @@
 import { create } from "zustand";
 import type { Workout, WorkoutFilters, FilterCondition, SortSpec } from "../types";
 
+export type DetailTab = "summary" | "share" | "compare";
+
 interface WorkoutState {
   workouts: Workout[];
   selectedWorkoutId: string | null;
+  detailTab: DetailTab;
   filters: WorkoutFilters;
   isLoading: boolean;
 
   setWorkouts: (workouts: Workout[]) => void;
   selectWorkout: (id: string | null) => void;
+  setDetailTab: (tab: DetailTab) => void;
   setFilters: (filters: WorkoutFilters) => void;
   setLoading: (loading: boolean) => void;
   addCondition: (condition: FilterCondition) => void;
@@ -26,11 +30,13 @@ const DEFAULT_SORT: SortSpec = { field: "date", direction: "desc" };
 export const useWorkoutStore = create<WorkoutState>((set) => ({
   workouts: [],
   selectedWorkoutId: null,
+  detailTab: "summary",
   filters: { conditions: [], sort: DEFAULT_SORT, search: "" },
   isLoading: false,
 
   setWorkouts: (workouts) => set({ workouts }),
-  selectWorkout: (id) => set({ selectedWorkoutId: id }),
+  selectWorkout: (id) => set({ selectedWorkoutId: id, detailTab: "summary" }),
+  setDetailTab: (detailTab) => set({ detailTab }),
   setFilters: (filters) => set({ filters }),
   setLoading: (isLoading) => set({ isLoading }),
 

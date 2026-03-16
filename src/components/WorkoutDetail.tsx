@@ -2,12 +2,10 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import type { Workout } from "../types";
 import { cachedFetchWorkoutDetail, cachedFetchPerformanceGraph, cachedFetchRideDetails } from "../lib/enrichmentCache";
 import { updateWorkoutMetrics, updateRideDetails, getWorkoutsByRideId } from "../lib/database";
-import { useWorkoutStore } from "../stores/workoutStore";
+import { useWorkoutStore, type DetailTab } from "../stores/workoutStore";
 import RideDetailChart from "./RideDetailChart";
 import CompareTab from "./CompareTab";
 import { parsePerformanceGraph, renderMetricChart, type CompareMetric } from "../lib/charts";
-
-type DetailTab = "summary" | "share" | "compare";
 
 interface WorkoutDetailProps {
   workout: Workout | null;
@@ -77,9 +75,10 @@ function parseWorkoutFtp(rawDetailJson: string | null | undefined): number | nul
 /** Detail view for a single workout with stats. */
 export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailProps) {
   const updateWorkout = useWorkoutStore((s) => s.updateWorkout);
+  const activeTab = useWorkoutStore((s) => s.detailTab);
+  const setActiveTab = useWorkoutStore((s) => s.setDetailTab);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [metricsError, setMetricsError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<DetailTab>("summary");
   const [sameClassWorkouts, setSameClassWorkouts] = useState<Workout[]>([]);
 
   const ftp = useMemo(() => parseWorkoutFtp(workout?.raw_detail_json), [workout?.raw_detail_json]);
@@ -89,12 +88,19 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
     [workout?.raw_performance_graph_json],
   );
 
-  const metricChartsRef = useRef<HTMLDivElement>(null);
+  const maxStats = useMemo(() => {
+    if (!timeSeries) return null;
+    const max = (arr: number[]) => arr.length > 0 ? Math.max(...arr) : null;
+    return {
+      output: max(timeSeries.output),
+      cadence: max(timeSeries.cadence),
+      resistance: max(timeSeries.resistance),
+      heartRate: max(timeSeries.heartRate),
+      speed: max(timeSeries.speed),
+    };
+  }, [timeSeries]);
 
-  // Reset tab when workout changes
-  useEffect(() => {
-    setActiveTab("summary");
-  }, [workout?.id]);
+  const metricChartsRef = useRef<HTMLDivElement>(null);
 
   // Render per-metric charts in Summary tab
   useEffect(() => {
@@ -107,7 +113,7 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
       const values = timeSeries[metric];
       if (!values || values.length === 0) continue;
 
-      const chart = renderMetricChart(timeSeries, metric, el.clientWidth || 600, 200);
+      const chart = renderMetricChart(timeSeries, metric, el.clientWidth || 600, 200, workout?.duration_seconds ?? undefined);
       el.appendChild(chart);
     }
   }, [timeSeries, activeTab]);
@@ -271,16 +277,31 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
 
         <div className="grid grid-cols-3 gap-6">
           <Stat label="Total Output" value={workout.total_work != null ? Math.round(workout.total_work / 1000) : null} unit="kj" loading={showLoading} />
-          <Stat label="Distance" value={workout.distance != null ? workout.distance.toFixed(2) : null} unit="mi" loading={showLoading} />
           <Stat label="Calories" value={workout.calories} unit="kcal" loading={showLoading} />
+          <Stat label="Strive Score" value={workout.strive_score != null ? workout.strive_score.toFixed(1) : null} />
 
           <Stat label="Avg Output" value={workout.avg_output} unit="watts" loading={showLoading} />
-          <Stat label="Avg Cadence" value={workout.avg_cadence} unit="rpm" loading={showLoading} />
-          <Stat label="Avg Resistance" value={workout.avg_resistance != null ? `${workout.avg_resistance}%` : null} loading={showLoading} />
-
-          <Stat label="Avg Speed" value={workout.avg_speed != null ? workout.avg_speed.toFixed(1) : null} unit="mph" loading={showLoading} />
           <Stat label="Avg Heart Rate" value={workout.avg_heart_rate} unit="bpm" loading={showLoading} />
-          <Stat label="Strive Score" value={workout.strive_score != null ? workout.strive_score.toFixed(1) : null} />
+          <Stat label="Avg Cadence" value={workout.avg_cadence} unit="rpm" loading={showLoading} />
+
+          {maxStats && (
+            <>
+              <Stat label="Max Output" value={maxStats.output} unit="watts" />
+              <Stat label="Max Heart Rate" value={maxStats.heartRate} unit="bpm" />
+              <Stat label="Max Cadence" value={maxStats.cadence} unit="rpm" />
+            </>
+          )}
+
+          <Stat label="Avg Resistance" value={workout.avg_resistance != null ? `${workout.avg_resistance}%` : null} loading={showLoading} />
+          <Stat label="Avg Speed" value={workout.avg_speed != null ? workout.avg_speed.toFixed(1) : null} unit="mph" loading={showLoading} />
+          <Stat label="Distance" value={workout.distance != null ? workout.distance.toFixed(2) : null} unit="mi" loading={showLoading} />
+
+          {maxStats && (
+            <>
+              <Stat label="Max Resistance" value={maxStats.resistance != null ? `${maxStats.resistance}%` : null} />
+              <Stat label="Max Speed" value={maxStats.speed != null ? maxStats.speed.toFixed(1) : null} unit="mph" />
+            </>
+          )}
         </div>
 
         {timeSeries && (

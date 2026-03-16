@@ -21,7 +21,7 @@
     "dialog:allow-save",
     "fs:default",
     {
-      "identifier": "fs:allow-write",
+      "identifier": "fs:allow-write-file",
       "allow": [{ "path": "$DOWNLOAD/**" }, { "path": "$DESKTOP/**" }, { "path": "$HOME/**" }]
     }
   ]

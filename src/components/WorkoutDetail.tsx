@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import type { Workout } from "../types";
 import { fetchWorkoutDetail, fetchPerformanceGraph, fetchRideDetails } from "../lib/api";
-import { updateWorkoutMetrics, updateRideDetails } from "../lib/database";
+import { updateWorkoutMetrics, updateRideDetails, getWorkoutsByRideId } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import RideDetailChart from "./RideDetailChart";
+import CompareTab from "./CompareTab";
+
+type DetailTab = "summary" | "share" | "compare";
 
 interface WorkoutDetailProps {
   workout: Workout | null;
@@ -75,9 +78,34 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
   const updateWorkout = useWorkoutStore((s) => s.updateWorkout);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [metricsError, setMetricsError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<DetailTab>("summary");
+  const [sameClassWorkouts, setSameClassWorkouts] = useState<Workout[]>([]);
 
   const ftp = useMemo(() => parseWorkoutFtp(workout?.raw_detail_json), [workout?.raw_detail_json]);
 
+  // Reset tab when workout changes
+  useEffect(() => {
+    setActiveTab("summary");
+  }, [workout?.id]);
+
+  // Query for other attempts at the same class (by Peloton ride ID)
+  useEffect(() => {
+    if (!workout?.ride_id) {
+      setSameClassWorkouts([]);
+      return;
+    }
+
+    let cancelled = false;
+    getWorkoutsByRideId(workout.ride_id).then((results) => {
+      if (!cancelled) setSameClassWorkouts(results);
+    }).catch(() => {
+      if (!cancelled) setSameClassWorkouts([]);
+    });
+
+    return () => { cancelled = true; };
+  }, [workout?.ride_id]);
+
+  // Fetch metrics on workout select (existing logic)
   useEffect(() => {
     if (!workout || !accessToken) return;
 
@@ -162,46 +190,83 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
 
   const discipline = workout.discipline.charAt(0).toUpperCase() + workout.discipline.slice(1);
   const showLoading = loadingMetrics && workout.calories == null;
+  const hasShareContent = workout.discipline === "cycling" && workout.raw_performance_graph_json;
+  const hasCompare = sameClassWorkouts.length >= 2;
+
+  const tabs: { key: DetailTab; label: string }[] = [
+    { key: "summary", label: "Summary" },
+    ...(hasShareContent ? [{ key: "share" as DetailTab, label: "Share" }] : []),
+    ...(hasCompare ? [{ key: "compare" as DetailTab, label: `Compare (${sameClassWorkouts.length})` }] : []),
+  ];
+
+  // If active tab is no longer available, fall back to summary
+  const currentTab = tabs.some((t) => t.key === activeTab) ? activeTab : "summary";
 
   return (
     <div className="max-w-2xl">
-      {/* Header */}
-      <div className="mb-6">
-        <p className="text-sm text-gray-500">
-          {formatDetailDate(workout.date)} at {formatDetailTime(workout.date)}
-        </p>
-        <h2 className="mt-1 text-xl font-bold">{discipline} Workout</h2>
-        <p className="mt-1 text-sm text-gray-600">
-          {workout.title}
-          {workout.instructor && <> · {workout.instructor}</>}
-        </p>
-        <p className="mt-1 text-sm text-gray-500">
-          Duration: {workout.duration_seconds != null ? formatDuration(workout.duration_seconds) : "—"}
-        </p>
-      </div>
+      {/* Tab bar */}
+      {tabs.length > 1 && (
+        <nav className="mb-4 flex gap-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`rounded px-3 py-1.5 text-sm font-medium ${
+                currentTab === tab.key
+                  ? "bg-gray-900 text-white"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      )}
 
       {metricsError && (
         <p className="mb-4 text-sm text-red-500">{metricsError}</p>
       )}
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-3 gap-6">
-        <Stat label="Total Output" value={workout.total_work != null ? Math.round(workout.total_work / 1000) : null} unit="kj" loading={showLoading} />
-        <Stat label="Distance" value={workout.distance != null ? workout.distance.toFixed(2) : null} unit="mi" loading={showLoading} />
-        <Stat label="Calories" value={workout.calories} unit="kcal" loading={showLoading} />
+      {/* Tab content */}
+      {currentTab === "summary" && (
+        <>
+        {/* Header */}
+        <div className="mb-6">
+          <p className="text-sm text-gray-500">
+            {formatDetailDate(workout.date)} at {formatDetailTime(workout.date)}
+          </p>
+          <h2 className="mt-1 text-xl font-bold">{discipline} Workout</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            {workout.title}
+            {workout.instructor && <> · {workout.instructor}</>}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">
+            Duration: {workout.duration_seconds != null ? formatDuration(workout.duration_seconds) : "—"}
+          </p>
+        </div>
 
-        <Stat label="Avg Output" value={workout.avg_output} unit="watts" loading={showLoading} />
-        <Stat label="Avg Cadence" value={workout.avg_cadence} unit="rpm" loading={showLoading} />
-        <Stat label="Avg Resistance" value={workout.avg_resistance != null ? `${workout.avg_resistance}%` : null} loading={showLoading} />
+        <div className="grid grid-cols-3 gap-6">
+          <Stat label="Total Output" value={workout.total_work != null ? Math.round(workout.total_work / 1000) : null} unit="kj" loading={showLoading} />
+          <Stat label="Distance" value={workout.distance != null ? workout.distance.toFixed(2) : null} unit="mi" loading={showLoading} />
+          <Stat label="Calories" value={workout.calories} unit="kcal" loading={showLoading} />
 
-        <Stat label="Avg Speed" value={workout.avg_speed != null ? workout.avg_speed.toFixed(1) : null} unit="mph" loading={showLoading} />
-        <Stat label="Avg Heart Rate" value={workout.avg_heart_rate} unit="bpm" loading={showLoading} />
-        <Stat label="Strive Score" value={workout.strive_score != null ? workout.strive_score.toFixed(1) : null} />
-      </div>
+          <Stat label="Avg Output" value={workout.avg_output} unit="watts" loading={showLoading} />
+          <Stat label="Avg Cadence" value={workout.avg_cadence} unit="rpm" loading={showLoading} />
+          <Stat label="Avg Resistance" value={workout.avg_resistance != null ? `${workout.avg_resistance}%` : null} loading={showLoading} />
 
-      {/* Power chart for cycling workouts */}
-      {workout.discipline === "cycling" && workout.raw_performance_graph_json && (
+          <Stat label="Avg Speed" value={workout.avg_speed != null ? workout.avg_speed.toFixed(1) : null} unit="mph" loading={showLoading} />
+          <Stat label="Avg Heart Rate" value={workout.avg_heart_rate} unit="bpm" loading={showLoading} />
+          <Stat label="Strive Score" value={workout.strive_score != null ? workout.strive_score.toFixed(1) : null} />
+        </div>
+        </>
+      )}
+
+      {currentTab === "share" && hasShareContent && (
         <RideDetailChart workout={workout} ftp={ftp} />
+      )}
+
+      {currentTab === "compare" && hasCompare && (
+        <CompareTab workouts={sameClassWorkouts} currentId={workout.id} />
       )}
     </div>
   );

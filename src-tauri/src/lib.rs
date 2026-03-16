@@ -156,6 +156,14 @@ pub fn run() {
             sql: "DROP TABLE IF EXISTS metrics;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 13,
+            description: "add_ride_id_column",
+            sql: "ALTER TABLE workouts ADD COLUMN ride_id TEXT;
+            UPDATE workouts SET ride_id = json_extract(raw_json, '$.ride.id') WHERE raw_json IS NOT NULL;
+            CREATE INDEX idx_workouts_ride_id ON workouts(ride_id);",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

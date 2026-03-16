@@ -113,6 +113,7 @@ function mapWorkout(w: PelotonWorkout, raw: unknown): Workout {
     raw_detail_json: null,
     raw_performance_graph_json: null,
     raw_ride_details_json: null,
+    ride_id: w.ride?.id ?? null,
     class_type: parseClassType(w.ride?.title ?? null, w.fitness_discipline),
     class_subtype: parseClassSubtype(w.ride?.title ?? null, parseClassType(w.ride?.title ?? null, w.fitness_discipline)),
     class_type_version: PARSE_VERSION,

@@ -214,6 +214,24 @@ export default function ApiSync({ onDataDeleted }: Props) {
         </div>
       </div>
 
+      {/* Sync */}
+      <div className="space-y-2">
+        <button
+          onClick={handleSync}
+          disabled={loading}
+          className="w-full rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        >
+          {loading ? "Syncing..." : "Sync Now"}
+        </button>
+        {progress && (
+          <p className="text-sm text-gray-500">
+            Fetched {progress.fetched} / {progress.total} workouts...
+          </p>
+        )}
+        {status && <p className="text-sm text-green-600">{status}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+      </div>
+
       {/* Detailed Metrics */}
       <div className="space-y-3 rounded-lg border border-gray-200 p-4">
         <div className="flex items-center justify-between">
@@ -267,24 +285,6 @@ export default function ApiSync({ onDataDeleted }: Props) {
             )}
           </div>
         )}
-      </div>
-
-      {/* Sync */}
-      <div className="space-y-2">
-        <button
-          onClick={handleSync}
-          disabled={loading}
-          className="w-full rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-        >
-          {loading ? "Syncing..." : "Sync Now"}
-        </button>
-        {progress && (
-          <p className="text-sm text-gray-500">
-            Fetched {progress.fetched} / {progress.total} workouts...
-          </p>
-        )}
-        {status && <p className="text-sm text-green-600">{status}</p>}
-        {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
 
       {/* Actions */}

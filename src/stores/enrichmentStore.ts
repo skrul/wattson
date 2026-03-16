@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { getSetting, setSetting, getUnenrichedWorkoutIds, getEnrichmentCounts, updateWorkoutMetrics } from "../lib/database";
-import { fetchPerformanceGraph } from "../lib/api";
+import { cachedFetchPerformanceGraph } from "../lib/enrichmentCache";
 import { useSessionStore } from "./sessionStore";
 
 type EnrichmentMode = "summary" | "detailed";
@@ -47,7 +47,7 @@ async function runBackfillLoop() {
 
     const workoutId = ids[0];
     try {
-      const result = await fetchPerformanceGraph(workoutId, session.accessToken);
+      const result = await cachedFetchPerformanceGraph(workoutId, session.accessToken);
       await updateWorkoutMetrics(workoutId, result, null, result.rawJson);
       await useEnrichmentStore.getState().refreshCounts();
     } catch (e) {

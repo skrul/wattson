@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import type { Workout } from "../types";
-import { fetchWorkoutDetail, fetchPerformanceGraph, fetchRideDetails } from "../lib/api";
+import { cachedFetchWorkoutDetail, cachedFetchPerformanceGraph, cachedFetchRideDetails } from "../lib/enrichmentCache";
 import { updateWorkoutMetrics, updateRideDetails, getWorkoutsByRideId } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import RideDetailChart from "./RideDetailChart";
@@ -131,18 +131,18 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
     }
 
     const detailPromise = needsMetrics
-      ? fetchWorkoutDetail(workout.id, accessToken).catch((err) => {
+      ? cachedFetchWorkoutDetail(workout.id, accessToken).catch((err) => {
           console.warn("Failed to fetch workout detail (non-fatal):", err);
           return null;
         })
       : Promise.resolve(null);
 
     const perfPromise = needsMetrics
-      ? fetchPerformanceGraph(workout.id, accessToken)
+      ? cachedFetchPerformanceGraph(workout.id, accessToken)
       : Promise.resolve(null);
 
     const ridePromise = rideId
-      ? fetchRideDetails(rideId, accessToken).catch((err) => {
+      ? cachedFetchRideDetails(rideId, accessToken).catch((err) => {
           console.warn("Failed to fetch ride details (non-fatal):", err);
           return null;
         })

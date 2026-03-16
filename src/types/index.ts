@@ -93,3 +93,36 @@ export interface WorkoutFilters {
   sort: SortSpec;
   search: string;
 }
+
+// --- Chart definitions ---
+
+export type YAxisSide = "left" | "right";
+export type ChartMarkType = "line" | "dot" | "bar";
+
+export interface YAxisField {
+  field: string;      // numeric field key from FIELD_DEFS
+  side: YAxisSide;
+}
+
+export interface ChartDefinition {
+  id: string;
+  name: string;
+  mark_type: ChartMarkType;
+  y_fields: YAxisField[];         // 1-2 fields
+  group_by: string | null;        // enum field key for color coding
+  filters: FilterCondition[];     // reuses existing type
+  created_at: number;
+  updated_at: number;
+}
+
+/** Row shape as stored in SQLite (JSON fields are strings). */
+export interface ChartDefinitionRow {
+  id: string;
+  name: string;
+  mark_type: string;
+  y_fields_json: string;
+  group_by: string | null;
+  filters_json: string;
+  created_at: number;
+  updated_at: number;
+}

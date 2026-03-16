@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { Workout, MetricSample, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics } from "../types";
+import type { Workout, MetricSample, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics, ChartDefinition, ChartDefinitionRow } from "../types";
 import { FIELD_MAP } from "./fields";
 
 let db: Database | null = null;
@@ -260,4 +260,63 @@ export async function insertMetrics(_metrics: MetricSample[]): Promise<void> {
 export async function getMetrics(_workoutId: string): Promise<MetricSample[]> {
   // TODO: implement query
   return [];
+}
+
+// --- Chart definitions ---
+
+function rowToChart(row: ChartDefinitionRow): ChartDefinition {
+  return {
+    id: row.id,
+    name: row.name,
+    mark_type: row.mark_type as ChartDefinition["mark_type"],
+    y_fields: JSON.parse(row.y_fields_json),
+    group_by: row.group_by,
+    filters: JSON.parse(row.filters_json),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+/** Get all saved chart definitions, newest first. */
+export async function getAllChartDefinitions(): Promise<ChartDefinition[]> {
+  const d = await getDb();
+  const rows = await d.select<ChartDefinitionRow[]>(
+    "SELECT * FROM chart_definitions ORDER BY updated_at DESC",
+  );
+  return rows.map(rowToChart);
+}
+
+/** Insert or replace a chart definition. */
+export async function saveChartDefinition(chart: ChartDefinition): Promise<void> {
+  const d = await getDb();
+  await d.execute(
+    `INSERT OR REPLACE INTO chart_definitions
+      (id, name, mark_type, y_fields_json, group_by, filters_json, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [
+      chart.id,
+      chart.name,
+      chart.mark_type,
+      JSON.stringify(chart.y_fields),
+      chart.group_by,
+      JSON.stringify(chart.filters),
+      chart.created_at,
+      chart.updated_at,
+    ],
+  );
+}
+
+/** Delete a chart definition by id. */
+export async function deleteChartDefinition(id: string): Promise<void> {
+  const d = await getDb();
+  await d.execute("DELETE FROM chart_definitions WHERE id = $1", [id]);
+}
+
+/** Wrap chart filter conditions into a WorkoutFilters for querying. */
+export function chartFiltersToWorkoutFilters(conditions: FilterCondition[]): WorkoutFilters {
+  return {
+    conditions,
+    sort: { field: "date", direction: "asc" },
+    search: "",
+  };
 }

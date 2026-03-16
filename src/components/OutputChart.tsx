@@ -1,9 +1,17 @@
-/** Output-over-time chart across all rides (or filtered rides). */
+import { useChartStore } from "../stores/chartStore";
+import ChartList from "./ChartList";
+import ChartBuilder from "./ChartBuilder";
+import ChartViewer from "./ChartViewer";
+
 export default function OutputChart() {
-  return (
-    <div className="rounded-lg border border-gray-200 p-6">
-      <h2 className="mb-4 text-lg font-semibold">Output Over Time</h2>
-      <p className="text-gray-500">Chart will render here</p>
-    </div>
-  );
+  const view = useChartStore((s) => s.view);
+
+  switch (view) {
+    case "builder":
+      return <ChartBuilder />;
+    case "viewer":
+      return <ChartViewer />;
+    default:
+      return <ChartList />;
+  }
 }

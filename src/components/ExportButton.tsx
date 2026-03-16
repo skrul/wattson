@@ -2,6 +2,7 @@ import { useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { renderRideDetailChart } from "../lib/charts";
+import { svgToImage } from "../lib/exportUtils";
 import type { Workout, PerformanceTimeSeries } from "../types";
 
 interface ExportButtonProps {
@@ -30,25 +31,6 @@ function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-/** Render the chart SVG to a canvas-drawable image. */
-function svgToImage(svgEl: SVGElement | HTMLElement): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const svgStr = new XMLSerializer().serializeToString(svgEl);
-    const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Failed to load SVG as image"));
-    };
-    img.src = url;
-  });
 }
 
 /** Build the full export PNG as a blob using canvas. */

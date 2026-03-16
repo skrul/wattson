@@ -116,6 +116,21 @@ pub fn run() {
             ALTER TABLE workouts ADD COLUMN raw_performance_graph_json TEXT;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 8,
+            description: "create_chart_definitions_table",
+            sql: "CREATE TABLE chart_definitions (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                mark_type TEXT NOT NULL DEFAULT 'line',
+                y_fields_json TEXT NOT NULL,
+                group_by TEXT,
+                filters_json TEXT NOT NULL DEFAULT '[]',
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

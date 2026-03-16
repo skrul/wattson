@@ -1,4 +1,5 @@
-import { login, fetchAllWorkouts, fetchUserProfile, fetchPerformanceGraph, AuthError } from "./api";
+import { login, fetchAllWorkouts, fetchUserProfile, AuthError } from "./api";
+import { cachedFetchPerformanceGraph } from "./enrichmentCache";
 import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile, updateWorkoutMetrics } from "./database";
 import { useSessionStore } from "../stores/sessionStore";
 import { useReauthStore } from "../stores/reauthStore";
@@ -66,7 +67,7 @@ export async function syncWorkouts(
     if (enrichmentMode === "detailed") {
       for (const w of newWorkouts) {
         try {
-          const result = await fetchPerformanceGraph(w.id, activeToken);
+          const result = await cachedFetchPerformanceGraph(w.id, activeToken);
           await updateWorkoutMetrics(w.id, result, null, result.rawJson);
         } catch (e) {
           console.error(`Inline enrichment failed for workout ${w.id}:`, e);

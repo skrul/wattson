@@ -81,8 +81,7 @@ function App() {
         const raw = JSON.parse(userProfile.raw_json);
         const username = raw.username as string | undefined;
         if (username) {
-          const first = username.split(/[\s_]+/)[0];
-          return first.charAt(0).toUpperCase() + first.slice(1);
+          return username;
         }
       }
       return "Account";

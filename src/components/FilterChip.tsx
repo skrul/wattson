@@ -10,6 +10,7 @@ import {
   NumberInput,
   TextInput,
   DateInput,
+  DateRangeInput,
   EnumMultiSelect,
 } from "./FilterEditors";
 
@@ -90,7 +91,17 @@ export default function FilterChip({
               />
             )}
 
-            {!isUnaryOp(condition.operator) && field.type === "date" && (
+            {!isUnaryOp(condition.operator) && field.type === "date" && (condition.operator === "last_n_days" || condition.operator === "between") && (
+              <DateRangeInput
+                operator={condition.operator}
+                value={condition.value}
+                values={condition.values}
+                onChangeValue={(v) => updateCondition(condition.id, { value: v })}
+                onChangeValues={(values) => updateCondition(condition.id, { values })}
+              />
+            )}
+
+            {!isUnaryOp(condition.operator) && field.type === "date" && condition.operator !== "last_n_days" && condition.operator !== "between" && (
               <DateInput
                 value={condition.value}
                 onChange={(v) => updateCondition(condition.id, { value: v })}

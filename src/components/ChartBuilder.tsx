@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { FIELD_DEFS } from "../lib/fields";
 import { queryWorkouts, chartFiltersToWorkoutFilters } from "../lib/database";
 import { useChartStore } from "../stores/chartStore";
-import type { Workout, ChartMarkType, YAxisField, YAxisSide } from "../types";
-import { useDebounce } from "./FilterEditors";
+import type { Workout, ChartMarkType, YAxisField, YAxisSide, FilterCondition } from "../types";
+import { useDebounce, isConditionActive } from "./FilterEditors";
 import ChartFilterBar from "./ChartFilterBar";
 import ChartPlot from "./ChartPlot";
 
@@ -15,14 +15,21 @@ export default function ChartBuilder() {
   const [previewWorkouts, setPreviewWorkouts] = useState<Workout[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const debouncedFilters = useDebounce(draft?.filters ?? [], 400);
+  // Only include complete filters so changing operator doesn't trigger a re-query
+  // while the new filter is still being configured
+  const activeFiltersKey = useMemo(
+    () => JSON.stringify((draft?.filters ?? []).filter(isConditionActive)),
+    [draft?.filters],
+  );
+  const debouncedFiltersKey = useDebounce(activeFiltersKey, 400);
 
   const fetchPreview = useCallback(async () => {
     if (!draft) return;
-    const filters = chartFiltersToWorkoutFilters(debouncedFilters);
+    const conditions = JSON.parse(debouncedFiltersKey) as FilterCondition[];
+    const filters = chartFiltersToWorkoutFilters(conditions);
     const workouts = await queryWorkouts(filters);
     setPreviewWorkouts(workouts);
-  }, [draft?.y_fields, draft?.group_by, draft?.mark_type, debouncedFilters]);
+  }, [draft?.y_fields, draft?.group_by, draft?.mark_type, debouncedFiltersKey]);
 
   useEffect(() => {
     fetchPreview();

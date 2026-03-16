@@ -1,7 +1,0 @@
-{
-  "identifier": "com.wattson.dev",
-  "build": {
-    "beforeDevCommand": "npx vite --port 1421",
-    "devUrl": "http://localhost:1421"
-  }
-}

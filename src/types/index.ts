@@ -18,7 +18,7 @@ export interface Workout {
   is_live: number | null;
   workout_type: string | null;
   total_work: number | null;
-  source: "csv" | "api";
+  source: "api";
   raw_json: string | null;
   raw_detail_json: string | null;
   raw_performance_graph_json: string | null;

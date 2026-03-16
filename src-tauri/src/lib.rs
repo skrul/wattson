@@ -34,7 +34,7 @@ pub fn run() {
     let migrations = vec![
         Migration {
             version: 1,
-            description: "create_initial_tables",
+            description: "create_schema",
             sql: "CREATE TABLE workouts (
                 id TEXT PRIMARY KEY,
                 peloton_id TEXT,
@@ -43,7 +43,7 @@ pub fn run() {
                 discipline TEXT,
                 title TEXT,
                 instructor TEXT,
-                output_watts REAL,
+                avg_output REAL,
                 calories REAL,
                 distance REAL,
                 avg_heart_rate REAL,
@@ -51,129 +51,49 @@ pub fn run() {
                 avg_resistance REAL,
                 avg_speed REAL,
                 strive_score REAL,
-                source TEXT
+                source TEXT,
+                is_live INTEGER,
+                workout_type TEXT,
+                total_work REAL,
+                avg_incline REAL,
+                avg_pace REAL,
+                raw_json TEXT,
+                raw_detail_json TEXT,
+                raw_performance_graph_json TEXT,
+                raw_ride_details_json TEXT,
+                class_type TEXT,
+                class_type_version INTEGER,
+                class_subtype TEXT,
+                ride_id TEXT
             );
 
-            CREATE TABLE metrics (
-                workout_id TEXT REFERENCES workouts(id),
-                second INTEGER,
-                output REAL,
-                cadence REAL,
-                resistance REAL,
-                heart_rate REAL,
-                speed REAL,
-                PRIMARY KEY (workout_id, second)
-            );
-
-            CREATE INDEX idx_workouts_date ON workouts(date);
-            CREATE INDEX idx_workouts_duration ON workouts(duration_seconds);
-            CREATE INDEX idx_metrics_workout ON metrics(workout_id);",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 2,
-            description: "add_workout_columns",
-            sql: "ALTER TABLE workouts ADD COLUMN is_live INTEGER;
-            ALTER TABLE workouts ADD COLUMN workout_type TEXT;
-            ALTER TABLE workouts ADD COLUMN total_output REAL;
-            ALTER TABLE workouts ADD COLUMN avg_incline REAL;
-            ALTER TABLE workouts ADD COLUMN avg_pace REAL;",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 3,
-            description: "add_raw_json_column",
-            sql: "ALTER TABLE workouts ADD COLUMN raw_json TEXT;",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 4,
-            description: "create_user_profile_table",
-            sql: "CREATE TABLE user_profile (
+            CREATE TABLE user_profile (
                 id TEXT PRIMARY KEY,
                 first_name TEXT,
                 total_workouts INTEGER,
                 raw_json TEXT
-            );",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 5,
-            description: "rename_total_output_to_total_work",
-            sql: "ALTER TABLE workouts RENAME COLUMN total_output TO total_work;",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 6,
-            description: "rename_output_watts_to_avg_output",
-            sql: "ALTER TABLE workouts RENAME COLUMN output_watts TO avg_output;",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 7,
-            description: "add_raw_detail_and_performance_json",
-            sql: "ALTER TABLE workouts ADD COLUMN raw_detail_json TEXT;
-            ALTER TABLE workouts ADD COLUMN raw_performance_graph_json TEXT;",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 8,
-            description: "create_chart_definitions_table",
-            sql: "CREATE TABLE chart_definitions (
+            );
+
+            CREATE TABLE chart_definitions (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 mark_type TEXT NOT NULL DEFAULT 'line',
                 y_fields_json TEXT NOT NULL,
                 group_by TEXT,
                 filters_json TEXT NOT NULL DEFAULT '[]',
+                x_axis_mode TEXT NOT NULL DEFAULT 'date',
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
-            );",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 9,
-            description: "add_raw_ride_details_json",
-            sql: "ALTER TABLE workouts ADD COLUMN raw_ride_details_json TEXT;",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 10,
-            description: "add_class_type_columns",
-            sql: "ALTER TABLE workouts ADD COLUMN class_type TEXT;
-            ALTER TABLE workouts ADD COLUMN class_type_version INTEGER;",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 11,
-            description: "add_class_subtype_column",
-            sql: "ALTER TABLE workouts ADD COLUMN class_subtype TEXT;",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 12,
-            description: "drop_metrics_table",
-            sql: "DROP TABLE IF EXISTS metrics;",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 13,
-            description: "add_ride_id_column",
-            sql: "ALTER TABLE workouts ADD COLUMN ride_id TEXT;
-            UPDATE workouts SET ride_id = json_extract(raw_json, '$.ride.id') WHERE raw_json IS NOT NULL;
+            );
+
+            CREATE TABLE settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+
+            CREATE INDEX idx_workouts_date ON workouts(date);
+            CREATE INDEX idx_workouts_duration ON workouts(duration_seconds);
             CREATE INDEX idx_workouts_ride_id ON workouts(ride_id);",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 14,
-            description: "add_x_axis_mode_to_chart_definitions",
-            sql: "ALTER TABLE chart_definitions ADD COLUMN x_axis_mode TEXT NOT NULL DEFAULT 'date';",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 15,
-            description: "create_settings_table",
-            sql: "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
             kind: MigrationKind::Up,
         },
     ];

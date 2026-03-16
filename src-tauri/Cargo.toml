@@ -2,7 +2,7 @@
 name = "wattson"
 version = "0.2.0"
 description = "Peloton Ride Analyzer"
-authors = ["you"]
+authors = ["skrul"]
 edition = "2021"
 
 [lib]

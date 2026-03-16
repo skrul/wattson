@@ -1,7 +1,6 @@
 import Database from "@tauri-apps/plugin-sql";
 import type { Workout, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics, ChartDefinition, ChartDefinitionRow, ChartXAxisMode } from "../types";
 import { FIELD_MAP } from "./fields";
-import { parseClassType, parseClassSubtype, PARSE_VERSION } from "./classType";
 
 let db: Database | null = null;
 
@@ -281,24 +280,6 @@ export async function updateRideDetails(workoutId: string, rawJson: string): Pro
     `UPDATE workouts SET raw_ride_details_json=$1 WHERE id=$2`,
     [rawJson, workoutId],
   );
-}
-
-/** Backfill class_type for rows that need it (null version or outdated version). */
-export async function backfillClassTypes(): Promise<void> {
-  const d = await getDb();
-  const rows = await d.select<{ id: string; title: string; discipline: string }[]>(
-    `SELECT id, title, discipline FROM workouts
-     WHERE class_type_version IS NULL OR class_type_version != $1`,
-    [PARSE_VERSION],
-  );
-  for (const row of rows) {
-    const classType = parseClassType(row.title, row.discipline);
-    const classSubtype = parseClassSubtype(row.title, classType);
-    await d.execute(
-      `UPDATE workouts SET class_type = $1, class_subtype = $2, class_type_version = $3 WHERE id = $4`,
-      [classType, classSubtype, PARSE_VERSION, row.id],
-    );
-  }
 }
 
 // --- Chart definitions ---

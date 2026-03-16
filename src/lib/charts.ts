@@ -505,6 +505,77 @@ export function renderDualAxisChart(
   });
 }
 
+// --- Compare chart ---
+
+export type CompareMetric = "output" | "cadence" | "resistance" | "heartRate" | "speed";
+
+export const COMPARE_METRICS: { key: CompareMetric; label: string }[] = [
+  { key: "output", label: "Output (watts)" },
+  { key: "cadence", label: "Cadence (rpm)" },
+  { key: "resistance", label: "Resistance (%)" },
+  { key: "heartRate", label: "Heart Rate (bpm)" },
+  { key: "speed", label: "Speed (mph)" },
+];
+
+interface CompareRide {
+  label: string;
+  timeSeries: PerformanceTimeSeries;
+}
+
+/**
+ * Render an overlay chart comparing multiple rides on a single metric.
+ * Each ride gets its own colored line keyed by label.
+ */
+export function renderCompareChart(
+  rides: CompareRide[],
+  metric: CompareMetric,
+  width = 800,
+  height = 300,
+): SVGElement | HTMLElement {
+  const data: { second: number; value: number; label: string }[] = [];
+  for (const ride of rides) {
+    const values = ride.timeSeries[metric];
+    for (let i = 0; i < values.length; i++) {
+      data.push({ second: i, value: values[i], label: ride.label });
+    }
+  }
+
+  if (data.length === 0) {
+    return Plot.plot({ width, height, marks: [] });
+  }
+
+  const maxSecond = Math.max(...data.map((d) => d.second));
+  const tickInterval = maxSecond <= 600 ? 60 : maxSecond <= 1800 ? 300 : 600;
+
+  const metricLabel = COMPARE_METRICS.find((m) => m.key === metric)?.label ?? metric;
+
+  return Plot.plot({
+    width,
+    height,
+    x: {
+      label: null,
+      ticks: Array.from(
+        { length: Math.floor(maxSecond / tickInterval) + 1 },
+        (_, i) => i * tickInterval,
+      ),
+      tickFormat: (d: number) => `${Math.floor(d / 60)}m`,
+    },
+    y: {
+      label: metricLabel,
+      grid: true,
+    },
+    color: { legend: true },
+    marks: [
+      Plot.lineY(data, {
+        x: "second",
+        y: "value",
+        stroke: "label",
+        strokeWidth: 1.5,
+      }),
+    ],
+  });
+}
+
 /** Render a custom chart, choosing single or dual axis. */
 export function renderCustomChart(
   workouts: Workout[],

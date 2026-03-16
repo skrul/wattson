@@ -55,20 +55,20 @@ function parseMetrics(rawJson: string): WorkoutMetrics {
   };
 }
 
-/** Fetch performance graph with cache. */
+/** Fetch performance graph with cache. Returns cacheHit flag so callers can skip rate limiting. */
 export async function cachedFetchPerformanceGraph(
   workoutId: string,
   accessToken: string,
-): Promise<WorkoutMetrics & { rawJson: string }> {
+): Promise<WorkoutMetrics & { rawJson: string; cacheHit: boolean }> {
   const key = `perf:${workoutId}`;
   const cached = await getCached(key);
   if (cached) {
-    return { ...parseMetrics(cached), rawJson: cached };
+    return { ...parseMetrics(cached), rawJson: cached, cacheHit: true };
   }
 
   const result = await fetchPerformanceGraph(workoutId, accessToken);
   await setCache(key, result.rawJson);
-  return result;
+  return { ...result, cacheHit: false };
 }
 
 /** Fetch workout detail with cache. */

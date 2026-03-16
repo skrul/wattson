@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import type { Workout } from "../types";
-import { fetchWorkoutDetail, fetchPerformanceGraph } from "../lib/api";
-import { updateWorkoutMetrics } from "../lib/database";
+import { fetchWorkoutDetail, fetchPerformanceGraph, fetchRideDetails } from "../lib/api";
+import { updateWorkoutMetrics, updateRideDetails } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import RideDetailChart from "./RideDetailChart";
 
@@ -80,29 +80,64 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
 
   useEffect(() => {
     if (!workout || !accessToken) return;
-    // Skip fetch if we already have both metrics and performance graph data
-    if (workout.calories != null && workout.raw_performance_graph_json != null) return;
+
+    const needsMetrics = workout.calories == null || workout.raw_performance_graph_json == null;
+    const needsRideDetails = workout.raw_ride_details_json == null;
+
+    if (!needsMetrics && !needsRideDetails) return;
 
     let cancelled = false;
-    setLoadingMetrics(true);
-    setMetricsError(null);
+    if (needsMetrics) {
+      setLoadingMetrics(true);
+      setMetricsError(null);
+    }
 
-    Promise.all([
-      fetchWorkoutDetail(workout.id, accessToken).catch((err) => {
-        console.warn("Failed to fetch workout detail (non-fatal):", err);
-        return null;
-      }),
-      fetchPerformanceGraph(workout.id, accessToken),
-    ])
-      .then(async ([rawDetailJson, perfResult]) => {
+    // Extract ride ID from raw workout JSON
+    let rideId: string | null = null;
+    if (needsRideDetails && workout.raw_json) {
+      try {
+        rideId = JSON.parse(workout.raw_json).ride?.id ?? null;
+      } catch {
+        rideId = null;
+      }
+    }
+
+    const detailPromise = needsMetrics
+      ? fetchWorkoutDetail(workout.id, accessToken).catch((err) => {
+          console.warn("Failed to fetch workout detail (non-fatal):", err);
+          return null;
+        })
+      : Promise.resolve(null);
+
+    const perfPromise = needsMetrics
+      ? fetchPerformanceGraph(workout.id, accessToken)
+      : Promise.resolve(null);
+
+    const ridePromise = rideId
+      ? fetchRideDetails(rideId, accessToken).catch((err) => {
+          console.warn("Failed to fetch ride details (non-fatal):", err);
+          return null;
+        })
+      : Promise.resolve(null);
+
+    Promise.all([detailPromise, perfPromise, ridePromise])
+      .then(async ([rawDetailJson, perfResult, rawRideDetailsJson]) => {
         if (cancelled) return;
-        const { rawJson: rawPerfJson, ...metrics } = perfResult;
-        await updateWorkoutMetrics(workout.id, metrics, rawDetailJson, rawPerfJson);
-        updateWorkout(workout.id, {
-          ...metrics,
-          raw_detail_json: rawDetailJson,
-          raw_performance_graph_json: rawPerfJson,
-        });
+
+        if (needsMetrics && perfResult) {
+          const { rawJson: rawPerfJson, ...metrics } = perfResult;
+          await updateWorkoutMetrics(workout.id, metrics, rawDetailJson, rawPerfJson);
+          updateWorkout(workout.id, {
+            ...metrics,
+            raw_detail_json: rawDetailJson,
+            raw_performance_graph_json: rawPerfJson,
+          });
+        }
+
+        if (rawRideDetailsJson) {
+          await updateRideDetails(workout.id, rawRideDetailsJson);
+          updateWorkout(workout.id, { raw_ride_details_json: rawRideDetailsJson });
+        }
       })
       .catch((err) => {
         if (cancelled) return;

@@ -75,6 +75,7 @@ interface PelotonWorkout {
     heart_rate_zone_durations: Record<string, number>;
   } | null;
   ride?: {
+    id: string;
     title: string;
     duration: number;
     is_live_in_studio_only: boolean;
@@ -110,6 +111,7 @@ function mapWorkout(w: PelotonWorkout, raw: unknown): Workout {
     raw_json: JSON.stringify(raw),
     raw_detail_json: null,
     raw_performance_graph_json: null,
+    raw_ride_details_json: null,
   };
 }
 
@@ -218,6 +220,29 @@ export async function fetchWorkoutDetail(
       throw new AuthError(`Fetch workout detail failed (${res.status}): ${text}`);
     }
     throw new Error(`Fetch workout detail failed (${res.status}): ${text}`);
+  }
+
+  const data = await res.json();
+  return JSON.stringify(data);
+}
+
+/** Fetch ride details from /api/ride/{rideId}/details. Returns the raw JSON string. */
+export async function fetchRideDetails(
+  rideId: string,
+  accessToken: string,
+): Promise<string> {
+  const url = `${API_BASE}/api/ride/${rideId}/details?stream_source=multichannel&include=sampled_top_tags&include=in_class_playlist`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    if (res.status === 401 || res.status === 403) {
+      throw new AuthError(`Fetch ride details failed (${res.status}): ${text}`);
+    }
+    throw new Error(`Fetch ride details failed (${res.status}): ${text}`);
   }
 
   const data = await res.json();

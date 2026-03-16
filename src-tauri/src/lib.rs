@@ -116,6 +116,12 @@ pub fn run() {
             ALTER TABLE workouts ADD COLUMN raw_performance_graph_json TEXT;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 8,
+            description: "add_raw_ride_details_json",
+            sql: "ALTER TABLE workouts ADD COLUMN raw_ride_details_json TEXT;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

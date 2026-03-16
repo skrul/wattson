@@ -68,15 +68,16 @@ function App() {
     });
   }, [loaded, session]);
 
-  // Auto-resume enrichment backfill when session is available and mode is detailed
-  const enrichmentMode = useEnrichmentStore((s) => s.mode);
-  const backfillStatus = useEnrichmentStore((s) => s.backfillStatus);
+  // Auto-resume enrichment backfill once on launch when session is available
+  const autoResumeRan = useRef(false);
   useEffect(() => {
-    if (!loaded || !session) return;
-    if (enrichmentMode === "detailed" && backfillStatus === "paused") {
+    if (!loaded || !session || autoResumeRan.current) return;
+    const { mode, backfillStatus } = useEnrichmentStore.getState();
+    if (mode === "detailed" && backfillStatus === "paused") {
+      autoResumeRan.current = true;
       useEnrichmentStore.getState().startBackfill();
     }
-  }, [loaded, session, enrichmentMode, backfillStatus]);
+  }, [loaded, session]);
 
   const handleUpdate = async () => {
     setUpdating(true);

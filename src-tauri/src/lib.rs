@@ -156,6 +156,12 @@ pub fn run() {
             sql: "DROP TABLE IF EXISTS metrics;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 13,
+            description: "add_x_axis_mode_to_chart_definitions",
+            sql: "ALTER TABLE chart_definitions ADD COLUMN x_axis_mode TEXT NOT NULL DEFAULT 'date';",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

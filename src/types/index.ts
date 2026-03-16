@@ -92,6 +92,7 @@ export interface WorkoutFilters {
 
 export type YAxisSide = "left" | "right";
 export type ChartMarkType = "line" | "dot" | "bar";
+export type ChartXAxisMode = "date" | "workout";
 
 export interface YAxisField {
   field: string;      // numeric field key from FIELD_DEFS
@@ -105,6 +106,7 @@ export interface ChartDefinition {
   y_fields: YAxisField[];         // 1-2 fields
   group_by: string | null;        // enum field key for color coding
   filters: FilterCondition[];     // reuses existing type
+  x_axis_mode: ChartXAxisMode;
   created_at: number;
   updated_at: number;
 }
@@ -117,6 +119,7 @@ export interface ChartDefinitionRow {
   y_fields_json: string;
   group_by: string | null;
   filters_json: string;
+  x_axis_mode: string | null;
   created_at: number;
   updated_at: number;
 }

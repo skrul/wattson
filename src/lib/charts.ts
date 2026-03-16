@@ -244,6 +244,7 @@ export function renderRideDetailChart(
 
 interface WorkoutPoint {
   date: Date;
+  label?: string;
   y: number;
   y2?: number;
   group?: string;
@@ -286,6 +287,17 @@ function prepareChartData(
     }
     points.push(point);
   }
+
+  if (chart.x_axis_mode === "workout") {
+    const seen = new Map<string, number>();
+    for (const p of points) {
+      const base = p.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+      const n = (seen.get(base) ?? 0) + 1;
+      seen.set(base, n);
+      p.label = n > 1 ? `${base} #${n}` : base;
+    }
+  }
+
   return points;
 }
 
@@ -303,6 +315,20 @@ function fieldLabel(fieldKey: string): string {
   return FIELD_MAP[fieldKey]?.label ?? fieldKey;
 }
 
+const MAX_X_TICKS = 20;
+
+function workoutXConfig(data: WorkoutPoint[]): Record<string, unknown> {
+  const domain = data.map((d) => d.label);
+  const n = domain.length;
+  const cfg: Record<string, unknown> = { label: null, domain };
+  if (n > MAX_X_TICKS) {
+    const step = Math.ceil(n / MAX_X_TICKS);
+    cfg.ticks = domain.filter((_, i) => i % step === 0);
+    cfg.tickRotate = -45;
+  }
+  return cfg;
+}
+
 /** Render a chart with a single Y axis. */
 export function renderSingleAxisChart(
   workouts: Workout[],
@@ -317,30 +343,46 @@ export function renderSingleAxisChart(
   }
 
   const color = chart.group_by ? "group" : "#2563eb";
+  const workout = chart.x_axis_mode === "workout";
+  const xKey = workout ? "label" : "date";
 
   let mark: Plot.Markish;
   if (chart.mark_type === "bar") {
-    mark = Plot.rectY(toBarData(data), {
-      x1: "x1",
-      x2: "x2",
-      y: "y",
-      fill: color,
-      ...(chart.group_by ? {} : { fillOpacity: 0.8 }),
-    });
+    if (workout) {
+      mark = Plot.barY(data, {
+        x: "label",
+        y: "y",
+        fill: color,
+        ...(chart.group_by ? {} : { fillOpacity: 0.8 }),
+      });
+    } else {
+      mark = Plot.rectY(toBarData(data), {
+        x1: "x1",
+        x2: "x2",
+        y: "y",
+        fill: color,
+        ...(chart.group_by ? {} : { fillOpacity: 0.8 }),
+      });
+    }
   } else if (chart.mark_type === "dot") {
-    mark = Plot.dot(data, { x: "date", y: "y", stroke: color, fill: color, r: 3 });
+    mark = Plot.dot(data, { x: xKey, y: "y", stroke: color, fill: color, r: 3 });
   } else {
     mark = Plot.lineY(data, {
-      x: "date", y: "y", stroke: color, strokeWidth: 1.5,
-      ...(chart.group_by ? { sort: "date" } : {}),
+      x: xKey, y: "y", stroke: color, strokeWidth: 1.5,
+      ...(chart.group_by ? { sort: xKey } : {}),
     });
   }
+
+  const xConfig: Record<string, unknown> = workout
+    ? workoutXConfig(data)
+    : { label: null, type: "utc" };
 
   return Plot.plot({
     width,
     height,
     marginRight: 40,
-    x: { label: null, type: "utc" },
+    marginBottom: workout && data.length > MAX_X_TICKS ? 60 : undefined,
+    x: xConfig,
     y: { label: fieldLabel(yField.field), grid: true },
     color: chart.group_by ? { legend: true } : undefined,
     marks: [mark],
@@ -381,6 +423,7 @@ export function renderDualAxisChart(
     .filter((d) => d.y2 != null)
     .map((d) => ({
       date: d.date,
+      label: d.label,
       y: rightToLeft(d.y2!),
       group: d.group,
     }));
@@ -388,23 +431,33 @@ export function renderDualAxisChart(
   const marks: Plot.Markish[] = [];
   const leftColor = "#2563eb";
   const rightColor = "#dc2626";
+  const workout = chart.x_axis_mode === "workout";
+  const xKey = workout ? "label" : "date";
 
   // Left Y marks
   if (chart.mark_type === "bar") {
-    marks.push(Plot.rectY(toBarData(data), { x1: "x1", x2: "x2", y: "y", fill: leftColor, fillOpacity: 0.8 }));
+    if (workout) {
+      marks.push(Plot.barY(data, { x: "label", y: "y", fill: leftColor, fillOpacity: 0.8 }));
+    } else {
+      marks.push(Plot.rectY(toBarData(data), { x1: "x1", x2: "x2", y: "y", fill: leftColor, fillOpacity: 0.8 }));
+    }
   } else if (chart.mark_type === "dot") {
-    marks.push(Plot.dot(data, { x: "date", y: "y", stroke: leftColor, fill: leftColor, r: 3 }));
+    marks.push(Plot.dot(data, { x: xKey, y: "y", stroke: leftColor, fill: leftColor, r: 3 }));
   } else {
-    marks.push(Plot.lineY(data, { x: "date", y: "y", stroke: leftColor, strokeWidth: 1.5 }));
+    marks.push(Plot.lineY(data, { x: xKey, y: "y", stroke: leftColor, strokeWidth: 1.5 }));
   }
 
   // Right Y marks (mapped into left range)
   if (chart.mark_type === "bar") {
-    marks.push(Plot.rectY(toBarData(mappedData), { x1: "x1", x2: "x2", y: "y", fill: rightColor, fillOpacity: 0.5 }));
+    if (workout) {
+      marks.push(Plot.barY(mappedData, { x: "label", y: "y", fill: rightColor, fillOpacity: 0.5 }));
+    } else {
+      marks.push(Plot.rectY(toBarData(mappedData), { x1: "x1", x2: "x2", y: "y", fill: rightColor, fillOpacity: 0.5 }));
+    }
   } else if (chart.mark_type === "dot") {
-    marks.push(Plot.dot(mappedData, { x: "date", y: "y", stroke: rightColor, fill: rightColor, r: 3 }));
+    marks.push(Plot.dot(mappedData, { x: xKey, y: "y", stroke: rightColor, fill: rightColor, r: 3 }));
   } else {
-    marks.push(Plot.lineY(mappedData, { x: "date", y: "y", stroke: rightColor, strokeWidth: 1.5, strokeDasharray: "4 2" }));
+    marks.push(Plot.lineY(mappedData, { x: xKey, y: "y", stroke: rightColor, strokeWidth: 1.5, strokeDasharray: "4 2" }));
   }
 
   // Right-side axis ticks
@@ -412,10 +465,12 @@ export function renderDualAxisChart(
   const leftDomain = [leftExtent[0], leftExtent[1]];
   const tickCount = 6;
   const leftStep = (leftDomain[1] - leftDomain[0]) / (tickCount - 1);
-  const maxDate = data.reduce((max, d) => (d.date > max ? d.date : max), data[0].date);
+  const maxXVal = workout
+    ? data[data.length - 1]?.label
+    : data.reduce((max, d) => (d.date > max ? d.date : max), data[0].date);
   const rightTicks = Array.from({ length: tickCount }, (_, i) => {
     const leftVal = leftDomain[0] + i * leftStep;
-    return { x: maxDate, y: leftVal, label: Math.round(leftToRight(leftVal)).toString() };
+    return { x: maxXVal, y: leftVal, label: Math.round(leftToRight(leftVal)).toString() };
   });
 
   marks.push(
@@ -430,11 +485,16 @@ export function renderDualAxisChart(
     }),
   );
 
+  const xConfig: Record<string, unknown> = workout
+    ? workoutXConfig(data)
+    : { label: null, type: "utc" };
+
   return Plot.plot({
     width,
     height,
     marginRight: 70,
-    x: { label: null, type: "utc" },
+    marginBottom: workout && data.length > MAX_X_TICKS ? 60 : undefined,
+    x: xConfig,
     y: {
       label: fieldLabel(leftField.field),
       grid: true,

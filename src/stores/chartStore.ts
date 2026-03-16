@@ -36,6 +36,7 @@ function makeEmptyDraft(): ChartDefinition {
     y_fields: [],
     group_by: null,
     filters: [],
+    x_axis_mode: "date",
     created_at: now,
     updated_at: now,
   };

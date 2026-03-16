@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { FIELD_DEFS } from "../lib/fields";
 import { queryWorkouts, chartFiltersToWorkoutFilters } from "../lib/database";
 import { useChartStore } from "../stores/chartStore";
-import type { Workout, ChartMarkType, YAxisField, YAxisSide, FilterCondition } from "../types";
+import type { Workout, ChartMarkType, ChartXAxisMode, YAxisField, YAxisSide, FilterCondition } from "../types";
 import { useDebounce, isConditionActive } from "./FilterEditors";
 import ChartFilterBar from "./ChartFilterBar";
 import ChartPlot from "./ChartPlot";
@@ -119,6 +119,23 @@ export default function ChartBuilder() {
                   className="text-blue-600"
                 />
                 <span className="capitalize">{type}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">X-Axis</label>
+          <div className="flex gap-4 py-2">
+            {(["date", "workout"] as ChartXAxisMode[]).map((mode) => (
+              <label key={mode} className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="x_axis_mode"
+                  checked={draft.x_axis_mode === mode}
+                  onChange={() => updateDraft({ x_axis_mode: mode })}
+                  className="text-blue-600"
+                />
+                <span className="capitalize">{mode}</span>
               </label>
             ))}
           </div>

@@ -14,6 +14,14 @@ A free, open-source desktop app for analyzing your Peloton workout data. Sync yo
 
 All data stays on your machine in a local SQLite database. Credentials are stored in your system keychain (macOS Keychain, Windows Credential Manager).
 
+## Screenshots
+
+![Workout list with filters and ride detail](screenshots/filter.png)
+
+![Chart builder](screenshots/charts.png)
+
+![Compare repeated rides](screenshots/compare.png)
+
 ## Install
 
 Download the latest release for your platform from the [Releases](https://github.com/skrul/wattson/releases) page.

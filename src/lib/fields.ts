@@ -24,7 +24,7 @@ const ENUM_OPS: FilterOperator[] = [
 ];
 
 const DATE_OPS: FilterOperator[] = [
-  "equals", "before", "after", "is_empty", "is_not_empty",
+  "equals", "before", "after", "last_n_days", "between", "is_empty", "is_not_empty",
 ];
 
 export const FIELD_DEFS: FieldDef[] = [
@@ -63,6 +63,8 @@ export const OPERATOR_LABELS: Record<FilterOperator, string> = {
   lte: "≤",
   before: "Before",
   after: "After",
+  last_n_days: "Last N days",
+  between: "Between",
   is_empty: "Is empty",
   is_not_empty: "Is not empty",
 };

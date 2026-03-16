@@ -73,6 +73,7 @@ export type FilterOperator =
   | "starts_with" | "ends_with"
   | "gt" | "gte" | "lt" | "lte"
   | "before" | "after"
+  | "last_n_days" | "between"
   | "is_empty" | "is_not_empty";
 
 export interface FilterCondition {

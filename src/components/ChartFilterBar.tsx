@@ -11,6 +11,7 @@ import {
   NumberInput,
   TextInput,
   DateInput,
+  DateRangeInput,
   EnumMultiSelect,
 } from "./FilterEditors";
 
@@ -82,7 +83,17 @@ function ChartFilterChip({ condition, defaultOpen = false }: { condition: Filter
               />
             )}
 
-            {!isUnaryOp(condition.operator) && field.type === "date" && (
+            {!isUnaryOp(condition.operator) && field.type === "date" && (condition.operator === "last_n_days" || condition.operator === "between") && (
+              <DateRangeInput
+                operator={condition.operator}
+                value={condition.value}
+                values={condition.values}
+                onChangeValue={(v) => updateDraftFilter(condition.id, { value: v })}
+                onChangeValues={(values) => updateDraftFilter(condition.id, { values })}
+              />
+            )}
+
+            {!isUnaryOp(condition.operator) && field.type === "date" && condition.operator !== "last_n_days" && condition.operator !== "between" && (
               <DateInput
                 value={condition.value}
                 onChange={(v) => updateDraftFilter(condition.id, { value: v })}

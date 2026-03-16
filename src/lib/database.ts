@@ -46,6 +46,8 @@ const FILTERABLE_COLUMNS = new Set<string>(
 
 function isConditionComplete(cond: FilterCondition): boolean {
   if (cond.operator === "is_empty" || cond.operator === "is_not_empty") return true;
+  if (cond.operator === "last_n_days") return cond.value !== "" && !isNaN(Number(cond.value));
+  if (cond.operator === "between") return cond.values.length === 2 && cond.values[0] !== "" && cond.values[1] !== "";
   const field = FIELD_MAP[cond.field];
   if (field?.type === "enum") return cond.values.length > 0;
   return cond.value !== "";
@@ -125,6 +127,19 @@ function buildConditionClause(
     case "after":
       params.push(dateToTimestamp(cond.value));
       return `${col} > $${idx.val++}`;
+    case "last_n_days": {
+      const nDaysAgo = Math.floor(Date.now() / 1000) - Number(cond.value) * 86400;
+      params.push(nDaysAgo);
+      return `${col} >= $${idx.val++}`;
+    }
+    case "between": {
+      const startTs = dateToTimestamp(cond.values[0]);
+      const endTs = dateToTimestamp(cond.values[1]) + 86399; // end of day
+      params.push(startTs, endTs);
+      const p1 = `$${idx.val++}`;
+      const p2 = `$${idx.val++}`;
+      return `${col} >= ${p1} AND ${col} <= ${p2}`;
+    }
     default:
       return null;
   }

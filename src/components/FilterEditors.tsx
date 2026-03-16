@@ -16,6 +16,12 @@ export function isConditionActive(condition: FilterCondition): boolean {
   if (condition.operator === "is_empty" || condition.operator === "is_not_empty") {
     return true;
   }
+  if (condition.operator === "last_n_days") {
+    return condition.value !== "" && !isNaN(Number(condition.value));
+  }
+  if (condition.operator === "between") {
+    return condition.values.length === 2 && condition.values[0] !== "" && condition.values[1] !== "";
+  }
   const field = FIELD_MAP[condition.field];
   if (field?.type === "enum") {
     return condition.values.length > 0;
@@ -23,10 +29,24 @@ export function isConditionActive(condition: FilterCondition): boolean {
   return condition.value !== "";
 }
 
+function formatShortDate(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 export function valueSummary(condition: FilterCondition): string {
   const field = FIELD_MAP[condition.field];
   if (condition.operator === "is_empty") return "empty";
   if (condition.operator === "is_not_empty") return "not empty";
+  if (condition.operator === "last_n_days") {
+    return condition.value ? `last ${condition.value} days` : "...";
+  }
+  if (condition.operator === "between") {
+    if (condition.values.length === 2 && condition.values[0] && condition.values[1]) {
+      return `${formatShortDate(condition.values[0])} \u2013 ${formatShortDate(condition.values[1])}`;
+    }
+    return "...";
+  }
   if (field?.type === "enum" && condition.values.length > 0) {
     if (condition.values.length === 1) return condition.values[0];
     return `${condition.values.length} selected`;
@@ -144,6 +164,80 @@ export function DateInput({
       className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
       autoFocus
     />
+  );
+}
+
+const DAY_PRESETS = [7, 30, 60, 90, 365];
+
+export function DateRangeInput({
+  operator,
+  value,
+  values,
+  onChangeValue,
+  onChangeValues,
+}: {
+  operator: "last_n_days" | "between";
+  value: string;
+  values: string[];
+  onChangeValue: (v: string) => void;
+  onChangeValues: (v: string[]) => void;
+}) {
+  if (operator === "last_n_days") {
+    return (
+      <div className="space-y-2">
+        <input
+          type="number"
+          min="1"
+          value={value}
+          onChange={(e) => onChangeValue(e.target.value)}
+          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+          placeholder="Number of days..."
+          autoFocus
+        />
+        <div className="flex flex-wrap gap-1">
+          {DAY_PRESETS.map((n) => (
+            <button
+              key={n}
+              onClick={() => onChangeValue(String(n))}
+              className={`rounded px-2 py-0.5 text-xs ${
+                value === String(n)
+                  ? "bg-blue-100 text-blue-700 border border-blue-300"
+                  : "bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200"
+              }`}
+            >
+              {n}d
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const start = values[0] ?? "";
+  const end = values[1] ?? "";
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <label className="text-xs text-gray-500">Start</label>
+        <input
+          type="date"
+          value={start}
+          onChange={(e) => onChangeValues([e.target.value, end])}
+          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+          autoFocus
+        />
+      </div>
+      <div>
+        <label className="text-xs text-gray-500">End</label>
+        <input
+          type="date"
+          value={end}
+          onChange={(e) => onChangeValues([start, e.target.value])}
+          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+        />
+      </div>
+    </div>
   );
 }
 

@@ -7,8 +7,10 @@ export interface FieldDef {
   operators: FilterOperator[];
   filterable: boolean;
   sortable: boolean;
-  /** Multiply user-entered filter values by this before querying the DB. */
-  queryScale?: number;
+  /** Format a raw DB value for display in the UI. */
+  displayValue?: (raw: string) => string;
+  /** Extra SQL WHERE clause for distinct-value queries (e.g. "workout_type = 'class'"). */
+  distinctFilter?: string;
 }
 
 const STRING_OPS: FilterOperator[] = [
@@ -34,7 +36,7 @@ export const FIELD_DEFS: FieldDef[] = [
   { key: "title", label: "Title", type: "string", operators: STRING_OPS, filterable: true, sortable: true },
   { key: "instructor", label: "Instructor", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
   { key: "discipline", label: "Discipline", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
-  { key: "duration_seconds", label: "Duration (min)", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true, queryScale: 60 },
+  { key: "duration_seconds", label: "Duration", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true, displayValue: (v) => `${Math.round(Number(v) / 60)} min`, distinctFilter: "workout_type = 'class'" },
   { key: "total_work", label: "Total Output (kj)", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
   { key: "avg_output", label: "Avg Output (watts)", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
   { key: "calories", label: "Calories", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },

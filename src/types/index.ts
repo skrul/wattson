@@ -3,7 +3,7 @@ export interface Workout {
   id: string;
   peloton_id: string | null;
   date: number; // Unix timestamp
-  duration_seconds: number;
+  duration_seconds: number | null;
   discipline: string;
   title: string;
   instructor: string | null;

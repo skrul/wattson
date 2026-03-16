@@ -87,7 +87,7 @@ async function renderExportPng(
   const subtitle = [
     workout.instructor,
     formatExportDate(workout.date),
-    formatDuration(workout.duration_seconds),
+    workout.duration_seconds != null ? formatDuration(workout.duration_seconds) : null,
   ].filter(Boolean).join(" \u00B7 ");
   ctx.fillText(subtitle, PADDING, y + 40);
 

@@ -176,7 +176,7 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
           {workout.instructor && <> · {workout.instructor}</>}
         </p>
         <p className="mt-1 text-sm text-gray-500">
-          Duration: {formatDuration(workout.duration_seconds)}
+          Duration: {workout.duration_seconds != null ? formatDuration(workout.duration_seconds) : "—"}
         </p>
       </div>
 

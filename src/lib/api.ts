@@ -93,7 +93,7 @@ function mapWorkout(w: PelotonWorkout, raw: unknown): Workout {
     id: w.id,
     peloton_id: w.id,
     date: w.created_at,
-    duration_seconds: w.ride?.duration ?? (w.end_time - w.start_time),
+    duration_seconds: w.ride?.duration ?? null,
     discipline: w.fitness_discipline,
     title: w.ride?.title ?? "Just Work Out",
     instructor: w.ride?.instructor?.name ?? null,

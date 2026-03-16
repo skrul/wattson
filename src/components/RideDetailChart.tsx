@@ -90,7 +90,7 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
           <p className="text-sm font-semibold">{workout.title}</p>
           <p className="text-xs text-gray-500">
             {workout.instructor && <>{workout.instructor} · </>}
-            {formatChartDate(workout.date)} · {formatDuration(workout.duration_seconds)}
+            {formatChartDate(workout.date)}{workout.duration_seconds != null ? ` · ${formatDuration(workout.duration_seconds)}` : ""}
           </p>
         </div>
 

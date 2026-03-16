@@ -252,7 +252,6 @@ interface WorkoutPoint {
 /** Fields whose raw DB values need scaling for display. */
 const FIELD_DISPLAY_SCALE: Record<string, number> = {
   total_work: 1 / 1000, // joules → kj
-  duration_seconds: 1 / 60, // seconds → minutes
 };
 
 function scaleValue(field: string, value: number): number {
@@ -281,7 +280,9 @@ function prepareChartData(
       if (y2Val != null) point.y2 = scaleValue(y2Field, y2Val as number);
     }
     if (chart.group_by) {
-      point.group = ((w as unknown as Record<string, unknown>)[chart.group_by] as string) ?? "Unknown";
+      const raw = String((w as unknown as Record<string, unknown>)[chart.group_by] ?? "Unknown");
+      const displayFn = FIELD_MAP[chart.group_by]?.displayValue;
+      point.group = displayFn ? displayFn(raw) : raw;
     }
     points.push(point);
   }

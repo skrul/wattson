@@ -64,7 +64,6 @@ function buildConditionClause(
   if (!isConditionComplete(cond)) return null;
 
   const col = cond.field;
-  const scale = field.queryScale ?? 1;
 
   switch (cond.operator) {
     case "is_empty":
@@ -78,7 +77,7 @@ function buildConditionClause(
         return `${col} IN (${placeholders.join(", ")})`;
       }
       if (field.type === "number") {
-        params.push(parseFloat(cond.value) * scale);
+        params.push(parseFloat(cond.value));
       } else if (field.type === "date") {
         params.push(dateToTimestamp(cond.value));
       } else {
@@ -92,7 +91,7 @@ function buildConditionClause(
         return `${col} NOT IN (${placeholders.join(", ")})`;
       }
       if (field.type === "number") {
-        params.push(parseFloat(cond.value) * scale);
+        params.push(parseFloat(cond.value));
       } else if (field.type === "date") {
         params.push(dateToTimestamp(cond.value));
       } else {
@@ -112,16 +111,16 @@ function buildConditionClause(
       params.push(`%${cond.value}`);
       return `${col} LIKE $${idx.val++}`;
     case "gt":
-      params.push(parseFloat(cond.value) * scale);
+      params.push(parseFloat(cond.value));
       return `${col} > $${idx.val++}`;
     case "gte":
-      params.push(parseFloat(cond.value) * scale);
+      params.push(parseFloat(cond.value));
       return `${col} >= $${idx.val++}`;
     case "lt":
-      params.push(parseFloat(cond.value) * scale);
+      params.push(parseFloat(cond.value));
       return `${col} < $${idx.val++}`;
     case "lte":
-      params.push(parseFloat(cond.value) * scale);
+      params.push(parseFloat(cond.value));
       return `${col} <= $${idx.val++}`;
     case "before":
       params.push(dateToTimestamp(cond.value));
@@ -192,9 +191,11 @@ export async function getDistinctValues(column: string): Promise<string[]> {
   if (!DISTINCT_VALUE_COLUMNS.has(column)) {
     throw new Error(`Column "${column}" is not allowed for distinct values`);
   }
+  const field = FIELD_MAP[column];
+  const extraFilter = field?.distinctFilter ? ` AND ${field.distinctFilter}` : "";
   const d = await getDb();
   const rows = await d.select<Record<string, string>[]>(
-    `SELECT DISTINCT ${column} FROM workouts WHERE ${column} IS NOT NULL AND ${column} != '' ORDER BY ${column} ASC`,
+    `SELECT DISTINCT ${column} FROM workouts WHERE ${column} IS NOT NULL AND ${column} != ''${extraFilter} ORDER BY ${column} ASC`,
   );
   return rows.map((r) => r[column]);
 }

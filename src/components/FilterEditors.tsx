@@ -48,7 +48,8 @@ export function valueSummary(condition: FilterCondition): string {
     return "...";
   }
   if (field?.type === "enum" && condition.values.length > 0) {
-    if (condition.values.length === 1) return condition.values[0];
+    const display = field.displayValue ?? ((v: string) => v);
+    if (condition.values.length === 1) return display(condition.values[0]);
     return `${condition.values.length} selected`;
   }
   return condition.value || "...";
@@ -251,6 +252,7 @@ export function EnumMultiSelect({
   onChange: (values: string[]) => void;
 }) {
   const [options, setOptions] = useState<string[]>([]);
+  const displayValue = FIELD_MAP[fieldKey]?.displayValue ?? ((v: string) => v);
 
   useEffect(() => {
     getDistinctValues(fieldKey).then(setOptions).catch(() => setOptions([]));
@@ -273,7 +275,7 @@ export function EnumMultiSelect({
               key={v}
               className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800"
             >
-              {v}
+              {displayValue(v)}
               <button
                 onClick={() => toggle(v)}
                 className="ml-0.5 text-blue-600 hover:text-blue-900"
@@ -296,7 +298,7 @@ export function EnumMultiSelect({
               onChange={() => toggle(opt)}
               className="rounded border-gray-300"
             />
-            <span className="capitalize">{opt}</span>
+            <span>{displayValue(opt)}</span>
           </label>
         ))}
         {options.length === 0 && (

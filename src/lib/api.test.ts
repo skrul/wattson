@@ -270,7 +270,7 @@ describe("fetchAllWorkouts", () => {
     expect(onProgress).toHaveBeenCalledWith(1, 42);
   });
 
-  it("uses duration fallback when no ride", async () => {
+  it("returns null duration when no ride", async () => {
     const workout = makePelotonWorkout("w1", {
       start_time: 1000,
       end_time: 2800,
@@ -283,7 +283,7 @@ describe("fetchAllWorkouts", () => {
 
     const [result] = await fetchAllWorkouts("user1", "token1");
 
-    expect(result.duration_seconds).toBe(1800); // end_time - start_time
+    expect(result.duration_seconds).toBeNull();
     expect(result.title).toBe("Just Work Out");
     expect(result.instructor).toBeNull();
   });

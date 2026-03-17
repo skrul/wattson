@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { getUnenrichedWorkoutIds, getEnrichmentCounts, updateWorkoutMetrics } from "../lib/database";
-import { cachedFetchPerformanceGraph } from "../lib/enrichmentCache";
+import { getUnenrichedWorkouts, getEnrichmentCounts, updateWorkoutMetrics, updateRideDetails } from "../lib/database";
+import { cachedFetchPerformanceGraph, cachedFetchWorkoutDetail, cachedFetchRideDetails } from "../lib/enrichmentCache";
 import { useSessionStore } from "./sessionStore";
 
 type BackfillStatus = "running" | "paused" | "complete";
@@ -37,19 +37,26 @@ async function runBackfillLoop() {
       return;
     }
 
-    const ids = await getUnenrichedWorkoutIds();
-    if (ids.length === 0) {
+    const unenriched = await getUnenrichedWorkouts();
+    if (unenriched.length === 0) {
       await useEnrichmentStore.getState().refreshCounts();
       useEnrichmentStore.setState({ backfillStatus: "complete", enrichmentComplete: true });
       return;
     }
 
-    const workoutId = ids[0];
-    let wasCacheHit = false;
+    const { id: workoutId, ride_id: rideId } = unenriched[0];
+    let allCacheHits = false;
     try {
-      const result = await cachedFetchPerformanceGraph(workoutId, session.accessToken);
-      wasCacheHit = result.cacheHit;
-      await updateWorkoutMetrics(workoutId, result, null, result.rawJson);
+      const [perfResult, detailResult, rideResult] = await Promise.all([
+        cachedFetchPerformanceGraph(workoutId, session.accessToken),
+        cachedFetchWorkoutDetail(workoutId, session.accessToken).catch(() => null),
+        rideId ? cachedFetchRideDetails(rideId, session.accessToken).catch(() => null) : Promise.resolve(null),
+      ]);
+      allCacheHits = perfResult.cacheHit
+        && (detailResult?.cacheHit ?? false)
+        && (rideResult?.cacheHit ?? !rideId);
+      await updateWorkoutMetrics(workoutId, perfResult, detailResult?.rawJson ?? null, perfResult.rawJson);
+      await updateRideDetails(workoutId, rideResult?.rawJson ?? null);
       await useEnrichmentStore.getState().refreshCounts();
     } catch (e) {
       console.error(`Enrichment failed for workout ${workoutId}:`, e);
@@ -64,7 +71,7 @@ async function runBackfillLoop() {
     if (abortBackfill) break;
 
     // Only rate limit when we actually hit the API
-    if (!wasCacheHit) {
+    if (!allCacheHits) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }

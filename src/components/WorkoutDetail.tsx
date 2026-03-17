@@ -179,11 +179,12 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
       : Promise.resolve(null);
 
     Promise.all([detailPromise, perfPromise, ridePromise])
-      .then(async ([rawDetailJson, perfResult, rawRideDetailsJson]) => {
+      .then(async ([detailResult, perfResult, rideResult]) => {
         if (cancelled) return;
 
         if (needsMetrics && perfResult) {
           const { rawJson: rawPerfJson, ...metrics } = perfResult;
+          const rawDetailJson = detailResult?.rawJson ?? null;
           await updateWorkoutMetrics(workout.id, metrics, rawDetailJson, rawPerfJson);
           updateWorkout(workout.id, {
             ...metrics,
@@ -192,9 +193,9 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
           });
         }
 
-        if (rawRideDetailsJson) {
-          await updateRideDetails(workout.id, rawRideDetailsJson);
-          updateWorkout(workout.id, { raw_ride_details_json: rawRideDetailsJson });
+        await updateRideDetails(workout.id, rideResult?.rawJson ?? null);
+        if (rideResult) {
+          updateWorkout(workout.id, { raw_ride_details_json: rideResult.rawJson });
         }
       })
       .catch((err) => {

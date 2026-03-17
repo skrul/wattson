@@ -56,9 +56,9 @@ function App() {
     }
   }, [loaded, session]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-sync on launch when preference is enabled
+  // Auto-sync on launch when preference is enabled (skip while wizard is open)
   useEffect(() => {
-    if (!loaded || !session || autoSyncRan.current) return;
+    if (!loaded || !session || autoSyncRan.current || showWizard) return;
     const pref = localStorage.getItem(AUTO_SYNC_KEY);
     if (pref === "false") return;
     autoSyncRan.current = true;
@@ -66,18 +66,18 @@ function App() {
     syncWorkouts().catch((e) => {
       console.error("Auto-sync failed:", e);
     });
-  }, [loaded, session]);
+  }, [loaded, session, showWizard]);
 
   // Auto-resume enrichment backfill once on launch when session is available
   const autoResumeRan = useRef(false);
   useEffect(() => {
-    if (!loaded || !session || autoResumeRan.current) return;
+    if (!loaded || !session || autoResumeRan.current || showWizard) return;
     const { backfillStatus } = useEnrichmentStore.getState();
     if (backfillStatus === "paused") {
       autoResumeRan.current = true;
       useEnrichmentStore.getState().startBackfill();
     }
-  }, [loaded, session]);
+  }, [loaded, session, showWizard]);
 
   const handleUpdate = async () => {
     setUpdating(true);

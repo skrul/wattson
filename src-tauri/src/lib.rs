@@ -96,6 +96,14 @@ pub fn run() {
             CREATE INDEX idx_workouts_ride_id ON workouts(ride_id);",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 2,
+            description: "add_enrichment_timestamps",
+            sql: "ALTER TABLE workouts ADD COLUMN detail_fetched_at INTEGER;
+                  ALTER TABLE workouts ADD COLUMN perf_graph_fetched_at INTEGER;
+                  ALTER TABLE workouts ADD COLUMN ride_details_fetched_at INTEGER;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

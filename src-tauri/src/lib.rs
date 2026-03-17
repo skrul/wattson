@@ -110,6 +110,33 @@ pub fn run() {
                   UPDATE chart_definitions SET x_axis_sequential = 1, x_axis_mode = 'date' WHERE x_axis_mode = 'workout';",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "create_dashboard_tables",
+            sql: "CREATE TABLE dashboards (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL DEFAULT 'My Dashboard',
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE dashboard_widgets (
+                id TEXT PRIMARY KEY,
+                dashboard_id TEXT NOT NULL REFERENCES dashboards(id) ON DELETE CASCADE,
+                widget_type TEXT NOT NULL,
+                title TEXT NOT NULL DEFAULT '',
+                config_json TEXT NOT NULL DEFAULT '{}',
+                layout_json TEXT NOT NULL DEFAULT '{}',
+                sort_order INTEGER NOT NULL DEFAULT 0
+            );",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 5,
+            description: "drop_widget_title_column",
+            sql: "ALTER TABLE dashboard_widgets DROP COLUMN title;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

@@ -135,3 +135,52 @@ export interface ChartDefinitionRow {
   created_at: number;
   updated_at: number;
 }
+
+// --- Dashboard definitions ---
+
+export type WidgetType = "chart" | "metric_total" | "last_workout" | "section";
+
+export interface WidgetLayout {
+  x: number; y: number; w: number; h: number;
+  minW?: number; minH?: number;
+}
+
+export interface ChartWidgetConfig {
+  type: "chart";
+  chart: Omit<ChartDefinition, "id" | "created_at" | "updated_at">;
+}
+
+export interface MetricTotalWidgetConfig {
+  type: "metric_total";
+  label: string;
+  metric: string;
+  filters: FilterCondition[];
+}
+
+export interface LastWorkoutWidgetConfig {
+  type: "last_workout";
+  title: string;
+  filters: FilterCondition[];
+}
+
+export interface SectionWidgetConfig {
+  type: "section";
+  title: string;
+}
+
+export type WidgetConfig = ChartWidgetConfig | MetricTotalWidgetConfig | LastWorkoutWidgetConfig | SectionWidgetConfig;
+
+export interface DashboardWidget {
+  id: string;
+  widget_type: WidgetType;
+  config: WidgetConfig;
+  layout: WidgetLayout;
+}
+
+export interface Dashboard {
+  id: string;
+  name: string;
+  widgets: DashboardWidget[];
+  created_at: number;
+  updated_at: number;
+}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import ApiSync from "./components/ApiSync";
 import WorkoutList from "./components/WorkoutList";
-import OutputChart from "./components/OutputChart";
+import DashboardTab from "./components/DashboardTab";
 import InsightsTab from "./components/InsightsTab";
 import SetupWizard from "./components/SetupWizard";
 import ReauthModal from "./components/ReauthModal";
@@ -123,7 +123,7 @@ function App() {
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
         <h1 className="text-xl font-bold">Wattson</h1>
         <nav className="flex gap-2">
-          {(["workouts", "insights", "charts", "profile"] as Tab[]).map((tab) => (
+          {(["dashboard", "workouts", "insights", "profile"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -140,11 +140,11 @@ function App() {
       </header>
 
       {/* Content — all tabs stay mounted to preserve scroll position and avoid re-fetching */}
+      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "dashboard" ? "" : "hidden"}`}>
+        <DashboardTab />
+      </div>
       <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "workouts" ? "" : "hidden"}`}>
         <WorkoutList />
-      </div>
-      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "charts" ? "" : "hidden"}`}>
-        <OutputChart />
       </div>
       <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "insights" ? "" : "hidden"}`}>
         <InsightsTab />

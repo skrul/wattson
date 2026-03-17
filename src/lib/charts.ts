@@ -60,27 +60,38 @@ export function parsePerformanceGraph(rawJson: string): PerformanceTimeSeries | 
 }
 
 /**
- * Parse instructor_cues from raw ride details JSON.
- * Returns cue intervals for power zone segments, or null if none found.
+ * Extract the pedaling start offset from raw ride details JSON.
+ * This is the number of seconds from ride/video start until pedaling begins.
  */
-export function parseInstructorCues(rawRideDetailsJson: string): InstructorCue[] | null {
+export function parsePedalingStartOffset(rawRideDetailsJson: string | null | undefined): number {
+  if (!rawRideDetailsJson) return 0;
   try {
     const data = JSON.parse(rawRideDetailsJson);
-    const cues = data.instructor_cues;
-    if (!Array.isArray(cues)) return null;
+    return data.ride?.pedaling_start_offset ?? 0;
+  } catch {
+    return 0;
+  }
+}
 
-    // Cue offsets are relative to the ride video start, but performance data
-    // starts at the pedaling offset. Subtract it so cues align with the chart.
-    const pedalingOffset: number = data.ride?.pedaling_start_offset ?? 0;
+/**
+ * Parse target_metrics_performance_data from raw performance graph JSON.
+ * Returns target metric intervals for power zone segments, or null if none found.
+ * pedalingStartOffset adjusts offsets from ride/video start to pedaling start.
+ */
+export function parseTargetMetrics(rawPerformanceGraphJson: string, pedalingStartOffset = 0): InstructorCue[] | null {
+  try {
+    const data = JSON.parse(rawPerformanceGraphJson);
+    const targets = data.target_metrics_performance_data?.target_metrics;
+    if (!Array.isArray(targets)) return null;
 
     const parsed: InstructorCue[] = [];
-    for (const cue of cues) {
-      if (cue.segment_type !== "power_zone") continue;
-      const zone = cue.metrics?.[0]?.upper;
-      if (zone == null || !cue.offsets) continue;
+    for (const t of targets) {
+      if (t.segment_type !== "power_zone") continue;
+      const zone = t.metrics?.[0]?.upper;
+      if (zone == null || !t.offsets) continue;
       parsed.push({
-        startSecond: cue.offsets.start - pedalingOffset,
-        endSecond: cue.offsets.end - pedalingOffset,
+        startSecond: t.offsets.start - pedalingStartOffset,
+        endSecond: t.offsets.end - pedalingStartOffset,
         zone,
       });
     }
@@ -95,6 +106,12 @@ interface ChartOptions {
   width?: number;
   height?: number;
   durationSeconds?: number;
+  overlays?: { output?: boolean; heartRate?: boolean; cadence?: boolean; resistance?: boolean; speed?: boolean };
+  overlayColors?: { output?: string; heartRate?: string; cadence?: string; resistance?: string; speed?: string };
+  cueColor?: string;
+  showZoneBands?: boolean;
+  showInstructorCues?: boolean;
+  showYAxis?: boolean;
 }
 
 /**
@@ -117,12 +134,16 @@ export function renderRideDetailChart(
   const data = timeSeries.seconds.map((s, i) => ({
     second: s,
     output: timeSeries.output[i],
+    heartRate: timeSeries.heartRate[i] ?? 0,
+    cadence: timeSeries.cadence[i] ?? 0,
+    resistance: timeSeries.resistance[i] ?? 0,
+    speed: timeSeries.speed[i] ?? 0,
   }));
 
   const marks: Plot.Markish[] = [];
 
   // Zone bands (only if FTP is available)
-  if (ftp != null) {
+  if (options.showZoneBands !== false && ftp != null) {
     const zoneBands = POWER_ZONES.map((z) => ({
       y1: z.minPct * ftp,
       y2: Math.min(z.maxPct * ftp, yMax),
@@ -141,27 +162,31 @@ export function renderRideDetailChart(
       }),
     );
 
-    // Zone labels on the right
-    const zoneLabels = POWER_ZONES.filter((z) => z.minPct * ftp < yMax).map((z) => ({
-      y: ((z.minPct + Math.min(z.maxPct, yMax / ftp)) / 2) * ftp,
-      text: z.zone,
-    }));
+    // Zone labels on the right (always shown when bands are shown)
+    {
+      const zoneLabels = POWER_ZONES.filter((z) => z.minPct * ftp < yMax).map((z) => ({
+        y: ((z.minPct + Math.min(z.maxPct, yMax / ftp)) / 2) * ftp,
+        text: z.zone,
+      }));
 
-    marks.push(
-      Plot.text(zoneLabels, {
-        x: timeSeries.seconds.length - 1,
-        y: "y",
-        text: "text",
-        textAnchor: "start",
-        dx: 8,
-        fontSize: 10,
-        fill: "#666",
-      }),
-    );
+      marks.push(
+        Plot.text(zoneLabels, {
+          x: timeSeries.seconds.length - 1,
+          y: "y",
+          text: "text",
+          textAnchor: "start",
+          dx: 8,
+          fontSize: 10,
+          fill: "#666",
+        }),
+      );
+    }
   }
 
   // Class plan overlay (instructor cues)
-  if (ftp != null && cues && cues.length > 0) {
+  if (options.showInstructorCues !== false && ftp != null && cues && cues.length > 0) {
+    const cueColor = options.cueColor ?? "#333";
+
     const cueSegments = cues.map((c) => {
       const pz = POWER_ZONES[c.zone - 1];
       if (!pz) return null;
@@ -176,7 +201,7 @@ export function renderRideDetailChart(
         x2: "x2",
         y1: "y",
         y2: "y",
-        stroke: "#333",
+        stroke: cueColor,
         strokeOpacity: 0.5,
         strokeWidth: 2,
       }),
@@ -199,7 +224,7 @@ export function renderRideDetailChart(
           x2: "x",
           y1: "y1",
           y2: "y2",
-          stroke: "#333",
+          stroke: cueColor,
           strokeOpacity: 0.5,
           strokeWidth: 2,
         }),
@@ -208,14 +233,50 @@ export function renderRideDetailChart(
   }
 
   // Output line
-  marks.push(
-    Plot.lineY(data, {
-      x: "second",
-      y: "output",
-      stroke: "#e44",
-      strokeWidth: 1.5,
-    }),
-  );
+  if (options.overlays?.output !== false) {
+    marks.push(
+      Plot.lineY(data, {
+        x: "second",
+        y: "output",
+        stroke: options.overlayColors?.output ?? "#e44",
+        strokeWidth: 1.5,
+      }),
+    );
+  }
+
+  // Additional overlay lines (HR, cadence, resistance) mapped to the output Y domain
+  type OverlayKey = "heartRate" | "cadence" | "resistance" | "speed";
+  const overlayDefs: { key: OverlayKey; field: string; defaultColor: string; values: number[] }[] = [
+    { key: "heartRate", field: "heartRate", defaultColor: "#e91e63", values: timeSeries.heartRate },
+    { key: "cadence", field: "cadence", defaultColor: "#2196f3", values: timeSeries.cadence },
+    { key: "resistance", field: "resistance", defaultColor: "#4caf50", values: timeSeries.resistance },
+    { key: "speed", field: "speed", defaultColor: "#ff9800", values: timeSeries.speed },
+  ];
+
+  for (const overlay of overlayDefs) {
+    if (!options.overlays?.[overlay.key]) continue;
+    if (overlay.values.length === 0) continue;
+
+    const overlayMax = Math.max(...overlay.values);
+    if (overlayMax === 0) continue;
+
+    // Map overlay values into the output Y domain
+    const scale = scaleLinear().domain([0, overlayMax]).range([0, yMax * 0.8]);
+    const mappedData = data.map((d) => ({
+      second: d.second,
+      value: scale(d[overlay.field as keyof typeof d] as number),
+    }));
+
+    marks.push(
+      Plot.lineY(mappedData, {
+        x: "second",
+        y: "value",
+        stroke: options.overlayColors?.[overlay.key] ?? overlay.defaultColor,
+        strokeWidth: 1.5,
+        strokeOpacity: 0.7,
+      }),
+    );
+  }
 
   const totalSeconds = timeSeries.seconds.length;
   const xMax = options.durationSeconds ?? totalSeconds;
@@ -238,8 +299,9 @@ export function renderRideDetailChart(
     },
     y: {
       domain: [0, yMax],
-      label: "Watts",
-      grid: true,
+      label: options.showYAxis !== false ? "Watts" : null,
+      grid: options.showYAxis !== false,
+      ticks: options.showYAxis !== false ? undefined : [],
     },
     marks,
   });

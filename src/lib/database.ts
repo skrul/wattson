@@ -266,24 +266,29 @@ export async function updateWorkoutMetrics(
   rawPerformanceGraphJson: string | null,
 ): Promise<void> {
   const d = await getDb();
+  const now = Math.floor(Date.now() / 1000);
   await d.execute(
     `UPDATE workouts SET calories=$1, distance=$2, avg_output=$3, avg_cadence=$4,
      avg_resistance=$5, avg_speed=$6, avg_heart_rate=$7,
-     raw_detail_json=$8, raw_performance_graph_json=$9 WHERE id=$10`,
+     raw_detail_json=$8, raw_performance_graph_json=$9,
+     detail_fetched_at=$10, perf_graph_fetched_at=$11
+     WHERE id=$12`,
     [
       metrics.calories, metrics.distance, metrics.avg_output, metrics.avg_cadence,
       metrics.avg_resistance, metrics.avg_speed, metrics.avg_heart_rate,
-      rawDetailJson, rawPerformanceGraphJson, workoutId,
+      rawDetailJson, rawPerformanceGraphJson,
+      now, now, workoutId,
     ],
   );
 }
 
 /** Update a workout's cached ride details JSON. */
-export async function updateRideDetails(workoutId: string, rawJson: string): Promise<void> {
+export async function updateRideDetails(workoutId: string, rawJson: string | null): Promise<void> {
   const d = await getDb();
+  const now = Math.floor(Date.now() / 1000);
   await d.execute(
-    `UPDATE workouts SET raw_ride_details_json=$1 WHERE id=$2`,
-    [rawJson, workoutId],
+    `UPDATE workouts SET raw_ride_details_json=$1, ride_details_fetched_at=$2 WHERE id=$3`,
+    [rawJson, now, workoutId],
   );
 }
 
@@ -378,20 +383,39 @@ export async function setSetting(key: string, value: string): Promise<void> {
   );
 }
 
-/** Get IDs of workouts that have not been enriched with performance graph data. */
-export async function getUnenrichedWorkoutIds(): Promise<string[]> {
+/** Get recent cycling workouts that have performance graph data (for Studio tab picker). */
+export async function getShareableWorkouts(limit = 50): Promise<Workout[]> {
   const d = await getDb();
-  const rows = await d.select<{ id: string }[]>(
-    "SELECT id FROM workouts WHERE raw_performance_graph_json IS NULL ORDER BY date DESC",
+  return d.select<Workout[]>(
+    `SELECT * FROM workouts
+     WHERE discipline = 'cycling' AND raw_performance_graph_json IS NOT NULL
+     ORDER BY date DESC LIMIT $1`,
+    [limit],
   );
-  return rows.map((r) => r.id);
 }
 
-/** Get counts of enriched vs total workouts. */
+/** Get workouts that have not been fully enriched (missing any fetch timestamp). */
+export async function getUnenrichedWorkouts(): Promise<{ id: string; ride_id: string | null }[]> {
+  const d = await getDb();
+  return d.select<{ id: string; ride_id: string | null }[]>(
+    `SELECT id, ride_id FROM workouts
+     WHERE detail_fetched_at IS NULL
+        OR perf_graph_fetched_at IS NULL
+        OR ride_details_fetched_at IS NULL
+     ORDER BY date DESC`,
+  );
+}
+
+/** Get counts of fully enriched vs total workouts. */
 export async function getEnrichmentCounts(): Promise<{ enriched: number; total: number }> {
   const d = await getDb();
   const rows = await d.select<{ total: number; enriched: number }[]>(
-    "SELECT COUNT(*) as total, COUNT(raw_performance_graph_json) as enriched FROM workouts",
+    `SELECT COUNT(*) as total,
+            COALESCE(SUM(CASE WHEN detail_fetched_at IS NOT NULL
+                               AND perf_graph_fetched_at IS NOT NULL
+                               AND ride_details_fetched_at IS NOT NULL
+                          THEN 1 ELSE 0 END), 0) as enriched
+     FROM workouts`,
   );
   return { enriched: rows[0].enriched, total: rows[0].total };
 }

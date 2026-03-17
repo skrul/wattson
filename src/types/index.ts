@@ -120,6 +120,42 @@ export interface ChartDefinition {
   updated_at: number;
 }
 
+export interface ShareChartSettings {
+  overlays: {
+    output: boolean;
+    heartRate: boolean;
+    cadence: boolean;
+    resistance: boolean;
+    speed: boolean;
+  };
+  overlayColors: {
+    output: string;
+    heartRate: string;
+    cadence: string;
+    resistance: string;
+    speed: string;
+  };
+  cueColor: string;
+  zoneBands: "off" | "always" | "pz-only";
+  showInstructorCues: boolean;
+  showHeader: boolean;
+  showUsername: boolean;
+  customUsername: string;
+  showYAxis: boolean;
+  stats: {
+    avgPower: boolean;
+    totalOutput: boolean;
+    calories: boolean;
+    distance: boolean;
+    avgCadence: boolean;
+    avgResistance: boolean;
+    avgSpeed: boolean;
+    avgHR: boolean;
+    striveScore: boolean;
+    ftp: boolean;
+  };
+}
+
 /** Row shape as stored in SQLite (JSON fields are strings). */
 export interface ChartDefinitionRow {
   id: string;

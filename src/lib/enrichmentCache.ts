@@ -81,26 +81,26 @@ export async function cachedFetchPerformanceGraph(
 export async function cachedFetchWorkoutDetail(
   workoutId: string,
   accessToken: string,
-): Promise<string> {
+): Promise<{ rawJson: string; cacheHit: boolean }> {
   const key = `detail:${workoutId}`;
   const cached = await getCached(key);
-  if (cached) return cached;
+  if (cached) return { rawJson: cached, cacheHit: true };
 
   const rawJson = await fetchWorkoutDetail(workoutId, accessToken);
   await setCache(key, rawJson);
-  return rawJson;
+  return { rawJson, cacheHit: false };
 }
 
 /** Fetch ride details with cache. */
 export async function cachedFetchRideDetails(
   rideId: string,
   accessToken: string,
-): Promise<string> {
+): Promise<{ rawJson: string; cacheHit: boolean }> {
   const key = `ride:${rideId}`;
   const cached = await getCached(key);
-  if (cached) return cached;
+  if (cached) return { rawJson: cached, cacheHit: true };
 
   const rawJson = await fetchRideDetails(rideId, accessToken);
   await setCache(key, rawJson);
-  return rawJson;
+  return { rawJson, cacheHit: false };
 }

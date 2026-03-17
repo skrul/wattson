@@ -110,6 +110,14 @@ pub fn run() {
                   UPDATE chart_definitions SET x_axis_sequential = 1, x_axis_mode = 'date' WHERE x_axis_mode = 'workout';",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "add_enrichment_timestamps",
+            sql: "ALTER TABLE workouts ADD COLUMN detail_fetched_at INTEGER;
+                  ALTER TABLE workouts ADD COLUMN perf_graph_fetched_at INTEGER;
+                  ALTER TABLE workouts ADD COLUMN ride_details_fetched_at INTEGER;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

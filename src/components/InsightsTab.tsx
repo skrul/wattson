@@ -19,7 +19,7 @@ export default function InsightsTab() {
   }, [activeTab]);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="mx-auto max-w-5xl space-y-8">
       <PersonalRecords refreshKey={refreshKey} />
       <Favorites refreshKey={refreshKey} />
     </div>

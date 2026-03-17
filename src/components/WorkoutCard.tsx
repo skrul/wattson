@@ -1,6 +1,5 @@
+import { useMemo } from "react";
 import type { Workout } from "../types";
-
-const DAY_ABBREVS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 interface MetricDisplay {
   field: keyof Workout;
@@ -21,50 +20,165 @@ const METRIC_DISPLAYS: Record<string, MetricDisplay> = {
 
 const DEFAULT_METRIC = METRIC_DISPLAYS.total_work;
 
+interface ParsedRawJson {
+  instructorImageUrl: string | null;
+  classAirDate: number | null;
+}
+
+const parsedCache = new Map<string, ParsedRawJson>();
+
+function parseRawJson(workoutId: string, rawJson: string | null): ParsedRawJson {
+  const cached = parsedCache.get(workoutId);
+  if (cached) return cached;
+
+  const empty: ParsedRawJson = { instructorImageUrl: null, classAirDate: null };
+  if (!rawJson) {
+    parsedCache.set(workoutId, empty);
+    return empty;
+  }
+
+  try {
+    const parsed = JSON.parse(rawJson);
+    const rawUrl: string | null = parsed.ride?.instructor?.image_url ?? null;
+    const result: ParsedRawJson = {
+      instructorImageUrl: rawUrl
+        ? `https://res.cloudinary.com/peloton-uat/image/fetch/c_fill,dpr_2.0,f_auto,q_auto:good,w_100/${rawUrl}`
+        : null,
+      classAirDate: parsed.ride?.original_air_time ?? null,
+    };
+    parsedCache.set(workoutId, result);
+    return result;
+  } catch {
+    parsedCache.set(workoutId, empty);
+    return empty;
+  }
+}
+
+function formatWorkoutDate(ts: number): string {
+  const d = new Date(ts * 1000);
+  const day = d.toLocaleDateString(undefined, { weekday: "short" });
+  const month = d.getMonth() + 1;
+  const date = d.getDate();
+  const year = String(d.getFullYear()).slice(2);
+  const hours = d.getHours();
+  const minutes = d.getMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const h = hours % 12 || 12;
+  const mm = minutes.toString().padStart(2, "0");
+  return `${day} ${month}/${date}/${year} @ ${h}:${mm} ${ampm}`;
+}
+
+function formatClassDate(ts: number): string {
+  const d = new Date(ts * 1000);
+  const day = d.toLocaleDateString(undefined, { weekday: "short" });
+  const month = d.getMonth() + 1;
+  const date = d.getDate();
+  const year = String(d.getFullYear()).slice(2);
+  return `Class: ${day} ${month}/${date}/${year}`;
+}
+
+interface MetricOverride {
+  value: string;
+  unit: string;
+}
+
 interface WorkoutCardProps {
   workout: Workout;
   isSelected: boolean;
   onClick: () => void;
   sortField?: string;
+  label?: string;
+  metricOverride?: MetricOverride;
 }
 
-export default function WorkoutCard({ workout, isSelected, onClick, sortField }: WorkoutCardProps) {
-  const d = new Date(workout.date * 1000);
-  const dayAbbrev = DAY_ABBREVS[d.getDay()];
-  const dayNum = d.getDate();
+export default function WorkoutCard({ workout, isSelected, onClick, sortField, label, metricOverride }: WorkoutCardProps) {
+  const { instructorImageUrl, classAirDate } = useMemo(
+    () => parseRawJson(workout.id, workout.raw_json),
+    [workout.id, workout.raw_json],
+  );
 
   const metric = (sortField && METRIC_DISPLAYS[sortField]) || DEFAULT_METRIC;
   const raw = workout[metric.field] as number | null;
+  const hasMetric = metricOverride || (raw != null && raw > 0);
+  const metricValue = metricOverride?.value ?? (raw != null && raw > 0 ? metric.format(raw) : null);
+  const metricUnit = metricOverride?.unit ?? metric.unit;
+
+  const instructorDisplay = workout.instructor ?? null;
+  const subtitle = instructorDisplay
+    ? `${instructorDisplay.toUpperCase()} \u00b7 ${workout.discipline.toUpperCase()}`
+    : workout.discipline.toUpperCase();
 
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+      className={`flex w-full flex-col text-left transition-colors ${
         isSelected
           ? "bg-gray-800 text-white"
           : "hover:bg-gray-50"
       }`}
     >
-      <div className="flex flex-col items-center w-10 shrink-0">
-        <span className={`text-[10px] font-semibold tracking-wide ${isSelected ? "text-gray-400" : "text-gray-400"}`}>
-          {dayAbbrev}
-        </span>
-        <span className="text-lg font-bold leading-tight">{dayNum}</span>
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="truncate text-sm font-medium">{workout.title}</div>
-        <div className={`truncate text-xs ${isSelected ? "text-gray-400" : "text-gray-500"}`}>
-          {workout.instructor ?? "Unknown"} · {workout.discipline.toUpperCase()}
-        </div>
-      </div>
-
-      {raw != null && raw > 0 && (
-        <div className="shrink-0 text-right">
-          <span className="text-sm font-semibold">{metric.format(raw)}</span>
-          <span className={`ml-0.5 text-xs ${isSelected ? "text-gray-400" : "text-gray-500"}`}>{metric.unit}</span>
+      {label && (
+        <div className={`px-4 pt-2 text-xs font-medium uppercase tracking-wide ${
+          isSelected ? "text-gray-400" : "text-gray-500"
+        }`}>
+          {label}
         </div>
       )}
+
+      <div className="flex items-start gap-3 px-4 pt-3 pb-2">
+        {/* Avatar */}
+        <div className="shrink-0">
+          {instructorImageUrl ? (
+            <img
+              src={instructorImageUrl}
+              alt={instructorDisplay ?? "Instructor"}
+              className="h-10 w-10 rounded-full object-cover"
+              onError={(e) => {
+                const target = e.currentTarget;
+                target.style.display = "none";
+                target.nextElementSibling?.classList.remove("hidden");
+              }}
+            />
+          ) : null}
+          <div
+            className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold text-white bg-gray-400 ${
+              instructorImageUrl ? "hidden" : ""
+            }`}
+          >
+            {instructorDisplay ? instructorDisplay.charAt(0).toUpperCase() : "?"}
+          </div>
+        </div>
+
+        {/* Title + subtitle + class date */}
+        <div className="flex-1 min-w-0">
+          <div className="truncate text-sm font-medium">{workout.title}</div>
+          <div className={`truncate text-xs ${isSelected ? "text-gray-400" : "text-gray-500"}`}>
+            {subtitle}
+          </div>
+          {classAirDate && (
+            <div className={`text-xs mt-0.5 ${isSelected ? "text-gray-400" : "text-gray-500"}`}>
+              {formatClassDate(classAirDate)}
+            </div>
+          )}
+        </div>
+
+        {/* Metric */}
+        {hasMetric && metricValue && (
+          <div className="shrink-0 text-right pl-2">
+            <span className="text-xl font-bold leading-tight">{metricValue}</span>
+            <div className={`text-xs ${isSelected ? "text-gray-400" : "text-gray-500"}`}>
+              {metricUnit}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer: workout date */}
+      <div className={`px-4 pb-2 text-xs border-t ${
+        isSelected ? "border-gray-700 text-gray-400" : "border-gray-100 text-gray-500"
+      }`}>
+        <span className="pt-1.5 inline-block">{formatWorkoutDate(workout.date)}</span>
+      </div>
     </button>
   );
 }

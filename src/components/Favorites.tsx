@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import {
   getTopInstructors,
   getTopClassTypes,
-  getMostRepeatedRides,
+  getMostRepeatedRideWorkouts,
   type InstructorCount,
   type ClassTypeCount,
-  type RepeatedRide,
+  type RepeatedRideWorkout,
 } from "../lib/database";
 import { useNavigationStore } from "../stores/navigationStore";
+import WorkoutCard from "./WorkoutCard";
 import type { FilterCondition } from "../types";
 
 let condId = 0;
@@ -18,7 +19,7 @@ function mkCondition(field: string, values: string[]): FilterCondition {
 export default function Favorites({ refreshKey }: { refreshKey: number }) {
   const [instructors, setInstructors] = useState<InstructorCount[]>([]);
   const [classTypes, setClassTypes] = useState<ClassTypeCount[]>([]);
-  const [rides, setRides] = useState<RepeatedRide[]>([]);
+  const [rides, setRides] = useState<RepeatedRideWorkout[]>([]);
   const [loading, setLoading] = useState(true);
   const navigateToWorkout = useNavigationStore((s) => s.navigateToWorkout);
   const navigateToFilteredWorkouts = useNavigationStore((s) => s.navigateToFilteredWorkouts);
@@ -28,7 +29,7 @@ export default function Favorites({ refreshKey }: { refreshKey: number }) {
     Promise.all([
       getTopInstructors(5),
       getTopClassTypes(5),
-      getMostRepeatedRides(5),
+      getMostRepeatedRideWorkouts(5),
     ]).then(([ins, cts, rds]) => {
       if (!cancelled) {
         setInstructors(ins);
@@ -100,24 +101,20 @@ export default function Favorites({ refreshKey }: { refreshKey: number }) {
         )}
 
         {rides.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Most Repeated Rides</h3>
-            <ul className="space-y-2">
+          <div className="col-span-full">
+            <h3 className="text-sm font-medium text-gray-500 mb-2">Most Repeated Classes</h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {rides.map((ride) => (
-                <li key={ride.ride_id} className="text-sm">
-                  <button
-                    className="text-left hover:text-blue-600 transition-colors"
-                    onClick={() => navigateToWorkout(ride.workout_id)}
-                  >
-                    <span className="text-gray-900">{ride.title}</span>
-                    {ride.instructor && (
-                      <span className="text-gray-400 ml-1">({ride.instructor})</span>
-                    )}
-                    <span className="text-gray-400 ml-1">&middot; {ride.count} times</span>
-                  </button>
-                </li>
+                <div key={ride.ride_id} className="rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-colors overflow-hidden">
+                  <WorkoutCard
+                    workout={ride}
+                    isSelected={false}
+                    onClick={() => navigateToWorkout(ride.id)}
+                    metricOverride={{ value: String(ride.repeat_count), unit: "times" }}
+                  />
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
       </div>

@@ -8,6 +8,7 @@ import {
   type TopWorkoutFilters,
 } from "../lib/database";
 import { useNavigationStore } from "../stores/navigationStore";
+import WorkoutCard from "./WorkoutCard";
 import type { Workout, FilterCondition } from "../types";
 
 interface CardDef {
@@ -21,29 +22,6 @@ interface CardDef {
 interface CardData {
   def: CardDef;
   topWorkout: Workout;
-}
-
-function formatMetricValue(workout: Workout, metric: string, unit: string): string {
-  const raw = workout[metric as keyof Workout] as number | null;
-  if (raw == null) return "—";
-
-  if (unit === "kj") return `${(raw / 1000).toFixed(1)} kJ`;
-  if (unit === "cal") return `${Math.round(raw)} cal`;
-  if (unit === "pts") return `${raw.toFixed(1)} pts`;
-  if (unit === "mi") return `${raw.toFixed(2)} mi`;
-  if (unit === "bpm") return `${Math.round(raw)} bpm`;
-  if (unit === "rpm") return `${Math.round(raw)} rpm`;
-  if (unit === "mph") return `${raw.toFixed(1)} mph`;
-  if (unit === "w") return `${Math.round(raw)} W`;
-  return String(raw);
-}
-
-function formatDate(ts: number): string {
-  return new Date(ts * 1000).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 function formatDuration(seconds: number): string {
@@ -82,20 +60,15 @@ function RecordCard({ data }: { data: CardData }) {
   };
 
   return (
-    <button
-      className="rounded-lg border border-gray-200 bg-white p-4 text-left hover:border-gray-300 transition-colors w-full"
-      onClick={handleClick}
-    >
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-        {def.title}
-      </p>
-      <p className="mt-1 text-2xl font-bold text-gray-900">
-        {formatMetricValue(topWorkout, def.metric, def.unit)}
-      </p>
-      <p className="mt-0.5 text-sm text-gray-500">
-        {topWorkout.title} &middot; {formatDate(topWorkout.date)}
-      </p>
-    </button>
+    <div className="rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-colors overflow-hidden">
+      <WorkoutCard
+        workout={topWorkout}
+        isSelected={false}
+        onClick={handleClick}
+        sortField={def.metric}
+        label={def.title}
+      />
+    </div>
   );
 }
 

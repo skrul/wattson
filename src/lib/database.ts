@@ -421,6 +421,8 @@ export interface RepeatedRide {
   workout_id: string;
 }
 
+export type RepeatedRideWorkout = Workout & { repeat_count: number };
+
 /** Count workouts per discipline, ordered by count DESC. */
 export async function getDisciplineCounts(): Promise<DisciplineCount[]> {
   const d = await getDb();
@@ -547,6 +549,25 @@ export async function getMostRepeatedRides(limit: number): Promise<RepeatedRide[
   const d = await getDb();
   return d.select<RepeatedRide[]>(
     `SELECT w.ride_id, w.title, w.instructor, g.count, w.id as workout_id
+     FROM workouts w
+     INNER JOIN (
+       SELECT ride_id, COUNT(*) as count, MAX(date) as max_date
+       FROM workouts
+       WHERE ride_id IS NOT NULL AND ride_id != ''
+       GROUP BY ride_id
+       HAVING count > 1
+     ) g ON w.ride_id = g.ride_id AND w.date = g.max_date
+     ORDER BY g.count DESC, g.max_date DESC
+     LIMIT $1`,
+    [limit],
+  );
+}
+
+/** Most repeated rides returning full Workout rows plus repeat count. */
+export async function getMostRepeatedRideWorkouts(limit: number): Promise<RepeatedRideWorkout[]> {
+  const d = await getDb();
+  return d.select<RepeatedRideWorkout[]>(
+    `SELECT w.*, g.count as repeat_count
      FROM workouts w
      INNER JOIN (
        SELECT ride_id, COUNT(*) as count, MAX(date) as max_date

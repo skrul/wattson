@@ -19,8 +19,9 @@ export default function WorkoutList() {
   const cardVirtualizer = useVirtualizer({
     count: workouts.length,
     getScrollElement: () => cardScrollRef.current,
-    estimateSize: () => 64,
+    estimateSize: () => 120,
     overscan: 5,
+    measureElement: (el) => el.getBoundingClientRect().height,
   });
 
   // Stable key that only changes when query-affecting filter state changes.
@@ -104,6 +105,8 @@ export default function WorkoutList() {
                 return (
                   <div
                     key={w.id}
+                    ref={cardVirtualizer.measureElement}
+                    data-index={virtualRow.index}
                     style={{
                       position: "absolute",
                       top: 0,

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getDisciplineCounts, getEfficiencyFactorData } from "../lib/database";
+import { useEnrichmentStore } from "../stores/enrichmentStore";
 import { renderEFTrendChart } from "../lib/charts";
 import type { DisciplineCount, EFDataPoint } from "../lib/database";
 
@@ -9,19 +10,22 @@ export default function EfficiencyFactor({ refreshKey }: { refreshKey: number })
   const [data, setData] = useState<EFDataPoint[] | null>(null);
   const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
 
   // Load discipline list once
   useEffect(() => {
+    if (!enrichmentComplete) return;
     let cancelled = false;
     (async () => {
       const counts = await getDisciplineCounts();
       if (!cancelled) setDisciplines(counts);
     })();
     return () => { cancelled = true; };
-  }, [refreshKey]);
+  }, [refreshKey, enrichmentComplete]);
 
   // Load EF data when discipline changes
   useEffect(() => {
+    if (!enrichmentComplete) return;
     let cancelled = false;
     setLoading(true);
     (async () => {
@@ -32,7 +36,7 @@ export default function EfficiencyFactor({ refreshKey }: { refreshKey: number })
       }
     })();
     return () => { cancelled = true; };
-  }, [refreshKey, discipline]);
+  }, [refreshKey, discipline, enrichmentComplete]);
 
   // Render chart
   useEffect(() => {
@@ -58,20 +62,24 @@ export default function EfficiencyFactor({ refreshKey }: { refreshKey: number })
     <section>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">Efficiency Factor</h2>
-        <select
-          value={discipline}
-          onChange={(e) => setDiscipline(e.target.value)}
-          className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"
-        >
-          {disciplines.map((d) => (
-            <option key={d.discipline} value={d.discipline}>
-              {d.discipline}
-            </option>
-          ))}
-        </select>
+        {enrichmentComplete && (
+          <select
+            value={discipline}
+            onChange={(e) => setDiscipline(e.target.value)}
+            className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+          >
+            {disciplines.map((d) => (
+              <option key={d.discipline} value={d.discipline}>
+                {d.discipline}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <div className="rounded-lg border border-gray-200 bg-white p-4">
-        {loading ? (
+        {!enrichmentComplete ? (
+          <p className="text-sm text-gray-400 italic">Enable Detailed Metrics in Account to see efficiency factor trends</p>
+        ) : loading ? (
           <p className="text-sm text-gray-400">Loading efficiency factor data...</p>
         ) : data && data.length === 0 ? (
           <p className="text-sm text-gray-400">No workouts with both output and heart rate data.</p>

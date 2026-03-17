@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCumulativeTotals, type CumulativeTotals as CumulativeTotalsData } from "../lib/database";
+import { useEnrichmentStore } from "../stores/enrichmentStore";
 
 interface StatCard {
   label: string;
@@ -9,6 +10,7 @@ interface StatCard {
 export default function CumulativeTotals({ refreshKey }: { refreshKey: number }) {
   const [stats, setStats] = useState<StatCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
 
   useEffect(() => {
     let cancelled = false;
@@ -18,9 +20,9 @@ export default function CumulativeTotals({ refreshKey }: { refreshKey: number })
       const cards: StatCard[] = [
         { label: "Total Workouts", value: totals.total_workouts.toLocaleString() },
         { label: "Total Hours", value: Math.round(totals.total_duration_seconds / 3600).toLocaleString() },
-        { label: "Total Calories", value: Math.round(totals.total_calories).toLocaleString() },
+        { label: "Total Calories", value: enrichmentComplete ? Math.round(totals.total_calories).toLocaleString() : "—" },
         { label: "Total Output (kj)", value: Math.round(totals.total_work_joules / 1000).toLocaleString() },
-        { label: "Total Distance (mi)", value: totals.total_distance.toLocaleString(undefined, { maximumFractionDigits: 1 }) },
+        { label: "Total Distance (mi)", value: enrichmentComplete ? totals.total_distance.toLocaleString(undefined, { maximumFractionDigits: 1 }) : "—" },
       ];
 
       if (!cancelled) {
@@ -29,7 +31,7 @@ export default function CumulativeTotals({ refreshKey }: { refreshKey: number })
       }
     })();
     return () => { cancelled = true; };
-  }, [refreshKey]);
+  }, [refreshKey, enrichmentComplete]);
 
   if (loading) {
     return <p className="text-sm text-gray-400">Loading totals...</p>;
@@ -46,6 +48,9 @@ export default function CumulativeTotals({ refreshKey }: { refreshKey: number })
           </div>
         ))}
       </div>
+      {!enrichmentComplete && (
+        <p className="mt-2 text-xs text-gray-400 italic">Enable Detailed Metrics in Account to see all stats</p>
+      )}
     </section>
   );
 }

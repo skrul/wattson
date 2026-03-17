@@ -8,6 +8,7 @@ import {
   type TopWorkoutFilters,
 } from "../lib/database";
 import { useNavigationStore } from "../stores/navigationStore";
+import { useEnrichmentStore } from "../stores/enrichmentStore";
 import WorkoutCard from "./WorkoutCard";
 import type { Workout, FilterCondition } from "../types";
 
@@ -76,6 +77,8 @@ export default function PersonalRecords({ refreshKey }: { refreshKey: number }) 
   const [cards, setCards] = useState<CardData[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -83,7 +86,9 @@ export default function PersonalRecords({ refreshKey }: { refreshKey: number }) 
 
       // Overall bests
       defs.push({ title: "Highest Output", metric: "total_work", unit: "kj", group: "Overall" });
-      defs.push({ title: "Most Calories", metric: "calories", unit: "cal", group: "Overall" });
+      if (enrichmentComplete) {
+        defs.push({ title: "Most Calories", metric: "calories", unit: "cal", group: "Overall" });
+      }
       defs.push({ title: "Best Strive Score", metric: "strive_score", unit: "pts", group: "Overall" });
 
       // Per-discipline bests (disciplines with >= 5 workouts, non-empty name)
@@ -175,7 +180,7 @@ export default function PersonalRecords({ refreshKey }: { refreshKey: number }) 
       }
     })();
     return () => { cancelled = true; };
-  }, [refreshKey]);
+  }, [refreshKey, enrichmentComplete]);
 
   if (loading) {
     return <p className="text-sm text-gray-400">Loading records...</p>;

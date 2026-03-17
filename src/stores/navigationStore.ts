@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { FilterCondition, SortSpec } from "../types";
 
-export type Tab = "workouts" | "charts" | "insights" | "studio" | "profile";
+export type Tab = "dashboard" | "workouts" | "insights" | "studio" | "profile";
 
 interface PendingWorkoutNav {
   workoutId: string;
@@ -22,7 +22,7 @@ interface NavigationState {
 }
 
 export const useNavigationStore = create<NavigationState>((set, get) => ({
-  activeTab: "workouts",
+  activeTab: "dashboard",
   previousTab: null,
   pendingWorkoutNav: null,
 

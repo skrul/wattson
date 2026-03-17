@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { FIELD_DEFS, FIELD_MAP, OPERATOR_LABELS } from "../lib/fields";
-import { useChartStore } from "../stores/chartStore";
 import { useEnrichmentStore } from "../stores/enrichmentStore";
 import type { FilterCondition } from "../types";
 import {
@@ -243,18 +242,4 @@ export function FilterBar({
   );
 }
 
-/** Chart builder filter bar — connects FilterBar to the chart store's draft. */
-export default function ChartFilterBar() {
-  const { draft, addDraftFilter, updateDraftFilter, removeDraftFilter } = useChartStore();
-
-  if (!draft) return null;
-
-  return (
-    <FilterBar
-      filters={draft.filters}
-      onAdd={addDraftFilter}
-      onUpdate={updateDraftFilter}
-      onRemove={removeDraftFilter}
-    />
-  );
-}
+export default FilterBar;

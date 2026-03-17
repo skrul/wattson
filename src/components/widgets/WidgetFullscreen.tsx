@@ -1,0 +1,32 @@
+import type { DashboardWidget } from "../../types";
+import { useDashboardStore } from "../../stores/dashboardStore";
+import ChartWidget from "./ChartWidget";
+import MetricTotalWidget from "./MetricTotalWidget";
+import LastWorkoutWidget from "./LastWorkoutWidget";
+
+interface Props {
+  widget: DashboardWidget;
+}
+
+export default function WidgetFullscreen({ widget }: Props) {
+  const expandWidget = useDashboardStore((s) => s.expandWidget);
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900">{widget.widget_type}</h2>
+        <button
+          onClick={() => expandWidget(null)}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+        >
+          Exit Fullscreen
+        </button>
+      </div>
+      <div className="flex-1 overflow-auto rounded-lg border border-gray-200 bg-white p-4">
+        {widget.config.type === "chart" && <ChartWidget widget={widget} fullscreen />}
+        {widget.config.type === "metric_total" && <MetricTotalWidget widget={widget} fullscreen />}
+        {widget.config.type === "last_workout" && <LastWorkoutWidget widget={widget} fullscreen />}
+      </div>
+    </div>
+  );
+}

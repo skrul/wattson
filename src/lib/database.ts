@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { Workout, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics, ChartDefinition, ChartDefinitionRow, ChartXAxisMode, AggregationFunction } from "../types";
+import type { Workout, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics, ChartDefinition, ChartDefinitionRow, ChartXAxisMode, AggregationFunction, Dashboard, DashboardWidget } from "../types";
 import { FIELD_MAP } from "./fields";
 
 let db: Database | null = null;
@@ -714,4 +714,111 @@ export async function getMostRepeatedRideWorkoutsByDiscipline(
      LIMIT $2`,
     [discipline, limit],
   );
+}
+
+// --- Dashboard ---
+
+interface DashboardRow {
+  id: string;
+  name: string;
+  created_at: number;
+  updated_at: number;
+}
+
+interface DashboardWidgetRow {
+  id: string;
+  dashboard_id: string;
+  widget_type: string;
+  config_json: string;
+  layout_json: string;
+  sort_order: number;
+}
+
+/** Load the default dashboard (create if none exists). */
+export async function getOrCreateDashboard(): Promise<Dashboard> {
+  const d = await getDb();
+  const rows = await d.select<DashboardRow[]>(
+    "SELECT * FROM dashboards ORDER BY created_at ASC LIMIT 1",
+  );
+
+  let dashboard: DashboardRow;
+  if (rows.length === 0) {
+    const now = Date.now();
+    const id = crypto.randomUUID();
+    await d.execute(
+      "INSERT INTO dashboards (id, name, created_at, updated_at) VALUES ($1, $2, $3, $4)",
+      [id, "My Dashboard", now, now],
+    );
+    dashboard = { id, name: "My Dashboard", created_at: now, updated_at: now };
+  } else {
+    dashboard = rows[0];
+  }
+
+  const widgetRows = await d.select<DashboardWidgetRow[]>(
+    "SELECT * FROM dashboard_widgets WHERE dashboard_id = $1 ORDER BY sort_order ASC",
+    [dashboard.id],
+  );
+
+  const widgets: DashboardWidget[] = widgetRows.map((r) => ({
+    id: r.id,
+    widget_type: r.widget_type as DashboardWidget["widget_type"],
+    config: JSON.parse(r.config_json),
+    layout: JSON.parse(r.layout_json),
+  }));
+
+  return { ...dashboard, widgets };
+}
+
+/** Save all widgets for a dashboard (delete + re-insert). */
+export async function saveDashboardWidgets(
+  dashboardId: string,
+  widgets: DashboardWidget[],
+): Promise<void> {
+  const d = await getDb();
+  await d.execute("DELETE FROM dashboard_widgets WHERE dashboard_id = $1", [dashboardId]);
+  for (let i = 0; i < widgets.length; i++) {
+    const w = widgets[i];
+    await d.execute(
+      `INSERT INTO dashboard_widgets (id, dashboard_id, widget_type, config_json, layout_json, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [w.id, dashboardId, w.widget_type, JSON.stringify(w.config), JSON.stringify(w.layout), i],
+    );
+  }
+  await d.execute("UPDATE dashboards SET updated_at = $1 WHERE id = $2", [Date.now(), dashboardId]);
+}
+
+const METRIC_SQL: Record<string, string> = {
+  total_workouts: "COUNT(*)",
+  total_calories: "COALESCE(SUM(calories), 0)",
+  total_distance: "COALESCE(SUM(distance), 0)",
+  total_output_kj: "COALESCE(SUM(total_work) / 1000, 0)",
+  total_hours: "COALESCE(SUM(duration_seconds) / 3600.0, 0)",
+  avg_output: "AVG(avg_output)",
+  avg_heart_rate: "AVG(avg_heart_rate)",
+};
+
+/** Compute an aggregate metric value, optionally filtered. */
+export async function getMetricValue(
+  metric: string,
+  filters: FilterCondition[],
+): Promise<number> {
+  const sql = METRIC_SQL[metric];
+  if (!sql) throw new Error(`Unknown metric "${metric}"`);
+
+  const params: unknown[] = [];
+  const idx = { val: 1 };
+  const clauses: string[] = [];
+
+  for (const cond of filters) {
+    const clause = buildConditionClause(cond, params, idx);
+    if (clause) clauses.push(clause);
+  }
+
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+  const d = await getDb();
+  const rows = await d.select<{ val: number }[]>(
+    `SELECT ${sql} as val FROM workouts ${where}`,
+    params,
+  );
+  return rows[0]?.val ?? 0;
 }

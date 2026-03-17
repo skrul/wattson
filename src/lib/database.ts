@@ -582,6 +582,78 @@ export async function getMostRepeatedRideWorkouts(limit: number): Promise<Repeat
   );
 }
 
+// --- Efficiency Factor ---
+
+export interface EFDataPoint {
+  date: number;
+  avg_output: number;
+  avg_heart_rate: number;
+  discipline: string;
+  duration_seconds: number;
+}
+
+/** Get workouts with both output and heart rate data for efficiency factor trending. */
+export async function getEfficiencyFactorData(discipline?: string): Promise<EFDataPoint[]> {
+  const d = await getDb();
+  const clauses = [
+    "avg_output IS NOT NULL",
+    "avg_heart_rate IS NOT NULL",
+    "avg_heart_rate > 0",
+  ];
+  const params: unknown[] = [];
+  if (discipline) {
+    clauses.push("discipline = $1");
+    params.push(discipline);
+  }
+  return d.select<EFDataPoint[]>(
+    `SELECT date, avg_output, avg_heart_rate, discipline, duration_seconds
+     FROM workouts WHERE ${clauses.join(" AND ")}
+     ORDER BY date ASC`,
+    params,
+  );
+}
+
+// --- Cumulative Totals, Streaks, Heatmap, Trends ---
+
+export interface CumulativeTotals {
+  total_calories: number;
+  total_distance: number;
+  total_work_joules: number;
+  total_duration_seconds: number;
+  total_workouts: number;
+}
+
+export interface DailyWorkoutCount {
+  workout_date: string;
+  count: number;
+}
+
+/** Lifetime cumulative totals across all workouts. */
+export async function getCumulativeTotals(): Promise<CumulativeTotals> {
+  const d = await getDb();
+  const rows = await d.select<CumulativeTotals[]>(
+    `SELECT COALESCE(SUM(calories),0) as total_calories,
+            COALESCE(SUM(distance),0) as total_distance,
+            COALESCE(SUM(total_work),0) as total_work_joules,
+            COALESCE(SUM(duration_seconds),0) as total_duration_seconds,
+            COUNT(*) as total_workouts
+     FROM workouts`,
+  );
+  return rows[0];
+}
+
+/** Daily workout counts for the last N days. */
+export async function getDailyWorkoutCounts(days: number): Promise<DailyWorkoutCount[]> {
+  const d = await getDb();
+  const sinceTs = Math.floor(Date.now() / 1000) - days * 86400;
+  return d.select<DailyWorkoutCount[]>(
+    `SELECT date(date, 'unixepoch', 'localtime') as workout_date, COUNT(*) as count
+     FROM workouts WHERE date >= $1
+     GROUP BY workout_date ORDER BY workout_date ASC`,
+    [sinceTs],
+  );
+}
+
 /** Most repeated rides for a specific discipline, returning full Workout rows plus repeat count. */
 export async function getMostRepeatedRideWorkoutsByDiscipline(
   discipline: string,

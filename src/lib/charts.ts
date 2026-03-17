@@ -807,6 +807,161 @@ export function renderMetricChart(
   return container;
 }
 
+// --- Insights charts ---
+
+import type { DailyWorkoutCount } from "./database";
+
+/**
+ * Render a GitHub-style heatmap of daily workout counts for the last 52 weeks.
+ */
+export function renderWorkoutHeatmap(
+  dailyCounts: DailyWorkoutCount[],
+  width = 800,
+  height = 160,
+  onDayClick?: (date: string) => void,
+): SVGElement | HTMLElement {
+  const countMap = new Map(dailyCounts.map((d) => [d.workout_date, d.count]));
+
+  // Generate all days in the last 52 weeks
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - 52 * 7 + 1);
+  // Align to Sunday
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+
+  const data: { week: number; day: number; count: number; date: string }[] = [];
+  const current = new Date(startDate);
+  let weekNum = 0;
+  const weekStartMonth: { week: number; month: string; key: string }[] = [];
+
+  while (current <= today) {
+    const dateStr = current.toISOString().slice(0, 10);
+    const day = current.getDay();
+    if (day === 0 && (weekStartMonth.length === 0 || weekStartMonth[weekStartMonth.length - 1].week !== weekNum)) {
+      const monthLabel = current.toLocaleString("en-US", { month: "short" });
+      const monthKey = `${current.getFullYear()}-${current.getMonth()}`;
+      weekStartMonth.push({ week: weekNum, month: monthLabel, key: monthKey });
+    }
+    data.push({
+      week: weekNum,
+      day,
+      count: countMap.get(dateStr) ?? 0,
+      date: dateStr,
+    });
+    current.setDate(current.getDate() + 1);
+    if (current.getDay() === 0) weekNum++;
+  }
+
+  // Deduplicate month labels: only keep the first occurrence of each year-month
+  const seenMonths = new Set<string>();
+  const monthTicks: { week: number; month: string }[] = [];
+  for (const entry of weekStartMonth) {
+    if (!seenMonths.has(entry.key)) {
+      seenMonths.add(entry.key);
+      monthTicks.push({ week: entry.week, month: entry.month });
+    }
+  }
+
+  const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const svg = Plot.plot({
+    width,
+    height,
+    marginLeft: 30,
+    marginBottom: 20,
+    x: {
+      label: null,
+      ticks: monthTicks.map((t) => t.week),
+      tickFormat: (d: number) => monthTicks.find((t) => t.week === d)?.month ?? "",
+    },
+    y: {
+      label: null,
+      domain: [0, 1, 2, 3, 4, 5, 6],
+      ticks: [1, 3, 5],
+      tickFormat: (d: number) => dayLabels[d] ?? "",
+    },
+    color: {
+      type: "linear",
+      domain: [0, Math.max(1, ...data.map((d) => d.count))],
+      range: ["#ebedf0", "#216e39"],
+    },
+    marks: [
+      Plot.cell(data, {
+        x: "week",
+        y: "day",
+        fill: "count",
+        tip: true,
+        title: (d: { date: string; count: number }) => `${d.date}: ${d.count} workout${d.count !== 1 ? "s" : ""}`,
+        inset: 1,
+        rx: 2,
+      }),
+    ],
+  });
+
+  if (onDayClick) {
+    const rects = svg.querySelectorAll('[aria-label="cell"] rect');
+    rects.forEach((rect, i) => {
+      const d = data[i];
+      if (d && d.count > 0) {
+        (rect as SVGRectElement).style.cursor = "pointer";
+        rect.addEventListener("click", () => onDayClick(d.date));
+      } else {
+        (rect as SVGRectElement).style.pointerEvents = "none";
+      }
+    });
+  }
+
+  return svg;
+}
+
+/**
+ * Render a scatter plot of Efficiency Factor over time with a rolling average trend line.
+ */
+export function renderEFTrendChart(
+  data: { date: Date; ef: number }[],
+  width = 800,
+  height = 300,
+): SVGElement | HTMLElement {
+  if (data.length === 0) {
+    return Plot.plot({ width, height, marks: [] });
+  }
+
+  // Compute rolling average (window of 10)
+  const window = 10;
+  const rollingData: { date: Date; ef: number }[] = [];
+  for (let i = 0; i < data.length; i++) {
+    const start = Math.max(0, i - window + 1);
+    const slice = data.slice(start, i + 1);
+    const avg = slice.reduce((sum, d) => sum + d.ef, 0) / slice.length;
+    rollingData.push({ date: data[i].date, ef: avg });
+  }
+
+  return Plot.plot({
+    width,
+    height,
+    x: { label: null, type: "utc" },
+    y: { label: "EF (watts/bpm)", grid: true },
+    marks: [
+      Plot.dot(data, {
+        x: "date",
+        y: "ef",
+        fill: "#93c5fd",
+        r: 3,
+        tip: true,
+        title: (d: { date: Date; ef: number }) =>
+          `${d.date.toLocaleDateString()} — EF: ${d.ef.toFixed(2)}`,
+      }),
+      Plot.lineY(rollingData, {
+        x: "date",
+        y: "ef",
+        stroke: "#2563eb",
+        strokeWidth: 2,
+      }),
+    ],
+  });
+}
+
 /** Render a custom chart, choosing single or dual axis. */
 export function renderCustomChart(
   workouts: Workout[],

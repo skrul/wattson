@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogPanel } from "@headlessui/react";
 import { login } from "../lib/api";
 import { syncWorkouts } from "../lib/sync";
-import { deleteAllData, getWorkoutCount } from "../lib/database";
+import { deleteAllData, getWorkoutCount, getSetting, setSetting } from "../lib/database";
 import { clearCache } from "../lib/enrichmentCache";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
@@ -43,6 +43,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const [cacheStatus, setCacheStatus] = useState("");
   const [workoutCount, setWorkoutCount] = useState<number | null>(null);
   const [autoSync, setAutoSync] = useState(() => localStorage.getItem(AUTO_SYNC_KEY) !== "false");
+  const [experimentalInsights, setExperimentalInsights] = useState(false);
 
   const session = useSessionStore((s) => s.session);
   const userProfile = useSessionStore((s) => s.userProfile);
@@ -62,6 +63,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
   useEffect(() => {
     if (session) {
       getWorkoutCount().then(setWorkoutCount).catch(() => {});
+      getSetting("experimental_insights").then((v) => setExperimentalInsights(v === "true")).catch(() => {});
     }
   }, [session]);
 
@@ -307,6 +309,26 @@ export default function ApiSync({ onDataDeleted }: Props) {
             )}
           </div>
         )}
+      </div>
+
+      {/* Experimental Insights */}
+      <div className="space-y-1">
+        <label className="flex items-center gap-2 text-sm text-gray-600">
+          <input
+            type="checkbox"
+            checked={experimentalInsights}
+            onChange={(e) => {
+              const enabled = e.target.checked;
+              setExperimentalInsights(enabled);
+              setSetting("experimental_insights", enabled ? "true" : "false");
+            }}
+            className="rounded border-gray-300"
+          />
+          Enable experimental insights
+        </label>
+        <p className="pl-6 text-xs text-gray-500">
+          Show experimental analysis sections in the Insights tab
+        </p>
       </div>
 
       {/* Actions */}

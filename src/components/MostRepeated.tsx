@@ -29,7 +29,7 @@ export default function MostRepeated({ refreshKey }: { refreshKey: number }) {
 
       for (const dc of disciplines) {
         if (!dc.discipline) continue;
-        const rides = await getMostRepeatedRideWorkoutsByDiscipline(dc.discipline, 5);
+        const rides = await getMostRepeatedRideWorkoutsByDiscipline(dc.discipline, 3);
         if (rides.length > 0) {
           results.push({ discipline: dc.discipline, rides });
         }

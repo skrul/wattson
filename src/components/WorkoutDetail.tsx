@@ -102,10 +102,10 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
 
   const metricChartsRef = useRef<HTMLDivElement>(null);
 
-  // Render per-metric charts in Summary tab
+  // Render per-metric charts in Stats tab
   useEffect(() => {
     const el = metricChartsRef.current;
-    if (!el || !timeSeries || activeTab !== "summary") return;
+    if (!el || !timeSeries || activeTab !== "stats") return;
     el.innerHTML = "";
 
     const metrics: CompareMetric[] = ["heartRate", "output", "cadence", "resistance", "speed"];
@@ -225,7 +225,7 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
 
   const tabs: { key: DetailTab; label: string }[] = [
     { key: "summary", label: "Summary" },
-    ...(hasShareContent ? [{ key: "share" as DetailTab, label: "Share" }] : []),
+    { key: "stats", label: "Stats" },
     ...(hasCompare ? [{ key: "compare" as DetailTab, label: `Compare (${sameClassWorkouts.length})` }] : []),
   ];
 
@@ -260,7 +260,6 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
       {/* Tab content */}
       {currentTab === "summary" && (
         <>
-        {/* Header */}
         <div className="mb-6">
           <p className="text-sm text-gray-500">
             {formatDetailDate(workout.date)} at {formatDetailTime(workout.date)}
@@ -274,7 +273,14 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
             Duration: {workout.duration_seconds != null ? formatDuration(workout.duration_seconds) : "—"}
           </p>
         </div>
+        {hasShareContent && (
+          <RideDetailChart workout={workout} ftp={ftp} />
+        )}
+        </>
+      )}
 
+      {currentTab === "stats" && (
+        <>
         <div className="grid grid-cols-3 gap-6">
           <Stat label="Total Output" value={workout.total_work != null ? Math.round(workout.total_work / 1000) : null} unit="kj" loading={showLoading} />
           <Stat label="Calories" value={workout.calories} unit="kcal" loading={showLoading} />
@@ -308,10 +314,6 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
           <div ref={metricChartsRef} className="mt-6 flex flex-col gap-4" />
         )}
         </>
-      )}
-
-      {currentTab === "share" && hasShareContent && (
-        <RideDetailChart workout={workout} ftp={ftp} />
       )}
 
       {currentTab === "compare" && hasCompare && (

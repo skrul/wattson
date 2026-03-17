@@ -15,6 +15,7 @@ export default function WorkoutList() {
   const { workouts, selectedWorkoutId, filters, setWorkouts, selectWorkout, isLoading, setLoading } = useWorkoutStore();
   const accessToken = useSessionStore((s) => s.session?.accessToken ?? null);
   const cardScrollRef = useRef<HTMLDivElement>(null);
+  const prevSortRef = useRef(filters.sort);
 
   const cardVirtualizer = useVirtualizer({
     count: workouts.length,
@@ -34,10 +35,17 @@ export default function WorkoutList() {
   useEffect(() => {
     let cancelled = false;
     const currentFilters = useWorkoutStore.getState().filters;
+    const sortChanged =
+      prevSortRef.current.field !== currentFilters.sort.field ||
+      prevSortRef.current.direction !== currentFilters.sort.direction;
+    prevSortRef.current = currentFilters.sort;
     setLoading(true);
     queryWorkouts(currentFilters).then((rows) => {
       if (!cancelled) {
         setWorkouts(rows);
+        if (sortChanged && rows.length > 0) {
+          selectWorkout(rows[0].id);
+        }
         setLoading(false);
       }
     }).catch((e) => {

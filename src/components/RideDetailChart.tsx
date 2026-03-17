@@ -75,7 +75,7 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
   return (
     <div className="mt-6">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700">Power Chart</h3>
+        <h3 className="text-sm font-semibold text-gray-700">Shareable Chart</h3>
         <ExportButton
           filename={filename}
           workout={workout}

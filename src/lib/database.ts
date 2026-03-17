@@ -581,3 +581,27 @@ export async function getMostRepeatedRideWorkouts(limit: number): Promise<Repeat
     [limit],
   );
 }
+
+/** Most repeated rides for a specific discipline, returning full Workout rows plus repeat count. */
+export async function getMostRepeatedRideWorkoutsByDiscipline(
+  discipline: string,
+  limit: number,
+): Promise<RepeatedRideWorkout[]> {
+  const d = await getDb();
+  return d.select<RepeatedRideWorkout[]>(
+    `SELECT w.*, g.count as repeat_count
+     FROM workouts w
+     INNER JOIN (
+       SELECT ride_id, COUNT(*) as count, MAX(date) as max_date
+       FROM workouts
+       WHERE ride_id IS NOT NULL AND ride_id != ''
+         AND discipline = $1
+       GROUP BY ride_id
+       HAVING count > 1
+     ) g ON w.ride_id = g.ride_id AND w.date = g.max_date
+     WHERE w.discipline = $1
+     ORDER BY g.count DESC, g.max_date DESC
+     LIMIT $2`,
+    [discipline, limit],
+  );
+}

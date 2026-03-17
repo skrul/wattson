@@ -87,8 +87,22 @@ export default function WorkoutList() {
 
   const cardVirtualItems = cardVirtualizer.getVirtualItems();
 
+  const previousTab = useNavigationStore((s) => s.previousTab);
+  const goBack = useNavigationStore((s) => s.goBack);
+
   return (
     <div className="flex flex-col h-full">
+      {previousTab && (
+        <button
+          onClick={goBack}
+          className="flex items-center gap-1.5 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 border-b border-gray-200"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+            <path fillRule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25H16.25A.75.75 0 0 1 17 10Z" clipRule="evenodd" />
+          </svg>
+          Back to {previousTab.charAt(0).toUpperCase() + previousTab.slice(1)}
+        </button>
+      )}
       <WorkoutToolbar />
 
       <div className="flex flex-1 min-h-0">

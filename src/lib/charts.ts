@@ -480,11 +480,18 @@ function prepareChartData(
     result.push(point);
   }
 
-  // Sort: temporal by date, categorical alphabetically
+  // Sort: temporal by date, categorical by numeric prefix then alphabetically
   if (isTemporalAggregation(chart.x_axis_mode)) {
     result.sort((a, b) => a.date.getTime() - b.date.getTime());
   } else {
-    result.sort((a, b) => (a.label ?? "").localeCompare(b.label ?? ""));
+    result.sort((a, b) => {
+      const aLabel = a.label ?? "";
+      const bLabel = b.label ?? "";
+      const aNum = parseFloat(aLabel);
+      const bNum = parseFloat(bLabel);
+      if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+      return aLabel.localeCompare(bLabel);
+    });
   }
 
   return result;
@@ -505,6 +512,29 @@ const HALF_DAY_MS = 12 * 60 * 60 * 1000;
 
 function fieldLabel(fieldKey: string): string {
   return FIELD_MAP[fieldKey]?.label ?? fieldKey;
+}
+
+function tooltipTitle(d: WorkoutPoint, yFieldKey: string, chart: ChartDefinition, yValue?: number): string {
+  const xLabel = d.label ?? d.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+  const val = yValue ?? d.y;
+  const rounded = Number.isInteger(val) ? val : +val.toFixed(2);
+  const aggregated = isAggregatedMode(chart.x_axis_mode);
+  const prefix = aggregated && chart.agg_function ? `${AGG_LABEL[chart.agg_function]} ` : "";
+  let text = `${xLabel}\n${prefix}${fieldLabel(yFieldKey)}: ${rounded}`;
+  if (d.group) text += `\n${d.group}`;
+  return text;
+}
+
+/** Extract unique group names from data, sorted numerically when possible. */
+function sortedGroups(data: WorkoutPoint[]): string[] {
+  const groups = [...new Set(data.map((d) => d.group).filter((g): g is string => g != null))];
+  groups.sort((a, b) => {
+    const aNum = parseFloat(a);
+    const bNum = parseFloat(b);
+    if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+    return a.localeCompare(b);
+  });
+  return groups;
 }
 
 const MAX_X_TICKS = 20;
@@ -636,15 +666,54 @@ export function renderSingleAxisChart(
   const categorical = chart.x_axis_mode === "category" || chart.x_axis_sequential;
   const xKey = categorical ? "label" : "date";
 
-  let mark: Plot.Markish;
+  const titleFn = (d: WorkoutPoint) => tooltipTitle(d, yField.field, chart);
+  const pointTipOptions = { tip: { anchor: "bottom" as const }, title: titleFn };
+
+  // For grouped bars, build a title function that shows all groups at the same x-position
+  let groupedBarTitleFn: ((d: WorkoutPoint) => string) | undefined;
+  if (chart.mark_type === "bar" && chart.group_by) {
+    const groupsByX = new Map<string, { group: string; y: number }[]>();
+    for (const d of data) {
+      const key = d.label ?? d.date.toISOString();
+      if (!groupsByX.has(key)) groupsByX.set(key, []);
+      groupsByX.get(key)!.push({ group: d.group ?? "Unknown", y: d.y });
+    }
+    // Sort each group list numerically
+    for (const groups of groupsByX.values()) {
+      groups.sort((a, b) => {
+        const aNum = parseFloat(a.group);
+        const bNum = parseFloat(b.group);
+        if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+        return a.group.localeCompare(b.group);
+      });
+    }
+    const prefix = aggregated && chart.agg_function ? `${AGG_LABEL[chart.agg_function]} ` : "";
+    groupedBarTitleFn = (d: WorkoutPoint) => {
+      const key = d.label ?? d.date.toISOString();
+      const groups = groupsByX.get(key) ?? [];
+      const xLabel = d.label ?? d.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+      let text = `${xLabel}\n${prefix}${fieldLabel(yField.field)}`;
+      for (const g of groups) {
+        const rounded = Number.isInteger(g.y) ? g.y : +g.y.toFixed(2);
+        text += `\n${g.group}: ${rounded}`;
+      }
+      return text;
+    };
+  }
+
+  const chartMarks: Plot.Markish[] = [];
   if (chart.mark_type === "bar") {
+    const barTip = groupedBarTitleFn
+      ? { tip: true, title: groupedBarTitleFn }
+      : {};
     if (categorical) {
-      mark = Plot.barY(data, {
+      chartMarks.push(Plot.barY(data, {
         x: "label",
         y: "y",
         fill: color,
         ...(chart.group_by ? {} : { fillOpacity: 0.8 }),
-      });
+        ...barTip,
+      }));
     } else {
       const halfWidth = (temporal && TEMPORAL_BAR_HALF_WIDTH[chart.x_axis_mode]) || HALF_DAY_MS;
       const barData = data.map((d) => ({
@@ -652,21 +721,31 @@ export function renderSingleAxisChart(
         x1: new Date(d.date.getTime() - halfWidth),
         x2: new Date(d.date.getTime() + halfWidth),
       }));
-      mark = Plot.rectY(barData, {
+      chartMarks.push(Plot.rectY(barData, {
         x1: "x1",
         x2: "x2",
         y: "y",
         fill: color,
         ...(chart.group_by ? {} : { fillOpacity: 0.8 }),
-      });
+        ...barTip,
+      }));
+    }
+    if (!chart.group_by) {
+      chartMarks.push(Plot.tip(data, Plot.pointer({
+        x: xKey,
+        y: "y",
+        anchor: "bottom",
+        title: titleFn,
+      })));
     }
   } else if (chart.mark_type === "dot") {
-    mark = Plot.dot(data, { x: xKey, y: "y", stroke: color, fill: color, r: 3 });
+    chartMarks.push(Plot.dot(data, { x: xKey, y: "y", stroke: color, fill: color, r: 3, ...pointTipOptions }));
   } else {
-    mark = Plot.lineY(data, {
+    chartMarks.push(Plot.lineY(data, {
       x: xKey, y: "y", stroke: color, strokeWidth: 1.5,
       ...(chart.group_by ? { sort: xKey } : {}),
-    });
+      ...pointTipOptions,
+    }));
   }
 
   const isCategoryMode = chart.x_axis_mode === "category";
@@ -682,16 +761,18 @@ export function renderSingleAxisChart(
     yLabel = `${AGG_LABEL[chart.agg_function]} ${yLabel}`;
   }
 
-  return Plot.plot({
+  const plotConfig = {
     width,
     height,
     marginRight: 40,
     marginBottom: (xConfig as Record<string, unknown>).tickRotate ? 60 : undefined,
     x: xConfig,
     y: { label: yLabel, grid: true },
-    color: chart.group_by ? { legend: true } : undefined,
-    marks: [mark],
-  });
+    color: chart.group_by ? { legend: true, domain: sortedGroups(data) } : undefined,
+    marks: chartMarks,
+  };
+
+  return Plot.plot(plotConfig);
 }
 
 /** Render a chart with two Y axes (left + right). */
@@ -723,13 +804,14 @@ export function renderDualAxisChart(
     .domain(rightExtent)
     .range(leftExtent);
 
-  // Build mapped data for right axis
+  // Build mapped data for right axis (keep originalY for tooltips)
   const mappedData = data
     .filter((d) => d.y2 != null)
     .map((d) => ({
       date: d.date,
       label: d.label,
       y: rightToLeft(d.y2!),
+      originalY: d.y2!,
       group: d.group,
     }));
 
@@ -749,6 +831,11 @@ export function renderDualAxisChart(
       x2: new Date(d.date.getTime() + halfWidth),
     }));
 
+  const leftTitleFn = (d: WorkoutPoint) => tooltipTitle(d, leftField.field, chart);
+  const rightTitleFn = (d: { originalY: number } & WorkoutPoint) => tooltipTitle(d, rightField.field, chart, d.originalY);
+  const leftPointTip = { tip: { anchor: "bottom" as const }, title: leftTitleFn };
+  const rightPointTip = { tip: { anchor: "bottom" as const }, title: rightTitleFn };
+
   // Left Y marks
   if (chart.mark_type === "bar") {
     if (categorical) {
@@ -756,10 +843,11 @@ export function renderDualAxisChart(
     } else {
       marks.push(Plot.rectY(makeBarData(data), { x1: "x1", x2: "x2", y: "y", fill: leftColor, fillOpacity: 0.8 }));
     }
+    marks.push(Plot.tip(data, Plot.pointer({ x: xKey, y: "y", anchor: "bottom", title: leftTitleFn })));
   } else if (chart.mark_type === "dot") {
-    marks.push(Plot.dot(data, { x: xKey, y: "y", stroke: leftColor, fill: leftColor, r: 3 }));
+    marks.push(Plot.dot(data, { x: xKey, y: "y", stroke: leftColor, fill: leftColor, r: 3, ...leftPointTip }));
   } else {
-    marks.push(Plot.lineY(data, { x: xKey, y: "y", stroke: leftColor, strokeWidth: 1.5 }));
+    marks.push(Plot.lineY(data, { x: xKey, y: "y", stroke: leftColor, strokeWidth: 1.5, ...leftPointTip }));
   }
 
   // Right Y marks (mapped into left range)
@@ -769,10 +857,11 @@ export function renderDualAxisChart(
     } else {
       marks.push(Plot.rectY(makeBarData(mappedData), { x1: "x1", x2: "x2", y: "y", fill: rightColor, fillOpacity: 0.5 }));
     }
+    marks.push(Plot.tip(mappedData, Plot.pointer({ x: xKey, y: "y", anchor: "bottom", title: rightTitleFn })));
   } else if (chart.mark_type === "dot") {
-    marks.push(Plot.dot(mappedData, { x: xKey, y: "y", stroke: rightColor, fill: rightColor, r: 3 }));
+    marks.push(Plot.dot(mappedData, { x: xKey, y: "y", stroke: rightColor, fill: rightColor, r: 3, ...rightPointTip }));
   } else {
-    marks.push(Plot.lineY(mappedData, { x: xKey, y: "y", stroke: rightColor, strokeWidth: 1.5, strokeDasharray: "4 2" }));
+    marks.push(Plot.lineY(mappedData, { x: xKey, y: "y", stroke: rightColor, strokeWidth: 1.5, strokeDasharray: "4 2", ...rightPointTip }));
   }
 
   // Right-side axis ticks

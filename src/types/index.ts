@@ -93,7 +93,12 @@ export interface WorkoutFilters {
 
 export type YAxisSide = "left" | "right";
 export type ChartMarkType = "line" | "dot" | "bar";
-export type ChartXAxisMode = "date" | "workout";
+export type ChartXAxisMode =
+  | "date"
+  | "day" | "week" | "month" | "year"
+  | "category";
+
+export type AggregationFunction = "avg" | "sum" | "count" | "min" | "max";
 
 export interface YAxisField {
   field: string;      // numeric field key from FIELD_DEFS
@@ -108,6 +113,9 @@ export interface ChartDefinition {
   group_by: string | null;        // enum field key for color coding
   filters: FilterCondition[];     // reuses existing type
   x_axis_mode: ChartXAxisMode;
+  x_axis_field: string | null;    // enum field key, only for "category" mode
+  x_axis_sequential: boolean;     // evenly spaced categorical axis
+  agg_function: AggregationFunction | null;
   created_at: number;
   updated_at: number;
 }
@@ -121,6 +129,9 @@ export interface ChartDefinitionRow {
   group_by: string | null;
   filters_json: string;
   x_axis_mode: string | null;
+  x_axis_field: string | null;
+  x_axis_sequential: number | null;
+  agg_function: string | null;
   created_at: number;
   updated_at: number;
 }

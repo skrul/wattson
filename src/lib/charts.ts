@@ -1,7 +1,7 @@
 import * as Plot from "@observablehq/plot";
 import { scaleLinear } from "d3-scale";
 import { extent } from "d3-array";
-import type { PerformanceTimeSeries, Workout, ChartDefinition } from "../types";
+import type { PerformanceTimeSeries, Workout, ChartDefinition, ChartXAxisMode, AggregationFunction } from "../types";
 import { FIELD_MAP } from "./fields";
 
 export interface PowerZone {
@@ -253,7 +253,122 @@ interface WorkoutPoint {
   y: number;
   y2?: number;
   group?: string;
+  _workout?: Workout;
 }
+
+// --- Aggregation helpers ---
+
+export function isAggregatedMode(mode: ChartXAxisMode): boolean {
+  return mode !== "date";
+}
+
+function isTemporalAggregation(mode: ChartXAxisMode): boolean {
+  return mode === "day" || mode === "week" || mode === "month" || mode === "year";
+}
+
+function getTemporalBucketKey(date: Date, mode: ChartXAxisMode): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  switch (mode) {
+    case "day":
+      return `${y}-${m}-${d}`;
+    case "week": {
+      // ISO week: find Monday of the week
+      const day = date.getDay();
+      const diff = (day === 0 ? -6 : 1) - day;
+      const monday = new Date(date);
+      monday.setDate(monday.getDate() + diff);
+      const wy = monday.getFullYear();
+      const wm = String(monday.getMonth() + 1).padStart(2, "0");
+      const wd = String(monday.getDate()).padStart(2, "0");
+      return `${wy}-${wm}-${wd}`;
+    }
+    case "month":
+      return `${y}-${m}`;
+    case "year":
+      return `${y}`;
+    default:
+      return `${y}-${m}-${d}`;
+  }
+}
+
+function bucketKeyToDate(key: string, mode: ChartXAxisMode): Date {
+  switch (mode) {
+    case "day":
+      return new Date(key + "T12:00:00");
+    case "week":
+      // key is the Monday date; use mid-week (Thursday) as representative
+      { const d = new Date(key + "T12:00:00"); d.setDate(d.getDate() + 3); return d; }
+    case "month":
+      return new Date(key + "-15T12:00:00");
+    case "year":
+      return new Date(key + "-07-01T12:00:00");
+    default:
+      return new Date(key);
+  }
+}
+
+function formatBucketLabel(key: string, mode: ChartXAxisMode): string {
+  switch (mode) {
+    case "day": {
+      const d = new Date(key + "T12:00:00");
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+    }
+    case "week": {
+      // key is Monday date e.g. "2024-03-11" → "Mar 11 '24"
+      const d = new Date(key + "T12:00:00");
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+    }
+    case "month": {
+      const d = new Date(key + "-15T12:00:00");
+      return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+    }
+    case "year":
+      return key;
+    default:
+      return key;
+  }
+}
+
+/** Approximate character width of labels for a given mode. */
+const LABEL_CHAR_WIDTH: Record<string, number> = {
+  day: 11,   // "Mar 11 '24"
+  week: 11,  // "Mar 11 '24"
+  month: 8,  // "Mar '24"
+  year: 4,   // "2024"
+};
+
+function aggregate(values: number[], fn: AggregationFunction): number {
+  if (values.length === 0) return 0;
+  switch (fn) {
+    case "avg":
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    case "sum":
+      return values.reduce((a, b) => a + b, 0);
+    case "count":
+      return values.length;
+    case "min":
+      return Math.min(...values);
+    case "max":
+      return Math.max(...values);
+  }
+}
+
+const AGG_LABEL: Record<AggregationFunction, string> = {
+  avg: "Avg",
+  sum: "Sum",
+  count: "Count",
+  min: "Min",
+  max: "Max",
+};
+
+const TEMPORAL_BAR_HALF_WIDTH: Record<string, number> = {
+  day: 12 * 60 * 60 * 1000,           // 12 hours
+  week: 3.5 * 24 * 60 * 60 * 1000,    // 3.5 days
+  month: 15 * 24 * 60 * 60 * 1000,    // 15 days
+  year: 182 * 24 * 60 * 60 * 1000,    // ~6 months
+};
 
 /** Fields whose raw DB values need scaling for display. */
 const FIELD_DISPLAY_SCALE: Record<string, number> = {
@@ -265,7 +380,7 @@ function scaleValue(field: string, value: number): number {
   return scale ? Math.round(value * scale) : value;
 }
 
-function prepareChartData(
+function extractRawPoints(
   workouts: Workout[],
   chart: ChartDefinition,
 ): WorkoutPoint[] {
@@ -280,6 +395,7 @@ function prepareChartData(
     const point: WorkoutPoint = {
       date: new Date(w.date * 1000),
       y: scaleValue(yField, yVal as number),
+      _workout: w,
     };
     if (y2Field) {
       const y2Val = (w as unknown as Record<string, unknown>)[y2Field];
@@ -292,29 +408,100 @@ function prepareChartData(
     }
     points.push(point);
   }
-
-  if (chart.x_axis_mode === "workout") {
-    const seen = new Map<string, number>();
-    for (const p of points) {
-      const base = p.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
-      const n = (seen.get(base) ?? 0) + 1;
-      seen.set(base, n);
-      p.label = n > 1 ? `${base} #${n}` : base;
-    }
-  }
-
   return points;
 }
 
-const HALF_DAY_MS = 12 * 60 * 60 * 1000;
+function prepareChartData(
+  workouts: Workout[],
+  chart: ChartDefinition,
+): WorkoutPoint[] {
+  const points = extractRawPoints(workouts, chart);
+  if (points.length === 0) return [];
 
-function toBarData(data: WorkoutPoint[]) {
-  return data.map((d) => ({
-    ...d,
-    x1: new Date(d.date.getTime() - HALF_DAY_MS),
-    x2: new Date(d.date.getTime() + HALF_DAY_MS),
-  }));
+  // Non-aggregated mode (date): return raw points
+  if (!isAggregatedMode(chart.x_axis_mode)) {
+    if (chart.x_axis_sequential) {
+      assignSequentialLabels(points);
+    }
+    return points;
+  }
+
+  const fn = chart.agg_function ?? "avg";
+
+  // Group points into buckets
+  // Compound key: bucketKey + group (if group_by is set)
+  const buckets = new Map<string, { yValues: number[]; y2Values: number[]; date: Date; label: string; group?: string }>();
+
+  for (const p of points) {
+    let bucketKey: string;
+    let bucketLabel: string;
+    let bucketDate: Date;
+
+    if (isTemporalAggregation(chart.x_axis_mode)) {
+      bucketKey = getTemporalBucketKey(p.date, chart.x_axis_mode);
+      bucketLabel = formatBucketLabel(bucketKey, chart.x_axis_mode);
+      bucketDate = bucketKeyToDate(bucketKey, chart.x_axis_mode);
+    } else {
+      // category mode
+      const w = p._workout!;
+      const field = chart.x_axis_field;
+      if (!field) continue;
+      const raw = String((w as unknown as Record<string, unknown>)[field] ?? "Unknown");
+      const displayFn = FIELD_MAP[field]?.displayValue;
+      bucketKey = raw;
+      bucketLabel = displayFn ? displayFn(raw) : raw;
+      bucketDate = new Date(0); // not used for categorical
+    }
+
+    // Include group in compound key
+    const compoundKey = p.group != null ? `${bucketKey}\0${p.group}` : bucketKey;
+
+    let bucket = buckets.get(compoundKey);
+    if (!bucket) {
+      bucket = { yValues: [], y2Values: [], date: bucketDate, label: bucketLabel, group: p.group };
+      buckets.set(compoundKey, bucket);
+    }
+    bucket.yValues.push(p.y);
+    if (p.y2 != null) bucket.y2Values.push(p.y2);
+  }
+
+  // Aggregate and produce output points
+  const result: WorkoutPoint[] = [];
+  for (const bucket of buckets.values()) {
+    const point: WorkoutPoint = {
+      date: bucket.date,
+      label: bucket.label,
+      y: aggregate(bucket.yValues, fn),
+      group: bucket.group,
+    };
+    if (bucket.y2Values.length > 0) {
+      point.y2 = aggregate(bucket.y2Values, fn);
+    }
+    result.push(point);
+  }
+
+  // Sort: temporal by date, categorical alphabetically
+  if (isTemporalAggregation(chart.x_axis_mode)) {
+    result.sort((a, b) => a.date.getTime() - b.date.getTime());
+  } else {
+    result.sort((a, b) => (a.label ?? "").localeCompare(b.label ?? ""));
+  }
+
+  return result;
 }
+
+/** Assign sequential categorical labels to raw (non-aggregated) points. */
+function assignSequentialLabels(points: WorkoutPoint[]) {
+  const seen = new Map<string, number>();
+  for (const p of points) {
+    const base = p.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    p.label = n > 1 ? `${base} #${n}` : base;
+  }
+}
+
+const HALF_DAY_MS = 12 * 60 * 60 * 1000;
 
 function fieldLabel(fieldKey: string): string {
   return FIELD_MAP[fieldKey]?.label ?? fieldKey;
@@ -322,7 +509,7 @@ function fieldLabel(fieldKey: string): string {
 
 const MAX_X_TICKS = 20;
 
-function workoutXConfig(data: WorkoutPoint[]): Record<string, unknown> {
+function workoutXConfig(data: WorkoutPoint[], showAllTicks = false): Record<string, unknown> {
   const domain = data.map((d) => d.label);
   const n = domain.length;
   const cfg: Record<string, unknown> = {
@@ -330,11 +517,103 @@ function workoutXConfig(data: WorkoutPoint[]): Record<string, unknown> {
     domain,
     tickFormat: (d: string) => d.replace(/ #\d+$/, ""),
   };
-  if (n > MAX_X_TICKS) {
+  if (showAllTicks) {
+    if (n > MAX_X_TICKS) cfg.tickRotate = -45;
+  } else if (n > MAX_X_TICKS) {
     const step = Math.ceil(n / MAX_X_TICKS);
     cfg.ticks = domain.filter((_, i) => i % step === 0);
     cfg.tickRotate = -45;
   }
+  return cfg;
+}
+
+/** Build x-axis config for temporal aggregation modes (ticks at bar centers). */
+/**
+ * Generate evenly-spaced calendar ticks across a date range.
+ * Uses the same bucket key → date pipeline as the data points
+ * so ticks land exactly on bar centers.
+ */
+function generateCalendarTicks(minDate: Date, maxDate: Date, mode: ChartXAxisMode, maxTicks: number): Date[] {
+  // Step a cursor through calendar units, converting each to the
+  // canonical bucket-center date via the same path used for data.
+  const cursor = new Date(minDate);
+  // Align cursor to start of the first bucket period
+  switch (mode) {
+    case "day":
+      cursor.setHours(0, 0, 0, 0);
+      break;
+    case "week": {
+      const day = cursor.getDay();
+      const diff = (day === 0 ? -6 : 1) - day;
+      cursor.setDate(cursor.getDate() + diff);
+      cursor.setHours(0, 0, 0, 0);
+      break;
+    }
+    case "month":
+      cursor.setDate(1); cursor.setHours(0, 0, 0, 0);
+      break;
+    case "year":
+      cursor.setMonth(0, 1); cursor.setHours(0, 0, 0, 0);
+      break;
+  }
+
+  const allDates: Date[] = [];
+  const endTime = maxDate.getTime();
+  while (true) {
+    const key = getTemporalBucketKey(cursor, mode);
+    const center = bucketKeyToDate(key, mode);
+    if (center.getTime() > endTime) break;
+    allDates.push(center);
+    // Advance cursor by one period
+    switch (mode) {
+      case "day": cursor.setDate(cursor.getDate() + 1); break;
+      case "week": cursor.setDate(cursor.getDate() + 7); break;
+      case "month": cursor.setMonth(cursor.getMonth() + 1); break;
+      case "year": cursor.setFullYear(cursor.getFullYear() + 1); break;
+    }
+  }
+
+  if (allDates.length <= maxTicks) return allDates;
+
+  // Pick evenly spaced subset
+  const step = Math.ceil(allDates.length / maxTicks);
+  const ticks: Date[] = [];
+  for (let i = 0; i < allDates.length; i += step) {
+    ticks.push(allDates[i]);
+  }
+  return ticks;
+}
+
+/** Build x-axis config for temporal aggregation modes (ticks at regular calendar intervals). */
+function temporalAggXConfig(data: WorkoutPoint[], mode: ChartXAxisMode, chartWidth: number): Record<string, unknown> {
+  // Find date range from data
+  let minTime = Infinity, maxTime = -Infinity;
+  for (const d of data) {
+    const t = d.date.getTime();
+    if (t < minTime) minTime = t;
+    if (t > maxTime) maxTime = t;
+  }
+  const minDate = new Date(minTime);
+  const maxDate = new Date(maxTime);
+
+  // Estimate how many labels fit horizontally (~7px per char + 12px gap)
+  const charWidth = LABEL_CHAR_WIDTH[mode] ?? 10;
+  const labelPx = charWidth * 7 + 12;
+  const usableWidth = chartWidth - 80; // margins
+  const maxTicks = Math.max(4, Math.floor(usableWidth / labelPx));
+
+  const tickDates = generateCalendarTicks(minDate, maxDate, mode, maxTicks);
+
+  const cfg: Record<string, unknown> = {
+    label: null,
+    type: "utc",
+    ticks: tickDates,
+    tickFormat: (d: Date) => {
+      const key = getTemporalBucketKey(d, mode);
+      return formatBucketLabel(key, mode);
+    },
+  };
+  if (tickDates.length >= maxTicks) cfg.tickRotate = -45;
   return cfg;
 }
 
@@ -352,12 +631,14 @@ export function renderSingleAxisChart(
   }
 
   const color = chart.group_by ? "group" : "#2563eb";
-  const workout = chart.x_axis_mode === "workout";
-  const xKey = workout ? "label" : "date";
+  const aggregated = isAggregatedMode(chart.x_axis_mode);
+  const temporal = isTemporalAggregation(chart.x_axis_mode);
+  const categorical = chart.x_axis_mode === "category" || chart.x_axis_sequential;
+  const xKey = categorical ? "label" : "date";
 
   let mark: Plot.Markish;
   if (chart.mark_type === "bar") {
-    if (workout) {
+    if (categorical) {
       mark = Plot.barY(data, {
         x: "label",
         y: "y",
@@ -365,7 +646,13 @@ export function renderSingleAxisChart(
         ...(chart.group_by ? {} : { fillOpacity: 0.8 }),
       });
     } else {
-      mark = Plot.rectY(toBarData(data), {
+      const halfWidth = (temporal && TEMPORAL_BAR_HALF_WIDTH[chart.x_axis_mode]) || HALF_DAY_MS;
+      const barData = data.map((d) => ({
+        ...d,
+        x1: new Date(d.date.getTime() - halfWidth),
+        x2: new Date(d.date.getTime() + halfWidth),
+      }));
+      mark = Plot.rectY(barData, {
         x1: "x1",
         x2: "x2",
         y: "y",
@@ -382,17 +669,26 @@ export function renderSingleAxisChart(
     });
   }
 
-  const xConfig: Record<string, unknown> = workout
-    ? workoutXConfig(data)
-    : { label: null, type: "utc" };
+  const isCategoryMode = chart.x_axis_mode === "category";
+  const xConfig: Record<string, unknown> = categorical
+    ? workoutXConfig(data, isCategoryMode)
+    : temporal
+      ? temporalAggXConfig(data, chart.x_axis_mode, width)
+      : { label: null, type: "utc" };
+
+  // Y-axis label: prepend aggregation function name when active
+  let yLabel = fieldLabel(yField.field);
+  if (aggregated && chart.agg_function) {
+    yLabel = `${AGG_LABEL[chart.agg_function]} ${yLabel}`;
+  }
 
   return Plot.plot({
     width,
     height,
     marginRight: 40,
-    marginBottom: workout && data.length > MAX_X_TICKS ? 60 : undefined,
+    marginBottom: (xConfig as Record<string, unknown>).tickRotate ? 60 : undefined,
     x: xConfig,
-    y: { label: fieldLabel(yField.field), grid: true },
+    y: { label: yLabel, grid: true },
     color: chart.group_by ? { legend: true } : undefined,
     marks: [mark],
   });
@@ -440,15 +736,25 @@ export function renderDualAxisChart(
   const marks: Plot.Markish[] = [];
   const leftColor = "#2563eb";
   const rightColor = "#dc2626";
-  const workout = chart.x_axis_mode === "workout";
-  const xKey = workout ? "label" : "date";
+  const aggregated = isAggregatedMode(chart.x_axis_mode);
+  const temporal = isTemporalAggregation(chart.x_axis_mode);
+  const categorical = chart.x_axis_mode === "category" || chart.x_axis_sequential;
+  const xKey = categorical ? "label" : "date";
+
+  const halfWidth = (temporal && TEMPORAL_BAR_HALF_WIDTH[chart.x_axis_mode]) || HALF_DAY_MS;
+  const makeBarData = <T extends { date: Date }>(pts: T[]) =>
+    pts.map((d) => ({
+      ...d,
+      x1: new Date(d.date.getTime() - halfWidth),
+      x2: new Date(d.date.getTime() + halfWidth),
+    }));
 
   // Left Y marks
   if (chart.mark_type === "bar") {
-    if (workout) {
+    if (categorical) {
       marks.push(Plot.barY(data, { x: "label", y: "y", fill: leftColor, fillOpacity: 0.8 }));
     } else {
-      marks.push(Plot.rectY(toBarData(data), { x1: "x1", x2: "x2", y: "y", fill: leftColor, fillOpacity: 0.8 }));
+      marks.push(Plot.rectY(makeBarData(data), { x1: "x1", x2: "x2", y: "y", fill: leftColor, fillOpacity: 0.8 }));
     }
   } else if (chart.mark_type === "dot") {
     marks.push(Plot.dot(data, { x: xKey, y: "y", stroke: leftColor, fill: leftColor, r: 3 }));
@@ -458,10 +764,10 @@ export function renderDualAxisChart(
 
   // Right Y marks (mapped into left range)
   if (chart.mark_type === "bar") {
-    if (workout) {
+    if (categorical) {
       marks.push(Plot.barY(mappedData, { x: "label", y: "y", fill: rightColor, fillOpacity: 0.5 }));
     } else {
-      marks.push(Plot.rectY(toBarData(mappedData), { x1: "x1", x2: "x2", y: "y", fill: rightColor, fillOpacity: 0.5 }));
+      marks.push(Plot.rectY(makeBarData(mappedData), { x1: "x1", x2: "x2", y: "y", fill: rightColor, fillOpacity: 0.5 }));
     }
   } else if (chart.mark_type === "dot") {
     marks.push(Plot.dot(mappedData, { x: xKey, y: "y", stroke: rightColor, fill: rightColor, r: 3 }));
@@ -474,7 +780,7 @@ export function renderDualAxisChart(
   const leftDomain = [leftExtent[0], leftExtent[1]];
   const tickCount = 6;
   const leftStep = (leftDomain[1] - leftDomain[0]) / (tickCount - 1);
-  const maxXVal = workout
+  const maxXVal = categorical
     ? data[data.length - 1]?.label
     : data.reduce((max, d) => (d.date > max ? d.date : max), data[0].date);
   const rightTicks = Array.from({ length: tickCount }, (_, i) => {
@@ -494,23 +800,35 @@ export function renderDualAxisChart(
     }),
   );
 
-  const xConfig: Record<string, unknown> = workout
-    ? workoutXConfig(data)
-    : { label: null, type: "utc" };
+  const isCategoryMode = chart.x_axis_mode === "category";
+  const xConfig: Record<string, unknown> = categorical
+    ? workoutXConfig(data, isCategoryMode)
+    : temporal
+      ? temporalAggXConfig(data, chart.x_axis_mode, width)
+      : { label: null, type: "utc" };
+
+  // Y-axis labels: prepend aggregation function name when active
+  let leftLabel = fieldLabel(leftField.field);
+  let rightLabel = fieldLabel(rightField.field);
+  if (aggregated && chart.agg_function) {
+    const prefix = AGG_LABEL[chart.agg_function];
+    leftLabel = `${prefix} ${leftLabel}`;
+    rightLabel = `${prefix} ${rightLabel}`;
+  }
 
   return Plot.plot({
     width,
     height,
     marginRight: 70,
-    marginBottom: workout && data.length > MAX_X_TICKS ? 60 : undefined,
+    marginBottom: (xConfig as Record<string, unknown>).tickRotate ? 60 : undefined,
     x: xConfig,
     y: {
-      label: fieldLabel(leftField.field),
+      label: leftLabel,
       grid: true,
       domain: leftExtent,
     },
     marks,
-    caption: `Blue: ${fieldLabel(leftField.field)} · Red: ${fieldLabel(rightField.field)}`,
+    caption: `Blue: ${leftLabel} · Red: ${rightLabel}`,
   });
 }
 

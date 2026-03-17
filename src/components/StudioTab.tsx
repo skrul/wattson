@@ -19,11 +19,18 @@ function formatPickerDate(timestamp: number): string {
   });
 }
 
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
+function formatDateTime(timestamp: number): string {
+  const d = new Date(timestamp * 1000);
+  return d.toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
+
 
 function parseWorkoutFtp(rawDetailJson: string | null | undefined): number | null {
   if (!rawDetailJson) return null;
@@ -385,12 +392,12 @@ export default function StudioTab() {
                   <p className="text-xs text-gray-500">
                     {workout.instructor && <>{workout.instructor} · </>}
                     {formatPickerDate(workout.date)}
-                    {workout.duration_seconds != null ? ` · ${formatDuration(workout.duration_seconds)}` : ""}
                   </p>
                 </div>
-                {displayName && (
-                  <p className="text-sm font-semibold text-gray-500">{displayName}</p>
-                )}
+                <div className="text-right">
+                  {displayName && <p className="text-sm font-semibold text-gray-500">{displayName}</p>}
+                  <p className="text-xs text-gray-500">{formatDateTime(workout.date)}</p>
+                </div>
               </div>
             )}
 

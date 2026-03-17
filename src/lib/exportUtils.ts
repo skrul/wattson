@@ -49,6 +49,17 @@ export function formatExportDate(timestamp: number): string {
   });
 }
 
+function formatExportDateTime(timestamp: number): string {
+  return new Date(timestamp * 1000).toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -118,21 +129,24 @@ export async function renderExportPng(
     ctx.font = "600 18px system-ui, -apple-system, sans-serif";
     ctx.fillText(workout.title, PADDING, y + 18);
 
-    // Display name (right-aligned)
+    // Right side: display name + date/time
+    ctx.textAlign = "right";
     if (displayName) {
       ctx.fillStyle = "#6b7280";
       ctx.font = "600 14px system-ui, -apple-system, sans-serif";
-      ctx.textAlign = "right";
       ctx.fillText(displayName, EXPORT_WIDTH - PADDING, y + 18);
-      ctx.textAlign = "start";
     }
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "13px system-ui, -apple-system, sans-serif";
+    ctx.fillText(formatExportDateTime(workout.date), EXPORT_WIDTH - PADDING, y + 40);
+    ctx.textAlign = "start";
 
+    // Subtitle: instructor + date
     ctx.fillStyle = "#6b7280";
     ctx.font = "13px system-ui, -apple-system, sans-serif";
     const subtitle = [
       workout.instructor,
       formatExportDate(workout.date),
-      workout.duration_seconds != null ? formatDuration(workout.duration_seconds) : null,
     ].filter(Boolean).join(" \u00B7 ");
     ctx.fillText(subtitle, PADDING, y + 40);
 

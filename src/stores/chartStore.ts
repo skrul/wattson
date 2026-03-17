@@ -38,6 +38,9 @@ function makeEmptyDraft(): ChartDefinition {
     group_by: null,
     filters: [],
     x_axis_mode: "date",
+    x_axis_field: null,
+    x_axis_sequential: false,
+    agg_function: null,
     created_at: now,
     updated_at: now,
   };

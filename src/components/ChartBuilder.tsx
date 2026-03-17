@@ -3,7 +3,8 @@ import { FIELD_DEFS } from "../lib/fields";
 import { useEnrichmentStore } from "../stores/enrichmentStore";
 import { queryWorkouts, chartFiltersToWorkoutFilters } from "../lib/database";
 import { useChartStore } from "../stores/chartStore";
-import type { Workout, ChartMarkType, ChartXAxisMode, YAxisField, YAxisSide, FilterCondition } from "../types";
+import type { Workout, ChartMarkType, ChartXAxisMode, AggregationFunction, YAxisField, YAxisSide, FilterCondition } from "../types";
+import { isAggregatedMode } from "../lib/charts";
 import { useDebounce, isConditionActive } from "./FilterEditors";
 import ChartFilterBar from "./ChartFilterBar";
 import ChartPlot from "./ChartPlot";
@@ -96,128 +97,194 @@ export default function ChartBuilder() {
         </div>
       </div>
 
-      {/* Name + Chart type row */}
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <label className="mb-1 block text-sm font-medium text-gray-700">Chart Name</label>
-          <input
-            type="text"
-            value={draft.name}
-            onChange={(e) => updateDraft({ name: e.target.value })}
-            placeholder="e.g., Cycling Output Over Time"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Chart Type</label>
-          <div className="flex gap-4 py-2">
-            {(["line", "dot", "bar"] as ChartMarkType[]).map((type) => (
-              <label key={type} className="flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="mark_type"
-                  checked={draft.mark_type === type}
-                  onChange={() => updateDraft({ mark_type: type })}
-                  className="text-blue-600"
-                />
-                <span className="capitalize">{type}</span>
-              </label>
-            ))}
+      {/* Section 1: Name & Type */}
+      <fieldset className="rounded-lg border border-gray-200 px-4 pb-3 pt-2">
+        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Name & Type</legend>
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Chart Name</label>
+            <input
+              type="text"
+              value={draft.name}
+              onChange={(e) => updateDraft({ name: e.target.value })}
+              placeholder="e.g., Cycling Output Over Time"
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Chart Type</label>
+            <div className="flex gap-4 py-2">
+              {(["line", "dot", "bar"] as ChartMarkType[]).map((type) => (
+                <label key={type} className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="mark_type"
+                    checked={draft.mark_type === type}
+                    onChange={() => updateDraft({ mark_type: type })}
+                    className="text-blue-600"
+                  />
+                  <span className="capitalize">{type}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">X-Axis</label>
-          <div className="flex gap-4 py-2">
-            {(["date", "workout"] as ChartXAxisMode[]).map((mode) => (
-              <label key={mode} className="flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="x_axis_mode"
-                  checked={draft.x_axis_mode === mode}
-                  onChange={() => updateDraft({ x_axis_mode: mode })}
-                  className="text-blue-600"
-                />
-                <span className="capitalize">{mode}</span>
-              </label>
-            ))}
+      </fieldset>
+
+      {/* Section 2: X-Axis */}
+      <fieldset className="rounded-lg border border-gray-200 px-4 pb-3 pt-2">
+        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">X-Axis</legend>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="w-40">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Mode</label>
+            <select
+              value={draft.x_axis_mode}
+              onChange={(e) => {
+                const mode = e.target.value as ChartXAxisMode;
+                const updates: Partial<typeof draft> = { x_axis_mode: mode };
+                if (isAggregatedMode(mode)) {
+                  if (!draft.agg_function) updates.agg_function = "avg";
+                  if (mode !== "category") updates.x_axis_field = null;
+                } else {
+                  updates.agg_function = null;
+                  updates.x_axis_field = null;
+                }
+                updateDraft(updates);
+              }}
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            >
+              <option value="date">Date</option>
+              <option value="day">By Day</option>
+              <option value="week">By Week</option>
+              <option value="month">By Month</option>
+              <option value="year">By Year</option>
+              <option value="category">By Category</option>
+            </select>
           </div>
-        </div>
-      </div>
-
-      {/* Y-axis fields + Group by row */}
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Y-Axis Fields {draft.y_fields.length > 0 && `(${draft.y_fields.length}/2)`}
-          </label>
-          <div className="space-y-2">
-            {draft.y_fields.map((yf: YAxisField, i: number) => {
-              const fieldDef = NUMERIC_FIELDS.find((f) => f.key === yf.field);
-              return (
-                <div key={yf.field} className="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2">
-                  <span className="flex-1 text-sm">{fieldDef?.label ?? yf.field}</span>
-                  <button
-                    onClick={() => toggleSide(i)}
-                    className="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100"
-                  >
-                    {yf.side === "left" ? "Left axis" : "Right axis"}
-                  </button>
-                  <button
-                    onClick={() => removeYField(i)}
-                    className="text-gray-400 hover:text-red-500"
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M4 4l8 8M12 4l-8 8" />
-                    </svg>
-                  </button>
-                </div>
-              );
-            })}
-
-            {draft.y_fields.length < 2 && (
+          {draft.x_axis_mode === "category" && (
+            <div className="w-48">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Field</label>
               <select
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) addYField(e.target.value);
-                }}
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm text-gray-500 focus:border-blue-500 focus:outline-none"
+                value={draft.x_axis_field ?? ""}
+                onChange={(e) => updateDraft({ x_axis_field: e.target.value || null })}
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               >
-                <option value="">Add a Y-axis field...</option>
-                {availableFields.map((f) => {
-                  const disabled = f.requiresDetail && !enrichmentComplete;
-                  return (
-                    <option key={f.key} value={f.key} disabled={disabled}>
-                      {f.label}{disabled ? " (detailed mode)" : ""}
-                    </option>
-                  );
-                })}
+                <option value="">Select a field...</option>
+                {ENUM_FIELDS.map((f) => (
+                  <option key={f.key} value={f.key}>{f.label}</option>
+                ))}
               </select>
-            )}
+            </div>
+          )}
+          {isAggregatedMode(draft.x_axis_mode) && (
+            <div className="w-36">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Aggregation</label>
+              <select
+                value={draft.agg_function ?? "avg"}
+                onChange={(e) => updateDraft({ agg_function: e.target.value as AggregationFunction })}
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              >
+                <option value="avg">Average</option>
+                <option value="sum">Sum</option>
+                <option value="count">Count</option>
+                <option value="min">Min</option>
+                <option value="max">Max</option>
+              </select>
+            </div>
+          )}
+          {draft.x_axis_mode !== "category" && (
+            <div className="pb-2">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={draft.x_axis_sequential}
+                  onChange={(e) => updateDraft({ x_axis_sequential: e.target.checked })}
+                  className="text-blue-600"
+                />
+                <span className="whitespace-nowrap">Evenly spaced</span>
+              </label>
+            </div>
+          )}
+        </div>
+      </fieldset>
+
+      {/* Section 3: Y-Axis */}
+      <fieldset className="rounded-lg border border-gray-200 px-4 pb-3 pt-2">
+        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Y-Axis</legend>
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Fields {draft.y_fields.length > 0 && `(${draft.y_fields.length}/2)`}
+            </label>
+            <div className="space-y-2">
+              {draft.y_fields.map((yf: YAxisField, i: number) => {
+                const fieldDef = NUMERIC_FIELDS.find((f) => f.key === yf.field);
+                return (
+                  <div key={yf.field} className="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2">
+                    <span className="flex-1 text-sm">{fieldDef?.label ?? yf.field}</span>
+                    <button
+                      onClick={() => toggleSide(i)}
+                      className="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100"
+                    >
+                      {yf.side === "left" ? "Left axis" : "Right axis"}
+                    </button>
+                    <button
+                      onClick={() => removeYField(i)}
+                      className="text-gray-400 hover:text-red-500"
+                    >
+                      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M4 4l8 8M12 4l-8 8" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
+
+              {draft.y_fields.length < 2 && (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) addYField(e.target.value);
+                  }}
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm text-gray-500 focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="">Add a Y-axis field...</option>
+                  {availableFields.map((f) => {
+                    const disabled = f.requiresDetail && !enrichmentComplete;
+                    return (
+                      <option key={f.key} value={f.key} disabled={disabled}>
+                        {f.label}{disabled ? " (detailed mode)" : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
+            </div>
+          </div>
+
+          <div className="w-48 shrink-0">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Group By (color)</label>
+            <select
+              value={draft.group_by ?? ""}
+              onChange={(e) => updateDraft({ group_by: e.target.value || null })}
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            >
+              <option value="">None</option>
+              {ENUM_FIELDS.map((f) => (
+                <option key={f.key} value={f.key}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
+      </fieldset>
 
-        <div className="w-48 shrink-0">
-          <label className="mb-1 block text-sm font-medium text-gray-700">Group By (color)</label>
-          <select
-            value={draft.group_by ?? ""}
-            onChange={(e) => updateDraft({ group_by: e.target.value || null })}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-          >
-            <option value="">None</option>
-            {ENUM_FIELDS.map((f) => (
-              <option key={f.key} value={f.key}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Filters</label>
+      {/* Section 4: Filters */}
+      <fieldset className="rounded-lg border border-gray-200 px-4 pb-3 pt-2">
+        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Filters</legend>
         <ChartFilterBar />
-      </div>
+      </fieldset>
 
       {/* Live preview */}
       <div>

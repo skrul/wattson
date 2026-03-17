@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { Workout, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics, ChartDefinition, ChartDefinitionRow, ChartXAxisMode } from "../types";
+import type { Workout, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics, ChartDefinition, ChartDefinitionRow, ChartXAxisMode, AggregationFunction } from "../types";
 import { FIELD_MAP } from "./fields";
 
 let db: Database | null = null;
@@ -290,6 +290,9 @@ export async function updateRideDetails(workoutId: string, rawJson: string): Pro
 // --- Chart definitions ---
 
 function rowToChart(row: ChartDefinitionRow): ChartDefinition {
+  // Migrate legacy "workout" mode → date + sequential
+  const rawMode = row.x_axis_mode ?? "date";
+  const isLegacyWorkout = rawMode === "workout";
   return {
     id: row.id,
     name: row.name,
@@ -297,7 +300,10 @@ function rowToChart(row: ChartDefinitionRow): ChartDefinition {
     y_fields: JSON.parse(row.y_fields_json),
     group_by: row.group_by,
     filters: JSON.parse(row.filters_json),
-    x_axis_mode: (row.x_axis_mode ?? "date") as ChartXAxisMode,
+    x_axis_mode: (isLegacyWorkout ? "date" : rawMode) as ChartXAxisMode,
+    x_axis_field: row.x_axis_field ?? null,
+    x_axis_sequential: isLegacyWorkout || !!(row.x_axis_sequential),
+    agg_function: (row.agg_function as AggregationFunction) ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -317,8 +323,8 @@ export async function saveChartDefinition(chart: ChartDefinition): Promise<void>
   const d = await getDb();
   await d.execute(
     `INSERT OR REPLACE INTO chart_definitions
-      (id, name, mark_type, y_fields_json, group_by, filters_json, x_axis_mode, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      (id, name, mark_type, y_fields_json, group_by, filters_json, x_axis_mode, x_axis_field, x_axis_sequential, agg_function, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
     [
       chart.id,
       chart.name,
@@ -327,6 +333,9 @@ export async function saveChartDefinition(chart: ChartDefinition): Promise<void>
       chart.group_by,
       JSON.stringify(chart.filters),
       chart.x_axis_mode,
+      chart.x_axis_field,
+      chart.x_axis_sequential ? 1 : 0,
+      chart.agg_function,
       chart.created_at,
       chart.updated_at,
     ],

@@ -9,6 +9,7 @@ A free, open-source desktop app for analyzing your Peloton workout data. Sync yo
 - **Custom charts** — build time-series and grouped charts with the built-in chart builder
 - **Compare rides** — overlay multiple attempts of the same class to see progress
 - **Per-ride detail** — view output, cadence, resistance, and heart rate curves for any ride
+- **Insights** — activity heatmap, cumulative totals, personal records, favorite instructors, and most repeated classes
 - **Export** charts as PNG or SVG
 - **Auto-update** — the app checks for new versions on launch
 
@@ -21,6 +22,8 @@ All data stays on your machine in a local SQLite database. Credentials are store
 ![Chart builder](screenshots/charts.png)
 
 ![Compare repeated rides](screenshots/compare.png)
+
+![Insights tab](screenshots/insights.png)
 
 ## Install
 

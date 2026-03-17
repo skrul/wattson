@@ -180,7 +180,12 @@ export async function queryWorkouts(filters: WorkoutFilters): Promise<Workout[]>
   const sortDir = filters.sort?.direction === "asc" ? "ASC" : "DESC";
 
   return await d.select<Workout[]>(
-    `SELECT * FROM workouts ${where} ORDER BY ${sortCol} ${sortDir}`,
+    `SELECT id, peloton_id, date, duration_seconds, discipline, title, instructor,
+            avg_output, calories, distance, avg_heart_rate, avg_cadence,
+            avg_resistance, avg_speed, strive_score, is_live, workout_type,
+            total_work, source, raw_json, ride_id, class_type, class_subtype,
+            class_type_version
+     FROM workouts ${where} ORDER BY ${sortCol} ${sortDir}`,
     params,
   );
 }

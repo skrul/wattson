@@ -3,6 +3,7 @@ import ApiSync from "./components/ApiSync";
 import WorkoutList from "./components/WorkoutList";
 import OutputChart from "./components/OutputChart";
 import InsightsTab from "./components/InsightsTab";
+import StudioTab from "./components/StudioTab";
 import SetupWizard from "./components/SetupWizard";
 import ReauthModal from "./components/ReauthModal";
 import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
@@ -11,6 +12,7 @@ import { getUserProfile, hasWorkouts } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
 import { useEnrichmentStore } from "./stores/enrichmentStore";
 import { useNavigationStore, type Tab } from "./stores/navigationStore";
+import { useShareChartStore } from "./stores/shareChartStore";
 
 const AUTO_SYNC_KEY = "wattson:autoSyncOnLaunch";
 
@@ -34,6 +36,7 @@ function App() {
       if (status.available) setUpdate(status);
     });
     useEnrichmentStore.getState().loadState().catch((e) => console.error("Enrichment state load failed:", e));
+    useShareChartStore.getState().load().catch((e) => console.error("Share chart settings load failed:", e));
   }, []);
 
   // On initial load, determine data state; load cached profile when session exists
@@ -123,7 +126,7 @@ function App() {
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
         <h1 className="text-xl font-bold">Wattson</h1>
         <nav className="flex gap-2">
-          {(["workouts", "insights", "charts", "profile"] as Tab[]).map((tab) => (
+          {(["workouts", "insights", "charts", "studio", "profile"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -148,6 +151,9 @@ function App() {
       </div>
       <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "insights" ? "" : "hidden"}`}>
         <InsightsTab />
+      </div>
+      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "studio" ? "" : "hidden"}`}>
+        <StudioTab />
       </div>
       <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "profile" ? "" : "hidden"}`}>
         <ApiSync onDataDeleted={() => { setDataState("empty"); setShowWizard(true); }} />

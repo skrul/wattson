@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { FilterCondition, SortSpec } from "../types";
 
-export type Tab = "workouts" | "charts" | "insights" | "profile";
+export type Tab = "workouts" | "charts" | "insights" | "studio" | "profile";
 
 interface PendingWorkoutNav {
   workoutId: string;

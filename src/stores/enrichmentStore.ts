@@ -1,24 +1,23 @@
 import { create } from "zustand";
-import { getSetting, setSetting, getUnenrichedWorkoutIds, getEnrichmentCounts, updateWorkoutMetrics } from "../lib/database";
+import { getUnenrichedWorkoutIds, getEnrichmentCounts, updateWorkoutMetrics } from "../lib/database";
 import { cachedFetchPerformanceGraph } from "../lib/enrichmentCache";
 import { useSessionStore } from "./sessionStore";
 
-type EnrichmentMode = "summary" | "detailed";
-type BackfillStatus = "idle" | "running" | "paused" | "complete";
+type BackfillStatus = "running" | "paused" | "complete";
 
 interface EnrichmentState {
-  mode: EnrichmentMode;
+  countsLoaded: boolean;
   backfillStatus: BackfillStatus;
   enrichedCount: number;
   totalCount: number;
   enrichmentComplete: boolean;
 
   loadState: () => Promise<void>;
-  enableDetailedMode: () => Promise<void>;
-  disableDetailedMode: () => Promise<void>;
   startBackfill: () => void;
   pauseBackfill: () => void;
+  ensureRunning: () => void;
   refreshCounts: () => Promise<void>;
+  reset: () => void;
 }
 
 // Module-level abort flag for clean cancellation
@@ -76,39 +75,25 @@ async function runBackfillLoop() {
 }
 
 export const useEnrichmentStore = create<EnrichmentState>((set, get) => ({
-  mode: "summary",
-  backfillStatus: "idle",
+  countsLoaded: false,
+  backfillStatus: "paused",
   enrichedCount: 0,
   totalCount: 0,
   enrichmentComplete: false,
 
   loadState: async () => {
-    const mode = ((await getSetting("enrichment_mode")) ?? "summary") as EnrichmentMode;
     const counts = await getEnrichmentCounts();
     const complete = counts.total > 0 && counts.enriched >= counts.total;
     set({
-      mode,
+      countsLoaded: true,
       enrichedCount: counts.enriched,
       totalCount: counts.total,
       enrichmentComplete: complete,
-      backfillStatus: mode === "detailed" && !complete ? "paused" : mode === "detailed" ? "complete" : "idle",
+      backfillStatus: complete ? "complete" : "paused",
     });
   },
 
-  enableDetailedMode: async () => {
-    await setSetting("enrichment_mode", "detailed");
-    set({ mode: "detailed" });
-    runBackfillLoop();
-  },
-
-  disableDetailedMode: async () => {
-    abortBackfill = true;
-    await setSetting("enrichment_mode", "summary");
-    set({ mode: "summary", backfillStatus: "idle", enrichmentComplete: false });
-  },
-
   startBackfill: () => {
-    if (get().mode !== "detailed") return;
     runBackfillLoop();
   },
 
@@ -116,13 +101,39 @@ export const useEnrichmentStore = create<EnrichmentState>((set, get) => ({
     abortBackfill = true;
   },
 
+  reset: () => {
+    abortBackfill = true;
+    set({
+      countsLoaded: false,
+      backfillStatus: "paused",
+      enrichedCount: 0,
+      totalCount: 0,
+      enrichmentComplete: false,
+    });
+  },
+
+  ensureRunning: () => {
+    const { backfillStatus } = get();
+    if (backfillStatus !== "running" && backfillStatus !== "complete") {
+      runBackfillLoop();
+    }
+  },
+
   refreshCounts: async () => {
     const counts = await getEnrichmentCounts();
     const complete = counts.total > 0 && counts.enriched >= counts.total;
-    set({
+    const update: Partial<EnrichmentState> = {
+      countsLoaded: true,
       enrichedCount: counts.enriched,
       totalCount: counts.total,
       enrichmentComplete: complete,
-    });
+    };
+    // If status says "complete" but counts show unenriched workouts
+    // (e.g., new workouts inserted after backfill finished), reset to "paused"
+    // so ensureRunning() will pick them up.
+    if (!complete && get().backfillStatus === "complete") {
+      update.backfillStatus = "paused";
+    }
+    set(update);
   },
 }));

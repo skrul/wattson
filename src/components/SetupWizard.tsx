@@ -4,6 +4,7 @@ import { login, fetchAllWorkouts, fetchUserProfile } from "../lib/api";
 import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
+import { useEnrichmentStore } from "../stores/enrichmentStore";
 
 interface Props {
   open: boolean;
@@ -81,6 +82,8 @@ export default function SetupWizard({ open, onComplete }: Props) {
       if (workouts.length > 0) {
         await insertWorkouts(workouts);
       }
+      await useEnrichmentStore.getState().refreshCounts();
+
       const updated = await queryWorkouts(filters);
       setWorkouts(updated);
 
@@ -92,6 +95,9 @@ export default function SetupWizard({ open, onComplete }: Props) {
       } catch (e) {
         console.error("Failed to fetch user profile:", e);
       }
+
+      // Kick off enrichment backfill for unenriched workouts
+      useEnrichmentStore.getState().ensureRunning();
 
       setSyncedCount(workouts.length);
       setStep("success");
@@ -203,6 +209,9 @@ export default function SetupWizard({ open, onComplete }: Props) {
                 {syncedCount === 0
                   ? "Your workouts are already up to date."
                   : `Synced ${syncedCount} workout${syncedCount === 1 ? "" : "s"}.`}
+              </p>
+              <p className="mb-4 text-sm text-gray-500">
+                Detailed workout data will continue downloading in the background. Some filters and insights may be unavailable until this completes.
               </p>
               <label className="mb-4 flex items-center gap-2 text-sm">
                 <input

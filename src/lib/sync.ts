@@ -62,19 +62,16 @@ export async function syncWorkouts(
   if (newWorkouts.length > 0) {
     await insertWorkouts(newWorkouts);
 
-    // Inline enrichment: if detailed mode is on, fetch performance_graph for each new workout
-    const enrichmentMode = useEnrichmentStore.getState().mode;
-    if (enrichmentMode === "detailed") {
-      for (const w of newWorkouts) {
-        try {
-          const result = await cachedFetchPerformanceGraph(w.id, activeToken);
-          await updateWorkoutMetrics(w.id, result, null, result.rawJson);
-        } catch (e) {
-          console.error(`Inline enrichment failed for workout ${w.id}:`, e);
-        }
+    // Inline enrichment: fetch performance_graph for each new workout
+    for (const w of newWorkouts) {
+      try {
+        const result = await cachedFetchPerformanceGraph(w.id, activeToken);
+        await updateWorkoutMetrics(w.id, result, null, result.rawJson);
+      } catch (e) {
+        console.error(`Inline enrichment failed for workout ${w.id}:`, e);
       }
-      await useEnrichmentStore.getState().refreshCounts();
     }
+    await useEnrichmentStore.getState().refreshCounts();
 
     const filters = useWorkoutStore.getState().filters;
     const updated = await queryWorkouts(filters);
@@ -89,6 +86,9 @@ export async function syncWorkouts(
   } catch (e) {
     console.error("Failed to fetch user profile:", e);
   }
+
+  // Kick off backfill if there are unenriched workouts remaining
+  useEnrichmentStore.getState().ensureRunning();
 
   return newWorkouts.length;
 }

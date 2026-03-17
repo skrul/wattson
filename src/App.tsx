@@ -72,8 +72,8 @@ function App() {
   const autoResumeRan = useRef(false);
   useEffect(() => {
     if (!loaded || !session || autoResumeRan.current) return;
-    const { mode, backfillStatus } = useEnrichmentStore.getState();
-    if (mode === "detailed" && backfillStatus === "paused") {
+    const { backfillStatus } = useEnrichmentStore.getState();
+    if (backfillStatus === "paused") {
       autoResumeRan.current = true;
       useEnrichmentStore.getState().startBackfill();
     }

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogPanel } from "@headlessui/react";
 import { login } from "../lib/api";
 import { syncWorkouts } from "../lib/sync";
-import { deleteAllData, getWorkoutCount, getSetting, setSetting } from "../lib/database";
+import { deleteAllData, getSetting, setSetting } from "../lib/database";
 import { clearCache } from "../lib/enrichmentCache";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
@@ -41,7 +41,6 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const [progress, setProgress] = useState<{ fetched: number; total: number } | null>(null);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [cacheStatus, setCacheStatus] = useState("");
-  const [workoutCount, setWorkoutCount] = useState<number | null>(null);
   const [autoSync, setAutoSync] = useState(() => localStorage.getItem(AUTO_SYNC_KEY) !== "false");
   const [experimentalInsights, setExperimentalInsights] = useState(false);
 
@@ -51,18 +50,16 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const sessionLogout = useSessionStore((s) => s.logout);
   const setWorkouts = useWorkoutStore((s) => s.setWorkouts);
 
-  const enrichmentMode = useEnrichmentStore((s) => s.mode);
+  const countsLoaded = useEnrichmentStore((s) => s.countsLoaded);
   const backfillStatus = useEnrichmentStore((s) => s.backfillStatus);
   const enrichedCount = useEnrichmentStore((s) => s.enrichedCount);
   const totalCount = useEnrichmentStore((s) => s.totalCount);
-  const enableDetailedMode = useEnrichmentStore((s) => s.enableDetailedMode);
-  const disableDetailedMode = useEnrichmentStore((s) => s.disableDetailedMode);
   const startBackfill = useEnrichmentStore((s) => s.startBackfill);
   const pauseBackfill = useEnrichmentStore((s) => s.pauseBackfill);
+  const resetEnrichment = useEnrichmentStore((s) => s.reset);
 
   useEffect(() => {
     if (session) {
-      getWorkoutCount().then(setWorkoutCount).catch(() => {});
       getSetting("experimental_insights").then((v) => setExperimentalInsights(v === "true")).catch(() => {});
     }
   }, [session]);
@@ -99,8 +96,6 @@ export default function ApiSync({ onDataDeleted }: Props) {
       } else {
         setStatus(`Synced ${count} new workouts.`);
       }
-      const wc = await getWorkoutCount();
-      setWorkoutCount(wc);
     } catch (e) {
       console.error("Sync error:", e);
       setError(e instanceof Error ? e.message : String(e));
@@ -115,12 +110,11 @@ export default function ApiSync({ onDataDeleted }: Props) {
     await sessionLogout();
     setStatus("");
     setError("");
-    setWorkoutCount(null);
   };
 
   const handleReset = async () => {
     setConfirmResetOpen(false);
-    await disableDetailedMode();
+    resetEnrichment();
     await deleteAllData();
     setWorkouts([]);
     localStorage.removeItem(LAST_EMAIL_KEY);
@@ -129,7 +123,6 @@ export default function ApiSync({ onDataDeleted }: Props) {
     await sessionLogout();
     setStatus("");
     setError("");
-    setWorkoutCount(null);
   };
 
   const handleClearCache = async () => {
@@ -206,110 +199,88 @@ export default function ApiSync({ onDataDeleted }: Props) {
         )}
         <div>
           <h2 className="text-lg font-semibold">{profile?.username ?? "Peloton User"}</h2>
-          {memberSince && (
-            <p className="text-sm text-gray-500">Member since {memberSince}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Info grid */}
-      <div className="grid grid-cols-2 gap-3">
-        {profile?.cyclingFtp != null && (
-          <div className="rounded-lg border border-gray-200 p-3">
-            <p className="text-xs font-medium uppercase text-gray-500">FTP</p>
-            <p className="text-lg font-semibold">{profile.cyclingFtp}W</p>
-          </div>
-        )}
-        <div className="rounded-lg border border-gray-200 p-3">
-          <p className="text-xs font-medium uppercase text-gray-500">Total Workouts</p>
-          <p className="text-lg font-semibold">{workoutCount ?? "—"}</p>
-        </div>
-      </div>
-
-      {/* Sync */}
-      <div className="space-y-2">
-        <button
-          onClick={handleSync}
-          disabled={loading}
-          className="w-full rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-        >
-          {loading ? "Syncing..." : "Sync Now"}
-        </button>
-        {progress && (
           <p className="text-sm text-gray-500">
-            Fetched {progress.fetched} / {progress.total} workouts...
+            {[
+              memberSince ? `Member since ${memberSince}` : null,
+              profile?.cyclingFtp != null ? `FTP ${profile.cyclingFtp}W` : null,
+            ].filter(Boolean).join(" · ") || null}
           </p>
-        )}
-        {status && <p className="text-sm text-green-600">{status}</p>}
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <label className="flex items-center gap-2 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={autoSync}
-            onChange={(e) => {
-              setAutoSync(e.target.checked);
-              localStorage.setItem(AUTO_SYNC_KEY, e.target.checked ? "true" : "false");
-            }}
-            className="rounded border-gray-300"
-          />
-          Sync automatically on launch
-        </label>
+        </div>
       </div>
 
-      {/* Detailed Metrics */}
-      <div className="space-y-3 rounded-lg border border-gray-200 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-900">Detailed Metrics</p>
-            <p className="text-xs text-gray-500">
-              Fetch per-workout performance data (calories, distance, output, etc.)
-            </p>
-          </div>
-          <button
-            onClick={() => enrichmentMode === "detailed" ? disableDetailedMode() : enableDetailedMode()}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-              enrichmentMode === "detailed" ? "bg-blue-600" : "bg-gray-200"
-            }`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                enrichmentMode === "detailed" ? "translate-x-5" : "translate-x-0"
-              }`}
-            />
-          </button>
-        </div>
+      {/* Data */}
+      {countsLoaded && (
+        <div className="space-y-3 rounded-lg border border-gray-200 p-4">
+          {/* Summary line */}
+          <p className="text-sm text-gray-900">
+            <span className="font-semibold">{totalCount.toLocaleString()}</span>{" "}
+            {totalCount === 1 ? "workout" : "workouts"}
+            <span className="text-gray-500">
+              {" · "}
+              {backfillStatus === "complete"
+                ? "All details downloaded"
+                : backfillStatus === "running"
+                  ? "Downloading details..."
+                  : "Details paused"}
+            </span>
+          </p>
 
-        {enrichmentMode === "detailed" && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">
-                {backfillStatus === "complete"
-                  ? "All workouts enriched"
-                  : backfillStatus === "running"
-                    ? "Enriching workouts..."
-                    : "Enrichment paused"}
-              </span>
-              <span className="text-gray-500">
-                {enrichedCount} / {totalCount}
-              </span>
+          {/* Progress bar (only when incomplete) */}
+          {backfillStatus !== "complete" && (
+            <div className="space-y-1">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                <div
+                  className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                  style={{ width: totalCount > 0 ? `${(enrichedCount / totalCount) * 100}%` : "0%" }}
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                {enrichedCount.toLocaleString()} / {totalCount.toLocaleString()}
+              </p>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
-              <div
-                className="h-full rounded-full bg-blue-600 transition-all duration-300"
-                style={{ width: totalCount > 0 ? `${(enrichedCount / totalCount) * 100}%` : "0%" }}
-              />
-            </div>
+          )}
+
+          {/* Sync status messages */}
+          {progress && (
+            <p className="text-xs text-gray-500">
+              Fetching workouts... {progress.fetched} / {progress.total}
+            </p>
+          )}
+          {status && <p className="text-xs text-green-600">{status}</p>}
+          {error && <p className="text-xs text-red-600">{error}</p>}
+
+          {/* Button row */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSync}
+              disabled={loading}
+              className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+            >
+              {loading ? "Syncing..." : "Sync Now"}
+            </button>
             {backfillStatus !== "complete" && (
               <button
                 onClick={() => backfillStatus === "running" ? pauseBackfill() : startBackfill()}
-                className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
+                className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
                 {backfillStatus === "running" ? "Pause" : "Resume"}
               </button>
             )}
+            <label className="ml-auto flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={autoSync}
+                onChange={(e) => {
+                  setAutoSync(e.target.checked);
+                  localStorage.setItem(AUTO_SYNC_KEY, e.target.checked ? "true" : "false");
+                }}
+                className="rounded border-gray-300"
+              />
+              Sync on launch
+            </label>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Experimental Insights */}
       <div className="space-y-1">

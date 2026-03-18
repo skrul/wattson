@@ -174,7 +174,7 @@ export interface ChartDefinitionRow {
 
 // --- Dashboard definitions ---
 
-export type WidgetType = "chart" | "metric_total" | "last_workout" | "section";
+export type WidgetType = "chart" | "metric_total" | "last_workout" | "section" | "activity_grid";
 
 export interface WidgetLayout {
   x: number; y: number; w: number; h: number;
@@ -206,7 +206,15 @@ export interface SectionWidgetConfig {
   title: string;
 }
 
-export type WidgetConfig = ChartWidgetConfig | MetricTotalWidgetConfig | LastWorkoutWidgetConfig | SectionWidgetConfig;
+export interface ActivityGridWidgetConfig {
+  type: "activity_grid";
+  title: string;
+  metric: string;
+  color: string;
+  filters: FilterCondition[];
+}
+
+export type WidgetConfig = ChartWidgetConfig | MetricTotalWidgetConfig | LastWorkoutWidgetConfig | SectionWidgetConfig | ActivityGridWidgetConfig;
 
 export interface DashboardWidget {
   id: string;

@@ -680,6 +680,48 @@ export async function getCumulativeTotals(): Promise<CumulativeTotals> {
   return rows[0];
 }
 
+export interface DailyMetricValue {
+  workout_date: string;
+  value: number;
+}
+
+const DAILY_METRIC_SQL: Record<string, string> = {
+  workout_count: "COUNT(*)",
+  total_output: "COALESCE(SUM(total_work) / 1000.0, 0)",
+  total_calories: "COALESCE(SUM(calories), 0)",
+  total_distance: "COALESCE(SUM(distance), 0)",
+  total_duration: "COALESCE(SUM(duration_seconds) / 60.0, 0)",
+};
+
+/** Daily aggregated metric values for the last N days, with optional filters. */
+export async function getDailyMetricValues(
+  days: number,
+  metric: string,
+  filters: FilterCondition[],
+): Promise<DailyMetricValue[]> {
+  const agg = DAILY_METRIC_SQL[metric];
+  if (!agg) throw new Error(`Unknown daily metric "${metric}"`);
+
+  const sinceTs = Math.floor(Date.now() / 1000) - days * 86400;
+  const params: unknown[] = [sinceTs];
+  const idx = { val: 2 };
+  const clauses: string[] = ["date >= $1"];
+
+  for (const cond of filters) {
+    const clause = buildConditionClause(cond, params, idx);
+    if (clause) clauses.push(clause);
+  }
+
+  const where = clauses.join(" AND ");
+  const d = await getDb();
+  return d.select<DailyMetricValue[]>(
+    `SELECT date(date, 'unixepoch', 'localtime') as workout_date, ${agg} as value
+     FROM workouts WHERE ${where}
+     GROUP BY workout_date ORDER BY workout_date ASC`,
+    params,
+  );
+}
+
 /** Daily workout counts for the last N days. */
 export async function getDailyWorkoutCounts(days: number): Promise<DailyWorkoutCount[]> {
   const d = await getDb();

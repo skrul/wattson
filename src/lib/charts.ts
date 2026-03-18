@@ -1281,15 +1281,17 @@ export function renderMetricChart(
 import type { DailyWorkoutCount } from "./database";
 
 /**
- * Render a GitHub-style heatmap of daily workout counts for the last 52 weeks.
+ * Render a generic GitHub-style activity grid from daily values.
  */
-export function renderWorkoutHeatmap(
-  dailyCounts: DailyWorkoutCount[],
+export function renderActivityGrid(
+  dailyValues: { workout_date: string; value: number }[],
   width = 800,
   height = 160,
+  tooltipLabel = "workouts",
+  color = "#216e39",
   onDayClick?: (date: string) => void,
 ): SVGElement | HTMLElement {
-  const countMap = new Map(dailyCounts.map((d) => [d.workout_date, d.count]));
+  const valueMap = new Map(dailyValues.map((d) => [d.workout_date, d.value]));
 
   // Generate all days in the last 52 weeks
   const today = new Date();
@@ -1299,7 +1301,7 @@ export function renderWorkoutHeatmap(
   // Align to Sunday
   startDate.setDate(startDate.getDate() - startDate.getDay());
 
-  const data: { week: number; day: number; count: number; date: string }[] = [];
+  const data: { week: number; day: number; value: number; date: string }[] = [];
   const current = new Date(startDate);
   let weekNum = 0;
   const weekStartMonth: { week: number; month: string; key: string }[] = [];
@@ -1315,7 +1317,7 @@ export function renderWorkoutHeatmap(
     data.push({
       week: weekNum,
       day,
-      count: countMap.get(dateStr) ?? 0,
+      value: valueMap.get(dateStr) ?? 0,
       date: dateStr,
     });
     current.setDate(current.getDate() + 1);
@@ -1352,16 +1354,19 @@ export function renderWorkoutHeatmap(
     },
     color: {
       type: "linear",
-      domain: [0, Math.max(1, ...data.map((d) => d.count))],
-      range: ["#ebedf0", "#216e39"],
+      domain: [0, Math.max(1, ...data.map((d) => d.value))],
+      range: ["#ebedf0", color],
     },
     marks: [
       Plot.cell(data, {
         x: "week",
         y: "day",
-        fill: "count",
+        fill: "value",
         tip: true,
-        title: (d: { date: string; count: number }) => `${d.date}: ${d.count} workout${d.count !== 1 ? "s" : ""}`,
+        title: (d: { date: string; value: number }) => {
+          const formatted = Number.isInteger(d.value) ? String(d.value) : d.value.toFixed(1);
+          return `${d.date}: ${formatted} ${tooltipLabel}`;
+        },
         inset: 1,
         rx: 2,
       }),
@@ -1372,7 +1377,7 @@ export function renderWorkoutHeatmap(
     const rects = svg.querySelectorAll('[aria-label="cell"] rect');
     rects.forEach((rect, i) => {
       const d = data[i];
-      if (d && d.count > 0) {
+      if (d && d.value > 0) {
         (rect as SVGRectElement).style.cursor = "pointer";
         rect.addEventListener("click", () => onDayClick(d.date));
       } else {
@@ -1382,6 +1387,19 @@ export function renderWorkoutHeatmap(
   }
 
   return svg;
+}
+
+/**
+ * Render a GitHub-style heatmap of daily workout counts for the last 52 weeks.
+ */
+export function renderWorkoutHeatmap(
+  dailyCounts: DailyWorkoutCount[],
+  width = 800,
+  height = 160,
+  onDayClick?: (date: string) => void,
+): SVGElement | HTMLElement {
+  const dailyValues = dailyCounts.map((d) => ({ workout_date: d.workout_date, value: d.count }));
+  return renderActivityGrid(dailyValues, width, height, "workouts", "#216e39", onDayClick);
 }
 
 /**

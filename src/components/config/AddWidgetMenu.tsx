@@ -6,6 +6,7 @@ const WIDGET_TYPES: { type: WidgetType; label: string; description: string }[] =
   { type: "metric_total", label: "Metric Total", description: "Display a single aggregate value" },
   { type: "chart", label: "Chart", description: "Custom chart with the chart builder" },
   { type: "last_workout", label: "Last Workout", description: "Performance chart for the most recent matching workout" },
+  { type: "activity_grid", label: "Activity Grid", description: "GitHub-style heatmap of daily activity" },
   { type: "section", label: "Section", description: "Full-width separator to organize widgets" },
 ];
 

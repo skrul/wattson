@@ -4,6 +4,7 @@ import MetricTotalConfig from "./MetricTotalConfig";
 import ChartWidgetConfig from "./ChartWidgetConfig";
 import LastWorkoutConfig from "./LastWorkoutConfig";
 import SectionConfig from "./SectionConfig";
+import ActivityGridConfig from "./ActivityGridConfig";
 
 export default function WidgetConfigModal() {
   const configuringWidgetId = useDashboardStore((s) => s.configuringWidgetId);
@@ -19,7 +20,7 @@ export default function WidgetConfigModal() {
   const widgetType = isAdding ? addingWidgetType : widget?.widget_type;
   if (!widgetType) return null;
 
-  const WIDGET_LABELS: Record<string, string> = { metric_total: "Metric", chart: "Chart", last_workout: "Last Workout", section: "Section" };
+  const WIDGET_LABELS: Record<string, string> = { metric_total: "Metric", chart: "Chart", last_workout: "Last Workout", section: "Section", activity_grid: "Activity Grid" };
   const title = isAdding ? `Add ${WIDGET_LABELS[widgetType] ?? widgetType} Widget` : "Configure Widget";
 
   return (
@@ -40,6 +41,9 @@ export default function WidgetConfigModal() {
           )}
           {widgetType === "section" && (
             <SectionConfig widget={widget ?? null} />
+          )}
+          {widgetType === "activity_grid" && (
+            <ActivityGridConfig widget={widget ?? null} />
           )}
         </DialogPanel>
       </div>

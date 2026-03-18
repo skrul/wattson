@@ -12,6 +12,7 @@ export const WIDGET_DEFAULTS: Record<WidgetType, WidgetDefaults> = {
   metric_total: { defaultW: 3, defaultH: 2, minW: 2, minH: 2 },
   last_workout: { defaultW: 6, defaultH: 5, minW: 4, minH: 4 },
   section: { defaultW: 12, defaultH: 1, minW: 4, minH: 1 },
+  activity_grid: { defaultW: 12, defaultH: 3, minW: 6, minH: 2 },
 };
 
 export interface MetricDefinition {
@@ -19,6 +20,20 @@ export interface MetricDefinition {
   label: string;
   format: (value: number) => string;
 }
+
+export interface ActivityGridMetric {
+  key: string;
+  label: string;
+  tooltipLabel: string;
+}
+
+export const ACTIVITY_GRID_METRICS: ActivityGridMetric[] = [
+  { key: "workout_count", label: "Workout Count", tooltipLabel: "workouts" },
+  { key: "total_output", label: "Total Output (kj)", tooltipLabel: "kj" },
+  { key: "total_calories", label: "Calories", tooltipLabel: "cal" },
+  { key: "total_distance", label: "Distance", tooltipLabel: "mi" },
+  { key: "total_duration", label: "Duration (min)", tooltipLabel: "min" },
+];
 
 export const PREDEFINED_METRICS: MetricDefinition[] = [
   { key: "total_workouts", label: "Total Workouts", format: (v) => Math.round(v).toLocaleString() },

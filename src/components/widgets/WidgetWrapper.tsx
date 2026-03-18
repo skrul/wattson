@@ -4,6 +4,7 @@ import ChartWidget from "./ChartWidget";
 import MetricTotalWidget from "./MetricTotalWidget";
 import LastWorkoutWidget from "./LastWorkoutWidget";
 import SectionWidget from "./SectionWidget";
+import ActivityGridWidget from "./ActivityGridWidget";
 
 interface Props {
   widget: DashboardWidget;
@@ -81,6 +82,7 @@ export default function WidgetWrapper({ widget }: Props) {
         {widget.config.type === "metric_total" && <MetricTotalWidget widget={widget} />}
         {widget.config.type === "last_workout" && <LastWorkoutWidget widget={widget} />}
         {widget.config.type === "section" && <SectionWidget widget={widget} />}
+        {widget.config.type === "activity_grid" && <ActivityGridWidget widget={widget} />}
       </div>
     </div>
   );

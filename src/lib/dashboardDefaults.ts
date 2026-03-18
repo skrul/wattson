@@ -40,9 +40,9 @@ export const ACTIVITY_GRID_METRICS: ActivityGridMetric[] = [
 export const PREDEFINED_METRICS: MetricDefinition[] = [
   { key: "total_workouts", label: "Total Workouts", format: (v) => Math.round(v).toLocaleString() },
   { key: "total_calories", label: "Total Calories", format: (v) => Math.round(v).toLocaleString() },
-  { key: "total_distance", label: "Total Distance", format: (v) => v.toFixed(1) },
+  { key: "total_distance", label: "Total Distance", format: (v) => Math.round(v).toLocaleString() },
   { key: "total_output_kj", label: "Total Output (kj)", format: (v) => Math.round(v).toLocaleString() },
-  { key: "total_hours", label: "Total Hours", format: (v) => v.toFixed(1) },
+  { key: "total_hours", label: "Total Hours", format: (v) => Math.round(v).toLocaleString() },
   { key: "avg_output", label: "Avg Output", format: (v) => Math.round(v).toLocaleString() },
   { key: "avg_heart_rate", label: "Avg Heart Rate", format: (v) => Math.round(v).toLocaleString() },
 ];

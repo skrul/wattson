@@ -8,13 +8,13 @@ export interface WidgetDefaults {
 }
 
 export const WIDGET_DEFAULTS: Record<WidgetType, WidgetDefaults> = {
-  chart: { defaultW: 6, defaultH: 4, minW: 3, minH: 3 },
-  metric_total: { defaultW: 3, defaultH: 2, minW: 2, minH: 2 },
-  last_workout: { defaultW: 6, defaultH: 5, minW: 4, minH: 4 },
-  section: { defaultW: 12, defaultH: 1, minW: 4, minH: 1 },
-  activity_grid: { defaultW: 12, defaultH: 3, minW: 6, minH: 2 },
-  personal_record: { defaultW: 4, defaultH: 3, minW: 3, minH: 3 },
-  most_repeated: { defaultW: 4, defaultH: 4, minW: 3, minH: 3 },
+  chart: { defaultW: 12, defaultH: 8, minW: 6, minH: 6 },
+  metric_total: { defaultW: 4, defaultH: 3, minW: 3, minH: 3 },
+  last_workout: { defaultW: 12, defaultH: 10, minW: 8, minH: 8 },
+  section: { defaultW: 24, defaultH: 2, minW: 8, minH: 2 },
+  activity_grid: { defaultW: 24, defaultH: 6, minW: 12, minH: 4 },
+  personal_record: { defaultW: 6, defaultH: 5, minW: 4, minH: 4 },
+  most_repeated: { defaultW: 8, defaultH: 8, minW: 6, minH: 6 },
 };
 
 export interface MetricDefinition {

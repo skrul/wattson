@@ -39,6 +39,9 @@ export default function DashboardGrid({ dashboard }: Props) {
     );
   };
 
+  const cols = 24;
+  const rowHeight = 40;
+
   return (
     <div ref={containerRef}>
       {/* Toolbar */}
@@ -67,22 +70,42 @@ export default function DashboardGrid({ dashboard }: Props) {
       </div>
 
       {/* Grid */}
-      <GridLayout
-        className="layout"
-        layout={layout}
-        width={width}
-        gridConfig={{ cols: 12, rowHeight: 60 }}
-        dragConfig={{ enabled: mode === "edit", handle: ".widget-drag-handle" }}
-        resizeConfig={{ enabled: mode === "edit" }}
-        compactor={verticalCompactor}
-        onLayoutChange={handleLayoutChange}
-      >
-        {dashboard.widgets.map((widget) => (
-          <div key={widget.id} className="h-full">
-            <WidgetWrapper widget={widget} />
-          </div>
-        ))}
-      </GridLayout>
+      <div style={{ position: "relative" }}>
+        {mode === "edit" && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              pointerEvents: "none",
+              zIndex: 9999,
+              backgroundImage: `
+                linear-gradient(to right, rgba(59,130,246,0.2) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(59,130,246,0.2) 1px, transparent 1px)
+              `,
+              backgroundSize: `${width / cols}px ${rowHeight}px`,
+            }}
+          />
+        )}
+        <GridLayout
+          className="layout"
+          layout={layout}
+          width={width}
+          gridConfig={{ cols, rowHeight }}
+          dragConfig={{ enabled: mode === "edit", handle: ".widget-drag-handle" }}
+          resizeConfig={{ enabled: mode === "edit" }}
+          compactor={verticalCompactor}
+          onLayoutChange={handleLayoutChange}
+        >
+          {dashboard.widgets.map((widget) => (
+            <div key={widget.id} className="h-full">
+              <WidgetWrapper widget={widget} />
+            </div>
+          ))}
+        </GridLayout>
+      </div>
     </div>
   );
 }

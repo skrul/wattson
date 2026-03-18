@@ -33,9 +33,9 @@ function buildDefaultInsightsWidgets(): DashboardWidget[] {
 
   // Section: Overview
   widgets.push(makeWidget("section", { type: "section", title: "Overview" }, 0, y));
-  y += 1;
+  y += 2;
 
-  // 5 metric totals: workouts, hours, calories, output, distance
+  // 5 metric totals: w=4 each, 5 fit in one row (20 of 24 cols)
   const metrics = [
     { metric: "total_workouts", label: "Total Workouts" },
     { metric: "total_hours", label: "Total Hours" },
@@ -43,27 +43,15 @@ function buildDefaultInsightsWidgets(): DashboardWidget[] {
     { metric: "total_output_kj", label: "Total Output (kj)" },
     { metric: "total_distance", label: "Total Distance" },
   ];
-  // Layout: 3 + 3 + ... across 12 cols, but we have 5 so do row of 3 then row of 2
-  // Actually 5 metrics fit in ~2.4 each, let's do 2 cols wide each = 10 cols, or mix
-  // Use 2-col each, 5 across won't fit in 12. Do first row: 3 widgets x 4 cols
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < metrics.length; i++) {
     widgets.push(makeWidget("metric_total", {
       type: "metric_total",
       metric: metrics[i].metric,
       label: metrics[i].label,
       filters: [],
-    }, i * 4, y, 4, 2));
+    }, i * 4, y, 4, 3));
   }
-  y += 2;
-  for (let i = 3; i < 5; i++) {
-    widgets.push(makeWidget("metric_total", {
-      type: "metric_total",
-      metric: metrics[i].metric,
-      label: metrics[i].label,
-      filters: [],
-    }, (i - 3) * 4, y, 4, 2));
-  }
-  y += 2;
+  y += 3;
 
   // Activity grid
   widgets.push(makeWidget("activity_grid", {
@@ -72,14 +60,14 @@ function buildDefaultInsightsWidgets(): DashboardWidget[] {
     metric: "workout_count",
     color: "#216e39",
     filters: [],
-  }, 0, y, 12, 3));
-  y += 3;
+  }, 0, y, 24, 6));
+  y += 6;
 
   // Section: Personal Records
   widgets.push(makeWidget("section", { type: "section", title: "Personal Records" }, 0, y));
-  y += 1;
+  y += 2;
 
-  // 3 personal record widgets
+  // 3 personal record widgets: w=6 each
   const records = [
     { metric: "total_work", title: "Highest Output" },
     { metric: "calories", title: "Most Calories" },
@@ -91,15 +79,15 @@ function buildDefaultInsightsWidgets(): DashboardWidget[] {
       metric: records[i].metric,
       title: records[i].title,
       filters: [],
-    }, i * 4, y, 4, 3));
+    }, i * 6, y, 6, 5));
   }
-  y += 3;
+  y += 5;
 
   // Section: Favorites
   widgets.push(makeWidget("section", { type: "section", title: "Favorites" }, 0, y));
-  y += 1;
+  y += 2;
 
-  // 2 chart widgets: top instructors bar + top class types bar
+  // 2 chart widgets: w=12 each
   widgets.push(makeWidget("chart", {
     type: "chart",
     chart: {
@@ -113,7 +101,7 @@ function buildDefaultInsightsWidgets(): DashboardWidget[] {
       x_axis_sequential: false,
       agg_function: "count",
     },
-  }, 0, y, 6, 6));
+  }, 0, y, 12, 12));
 
   widgets.push(makeWidget("chart", {
     type: "chart",
@@ -128,19 +116,19 @@ function buildDefaultInsightsWidgets(): DashboardWidget[] {
       x_axis_sequential: false,
       agg_function: "count",
     },
-  }, 6, y, 6, 6));
-  y += 6;
+  }, 12, y, 12, 12));
+  y += 12;
 
   // Section: Most Repeated
   widgets.push(makeWidget("section", { type: "section", title: "Most Repeated" }, 0, y));
-  y += 1;
+  y += 2;
 
   widgets.push(makeWidget("most_repeated", {
     type: "most_repeated",
     title: "Most Repeated Rides",
     limit: 10,
     filters: [],
-  }, 0, y, 6, 5));
+  }, 0, y, 12, 10));
 
   return widgets;
 }

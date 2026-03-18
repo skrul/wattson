@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useDashboardStore } from "../stores/dashboardStore";
+import { DashboardContext } from "../stores/DashboardContext";
 import DashboardEmptyState from "./DashboardEmptyState";
 import DashboardGrid from "./DashboardGrid";
 import WidgetFullscreen from "./widgets/WidgetFullscreen";
@@ -27,17 +28,25 @@ export default function DashboardTab() {
 
   if (expandedWidgetId) {
     const widget = dashboard.widgets.find((w) => w.id === expandedWidgetId);
-    if (widget) return <WidgetFullscreen widget={widget} />;
+    if (widget) return (
+      <DashboardContext.Provider value={useDashboardStore}>
+        <WidgetFullscreen widget={widget} />
+      </DashboardContext.Provider>
+    );
   }
 
   if (dashboard.widgets.length === 0 && mode === "view") {
-    return <DashboardEmptyState />;
+    return (
+      <DashboardContext.Provider value={useDashboardStore}>
+        <DashboardEmptyState />
+      </DashboardContext.Provider>
+    );
   }
 
   return (
-    <>
+    <DashboardContext.Provider value={useDashboardStore}>
       {dashboard.widgets.length === 0 ? <DashboardEmptyState /> : <DashboardGrid dashboard={dashboard} />}
       {(configuringWidgetId || addingWidgetType) && <WidgetConfigModal />}
-    </>
+    </DashboardContext.Provider>
   );
 }

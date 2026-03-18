@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DashboardWidget, ActivityGridWidgetConfig, FilterCondition } from "../../types";
-import { useDashboardStore } from "../../stores/dashboardStore";
+import { useDashboardContext } from "../../stores/DashboardContext";
 import { ACTIVITY_GRID_METRICS } from "../../lib/dashboardDefaults";
 import { FilterBar } from "../ChartFilterBar";
 
@@ -9,9 +9,10 @@ interface Props {
 }
 
 export default function ActivityGridConfig({ widget }: Props) {
-  const addWidget = useDashboardStore((s) => s.addWidget);
-  const updateWidgetConfig = useDashboardStore((s) => s.updateWidgetConfig);
-  const cancelConfiguring = useDashboardStore((s) => s.cancelConfiguring);
+  const useStore = useDashboardContext();
+  const addWidget = useStore((s) => s.addWidget);
+  const updateWidgetConfig = useStore((s) => s.updateWidgetConfig);
+  const cancelConfiguring = useStore((s) => s.cancelConfiguring);
 
   const existing = widget?.config.type === "activity_grid" ? widget.config : null;
 

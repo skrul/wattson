@@ -1,15 +1,18 @@
 import type { DashboardWidget } from "../../types";
-import { useDashboardStore } from "../../stores/dashboardStore";
+import { useDashboardContext } from "../../stores/DashboardContext";
 import ChartWidget from "./ChartWidget";
 import MetricTotalWidget from "./MetricTotalWidget";
 import LastWorkoutWidget from "./LastWorkoutWidget";
+import PersonalRecordWidget from "./PersonalRecordWidget";
+import MostRepeatedWidget from "./MostRepeatedWidget";
 
 interface Props {
   widget: DashboardWidget;
 }
 
 export default function WidgetFullscreen({ widget }: Props) {
-  const expandWidget = useDashboardStore((s) => s.expandWidget);
+  const useStore = useDashboardContext();
+  const expandWidget = useStore((s) => s.expandWidget);
 
   return (
     <div className="flex h-full flex-col">
@@ -26,6 +29,8 @@ export default function WidgetFullscreen({ widget }: Props) {
         {widget.config.type === "chart" && <ChartWidget widget={widget} fullscreen />}
         {widget.config.type === "metric_total" && <MetricTotalWidget widget={widget} fullscreen />}
         {widget.config.type === "last_workout" && <LastWorkoutWidget widget={widget} fullscreen />}
+        {widget.config.type === "personal_record" && <PersonalRecordWidget widget={widget} fullscreen />}
+        {widget.config.type === "most_repeated" && <MostRepeatedWidget widget={widget} fullscreen />}
       </div>
     </div>
   );

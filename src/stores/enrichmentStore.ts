@@ -23,6 +23,9 @@ interface EnrichmentState {
 // Module-level abort flag for clean cancellation
 let abortBackfill = false;
 
+// Workout IDs that failed during this session — skipped until next app launch
+const skippedIds = new Set<string>();
+
 async function runBackfillLoop() {
   const store = useEnrichmentStore.getState();
   if (store.backfillStatus === "running") return; // already running
@@ -38,13 +41,15 @@ async function runBackfillLoop() {
     }
 
     const unenriched = await getUnenrichedWorkouts();
-    if (unenriched.length === 0) {
+    const next = unenriched.find((w) => !skippedIds.has(w.id));
+    if (!next) {
       await useEnrichmentStore.getState().refreshCounts();
       useEnrichmentStore.setState({ backfillStatus: "complete", enrichmentComplete: true });
       return;
     }
 
-    const { id: workoutId, ride_id: rideId } = unenriched[0];
+    const { id: workoutId, ride_id: rawRideId } = next;
+    const rideId = rawRideId && rawRideId !== "00000000000000000000000000000000" ? rawRideId : null;
     let allCacheHits = false;
     try {
       const [perfResult, detailResult, rideResult] = await Promise.all([
@@ -55,8 +60,21 @@ async function runBackfillLoop() {
       allCacheHits = perfResult.cacheHit
         && (detailResult?.cacheHit ?? false)
         && (rideResult?.cacheHit ?? !rideId);
+
+      const detailOk = detailResult != null;
+      const rideOk = rideResult != null || !rideId;
+
       await updateWorkoutMetrics(workoutId, perfResult, detailResult?.rawJson ?? null, perfResult.rawJson);
-      await updateRideDetails(workoutId, rideResult?.rawJson ?? null);
+      if (rideOk) {
+        await updateRideDetails(workoutId, rideResult?.rawJson ?? null);
+      }
+
+      // If detail or ride failed, skip this workout for the rest of the session
+      // so the loop advances. It will be retried on next app launch.
+      if (!detailOk || !rideOk) {
+        skippedIds.add(workoutId);
+      }
+
       await useEnrichmentStore.getState().refreshCounts();
     } catch (e) {
       console.error(`Enrichment failed for workout ${workoutId}:`, e);
@@ -65,7 +83,8 @@ async function runBackfillLoop() {
         useEnrichmentStore.setState({ backfillStatus: "paused" });
         return;
       }
-      // For other errors, continue to next workout
+      // For other errors, skip this workout and continue
+      skippedIds.add(workoutId);
     }
 
     if (abortBackfill) break;
@@ -110,6 +129,7 @@ export const useEnrichmentStore = create<EnrichmentState>((set, get) => ({
 
   reset: () => {
     abortBackfill = true;
+    skippedIds.clear();
     set({
       countsLoaded: false,
       backfillStatus: "paused",

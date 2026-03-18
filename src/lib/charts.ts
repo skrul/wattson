@@ -1299,21 +1299,28 @@ import type { DailyWorkoutCount } from "./database";
 /**
  * Render a generic GitHub-style activity grid from daily values.
  */
+/** Cell size and margins used by the activity grid — exported for label alignment. */
+export const ACTIVITY_GRID_LAYOUT = { cellSize: 18, marginTop: 6, marginBottom: 20 } as const;
+
 export function renderActivityGrid(
   dailyValues: { workout_date: string; value: number }[],
-  width = 800,
-  height = 160,
   tooltipLabel = "workouts",
   color = "#216e39",
   onDayClick?: (date: string) => void,
+  hideDayLabels = false,
 ): SVGElement | HTMLElement {
   const valueMap = new Map(dailyValues.map((d) => [d.workout_date, d.value]));
 
-  // Generate all days in the last 52 weeks
+  // Generate all days from earliest data point to today
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const startDate = new Date(today);
-  startDate.setDate(startDate.getDate() - 52 * 7 + 1);
+
+  const earliest = dailyValues.length > 0
+    ? new Date(dailyValues.reduce((min, d) => d.workout_date < min ? d.workout_date : min, dailyValues[0].workout_date) + "T00:00:00")
+    : new Date(today.getTime() - 52 * 7 * 86400000);
+  earliest.setHours(0, 0, 0, 0);
+
+  const startDate = new Date(earliest);
   // Align to Sunday
   startDate.setDate(startDate.getDate() - startDate.getDay());
 
@@ -1352,11 +1359,20 @@ export function renderActivityGrid(
 
   const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  // Fixed cell size for consistent squares regardless of container size
+  const { cellSize, marginTop, marginBottom } = ACTIVITY_GRID_LAYOUT;
+  const marginLeft = hideDayLabels ? 2 : 30;
+  const marginRight = 20;
+  const numWeeks = weekNum + 1;
+  const plotWidth = cellSize * numWeeks + marginLeft + marginRight;
+  const plotHeight = cellSize * 7 + marginTop + marginBottom;
+
   const svg = Plot.plot({
-    width,
-    height,
-    marginLeft: 30,
-    marginBottom: 20,
+    width: plotWidth,
+    height: plotHeight,
+    marginTop,
+    marginLeft,
+    marginBottom,
     x: {
       label: null,
       ticks: monthTicks.map((t) => t.week),
@@ -1365,7 +1381,7 @@ export function renderActivityGrid(
     y: {
       label: null,
       domain: [0, 1, 2, 3, 4, 5, 6],
-      ticks: [1, 3, 5],
+      ticks: hideDayLabels ? [] : [1, 3, 5],
       tickFormat: (d: number) => dayLabels[d] ?? "",
     },
     color: {
@@ -1378,14 +1394,33 @@ export function renderActivityGrid(
         x: "week",
         y: "day",
         fill: "value",
-        tip: true,
+        inset: 1,
+        rx: 2,
+      }),
+      // Top rows: tooltip below; bottom rows: tooltip above.
+      // maxRadius prevents each tip from matching cells in the other half.
+      Plot.tip(data.filter((d) => d.day <= 2), Plot.pointer({
+        x: "week",
+        y: "day",
+        maxRadius: cellSize * 0.49,
         title: (d: { date: string; value: number }) => {
           const formatted = Number.isInteger(d.value) ? String(d.value) : d.value.toFixed(1);
           return `${d.date}: ${formatted} ${tooltipLabel}`;
         },
-        inset: 1,
-        rx: 2,
-      }),
+        anchor: "top",
+        dy: cellSize / 2,
+      })),
+      Plot.tip(data.filter((d) => d.day > 2), Plot.pointer({
+        x: "week",
+        y: "day",
+        maxRadius: cellSize * 0.49,
+        title: (d: { date: string; value: number }) => {
+          const formatted = Number.isInteger(d.value) ? String(d.value) : d.value.toFixed(1);
+          return `${d.date}: ${formatted} ${tooltipLabel}`;
+        },
+        anchor: "bottom",
+        dy: -cellSize / 2,
+      })),
     ],
   });
 
@@ -1397,7 +1432,10 @@ export function renderActivityGrid(
         (rect as SVGRectElement).style.cursor = "pointer";
         rect.addEventListener("click", () => onDayClick(d.date));
       } else {
-        (rect as SVGRectElement).style.pointerEvents = "none";
+        rect.addEventListener("pointerdown", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        });
       }
     });
   }
@@ -1410,12 +1448,10 @@ export function renderActivityGrid(
  */
 export function renderWorkoutHeatmap(
   dailyCounts: DailyWorkoutCount[],
-  width = 800,
-  height = 160,
   onDayClick?: (date: string) => void,
 ): SVGElement | HTMLElement {
   const dailyValues = dailyCounts.map((d) => ({ workout_date: d.workout_date, value: d.count }));
-  return renderActivityGrid(dailyValues, width, height, "workouts", "#216e39", onDayClick);
+  return renderActivityGrid(dailyValues, "workouts", "#216e39", onDayClick);
 }
 
 /**

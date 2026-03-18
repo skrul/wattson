@@ -1,16 +1,19 @@
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
-import { useDashboardStore } from "../../stores/dashboardStore";
+import { useDashboardContext } from "../../stores/DashboardContext";
 import MetricTotalConfig from "./MetricTotalConfig";
 import ChartWidgetConfig from "./ChartWidgetConfig";
 import LastWorkoutConfig from "./LastWorkoutConfig";
 import SectionConfig from "./SectionConfig";
 import ActivityGridConfig from "./ActivityGridConfig";
+import PersonalRecordConfig from "./PersonalRecordConfig";
+import MostRepeatedConfig from "./MostRepeatedConfig";
 
 export default function WidgetConfigModal() {
-  const configuringWidgetId = useDashboardStore((s) => s.configuringWidgetId);
-  const addingWidgetType = useDashboardStore((s) => s.addingWidgetType);
-  const cancelConfiguring = useDashboardStore((s) => s.cancelConfiguring);
-  const dashboard = useDashboardStore((s) => s.dashboard);
+  const useStore = useDashboardContext();
+  const configuringWidgetId = useStore((s) => s.configuringWidgetId);
+  const addingWidgetType = useStore((s) => s.addingWidgetType);
+  const cancelConfiguring = useStore((s) => s.cancelConfiguring);
+  const dashboard = useStore((s) => s.dashboard);
 
   const isAdding = addingWidgetType != null;
   const widget = configuringWidgetId
@@ -20,7 +23,7 @@ export default function WidgetConfigModal() {
   const widgetType = isAdding ? addingWidgetType : widget?.widget_type;
   if (!widgetType) return null;
 
-  const WIDGET_LABELS: Record<string, string> = { metric_total: "Metric", chart: "Chart", last_workout: "Last Workout", section: "Section", activity_grid: "Activity Grid" };
+  const WIDGET_LABELS: Record<string, string> = { metric_total: "Metric", chart: "Chart", last_workout: "Last Workout", section: "Section", activity_grid: "Activity Grid", personal_record: "Personal Record", most_repeated: "Most Repeated" };
   const title = isAdding ? `Add ${WIDGET_LABELS[widgetType] ?? widgetType} Widget` : "Configure Widget";
 
   return (
@@ -44,6 +47,12 @@ export default function WidgetConfigModal() {
           )}
           {widgetType === "activity_grid" && (
             <ActivityGridConfig widget={widget ?? null} />
+          )}
+          {widgetType === "personal_record" && (
+            <PersonalRecordConfig widget={widget ?? null} />
+          )}
+          {widgetType === "most_repeated" && (
+            <MostRepeatedConfig widget={widget ?? null} />
           )}
         </DialogPanel>
       </div>

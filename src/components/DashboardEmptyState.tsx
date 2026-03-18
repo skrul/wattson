@@ -1,9 +1,10 @@
-import { useDashboardStore } from "../stores/dashboardStore";
+import { useDashboardContext } from "../stores/DashboardContext";
 import AddWidgetMenu from "./config/AddWidgetMenu";
 
 export default function DashboardEmptyState() {
-  const mode = useDashboardStore((s) => s.mode);
-  const enterEditMode = useDashboardStore((s) => s.enterEditMode);
+  const useStore = useDashboardContext();
+  const mode = useStore((s) => s.mode);
+  const enterEditMode = useStore((s) => s.enterEditMode);
 
   return (
     <div className="flex flex-col items-center justify-center py-24">

@@ -21,7 +21,13 @@ interface DashboardState {
   startConfiguring: (id: string | null) => void;
   startAddingWidget: (type: WidgetType | null) => void;
   cancelConfiguring: () => void;
-  save: () => Promise<void>;
+}
+
+/** Persist current widgets to the database (fire-and-forget). */
+function persistWidgets(dashboard: Dashboard) {
+  saveDashboardWidgets(dashboard.id, dashboard.widgets).catch((err) =>
+    console.error("Failed to save dashboard:", err),
+  );
 }
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
@@ -57,47 +63,48 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         minH: defaults.minH,
       },
     };
+    const updated = { ...dashboard, widgets: [...dashboard.widgets, widget] };
     set({
-      dashboard: { ...dashboard, widgets: [...dashboard.widgets, widget] },
+      dashboard: updated,
       addingWidgetType: null,
       configuringWidgetId: null,
     });
+    persistWidgets(updated);
   },
 
   removeWidget: (id) => {
     const { dashboard } = get();
     if (!dashboard) return;
-    set({
-      dashboard: { ...dashboard, widgets: dashboard.widgets.filter((w) => w.id !== id) },
-    });
+    const updated = { ...dashboard, widgets: dashboard.widgets.filter((w) => w.id !== id) };
+    set({ dashboard: updated });
+    persistWidgets(updated);
   },
 
   updateWidgetConfig: (id, config) => {
     const { dashboard } = get();
     if (!dashboard) return;
-    set({
-      dashboard: {
-        ...dashboard,
-        widgets: dashboard.widgets.map((w) => (w.id === id ? { ...w, config } : w)),
-      },
-      configuringWidgetId: null,
-    });
+    const updated = {
+      ...dashboard,
+      widgets: dashboard.widgets.map((w) => (w.id === id ? { ...w, config } : w)),
+    };
+    set({ dashboard: updated, configuringWidgetId: null });
+    persistWidgets(updated);
   },
 
   updateLayouts: (layouts) => {
     const { dashboard } = get();
     if (!dashboard) return;
     const layoutMap = new Map(layouts.map((l) => [l.i, l]));
-    set({
-      dashboard: {
-        ...dashboard,
-        widgets: dashboard.widgets.map((w) => {
-          const l = layoutMap.get(w.id);
-          if (!l) return w;
-          return { ...w, layout: { ...w.layout, x: l.x, y: l.y, w: l.w, h: l.h } };
-        }),
-      },
-    });
+    const updated = {
+      ...dashboard,
+      widgets: dashboard.widgets.map((w) => {
+        const l = layoutMap.get(w.id);
+        if (!l) return w;
+        return { ...w, layout: { ...w.layout, x: l.x, y: l.y, w: l.w, h: l.h } };
+      }),
+    };
+    set({ dashboard: updated });
+    persistWidgets(updated);
   },
 
   expandWidget: (id) => set({ expandedWidgetId: id }),
@@ -107,11 +114,4 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   startAddingWidget: (type) => set({ addingWidgetType: type }),
 
   cancelConfiguring: () => set({ configuringWidgetId: null, addingWidgetType: null }),
-
-  save: async () => {
-    const { dashboard } = get();
-    if (!dashboard) return;
-    await saveDashboardWidgets(dashboard.id, dashboard.widgets);
-    set({ mode: "view" });
-  },
 }));

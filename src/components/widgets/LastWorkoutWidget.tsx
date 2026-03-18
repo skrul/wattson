@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import type { DashboardWidget, Workout, FilterCondition } from "../../types";
 import { queryWorkouts, getDb } from "../../lib/database";
 import { isConditionActive } from "../FilterEditors";
-import { parsePerformanceGraph, parseInstructorCues, renderRideDetailChart } from "../../lib/charts";
+import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset } from "../../lib/charts";
+import { useShareChartStore, resolveDisplayName } from "../../stores/shareChartStore";
+import { useSessionStore } from "../../stores/sessionStore";
+import ChartCard from "../ChartCard";
 
 interface Props {
   widget: DashboardWidget;
@@ -12,10 +15,19 @@ interface Props {
 export default function LastWorkoutWidget({ widget }: Props) {
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(true);
-  const chartRef = useRef<HTMLDivElement>(null);
+
+  const settings = useShareChartStore((s) => s.settings);
+  const userProfile = useSessionStore((s) => s.userProfile);
+
+  const pelotonUsername = useMemo(() => {
+    if (!userProfile?.raw_json) return null;
+    try { return (JSON.parse(userProfile.raw_json).username as string) ?? null; } catch { return null; }
+  }, [userProfile?.raw_json]);
+
+  const displayName = resolveDisplayName(settings, pelotonUsername);
 
   if (widget.config.type !== "last_workout") return null;
-  const { title, filters } = widget.config;
+  const { title, filters, showHeader: configShowHeader, showFooter: configShowFooter } = widget.config;
 
   const activeFiltersKey = useMemo(
     () => JSON.stringify((filters ?? []).filter(isConditionActive)),
@@ -45,26 +57,27 @@ export default function LastWorkoutWidget({ widget }: Props) {
     fetchWorkout();
   }, [fetchWorkout]);
 
+  const ftp = useMemo(() => {
+    if (!workout?.raw_detail_json) return null;
+    try {
+      const raw = JSON.parse(workout.raw_detail_json);
+      const v = raw?.ftp_info?.ftp;
+      return typeof v === "number" ? v : null;
+    } catch { return null; }
+  }, [workout?.raw_detail_json]);
+
   const timeSeries = useMemo(() => {
     if (!workout?.raw_performance_graph_json) return null;
     return parsePerformanceGraph(workout.raw_performance_graph_json);
   }, [workout?.raw_performance_graph_json]);
 
   const cues = useMemo(() => {
-    if (!workout?.raw_ride_details_json) return null;
-    return parseInstructorCues(workout.raw_ride_details_json);
-  }, [workout?.raw_ride_details_json]);
+    if (!workout?.raw_performance_graph_json) return null;
+    const offset = parsePedalingStartOffset(workout.raw_ride_details_json);
+    return parseTargetMetrics(workout.raw_performance_graph_json, offset);
+  }, [workout?.raw_performance_graph_json, workout?.raw_ride_details_json]);
 
-  useEffect(() => {
-    if (!chartRef.current || !timeSeries || !workout) return;
-    const el = chartRef.current;
-    const chart = renderRideDetailChart(timeSeries, null, {
-      width: el.clientWidth || 800,
-      durationSeconds: workout.duration_seconds ?? undefined,
-    }, cues);
-    el.replaceChildren(chart);
-    return () => { el.replaceChildren(); };
-  }, [timeSeries, cues, workout]);
+  const isPZ = workout?.class_type === "Power Zone";
 
   if (loading) {
     return <div className="flex h-full items-center justify-center text-sm text-gray-400">Loading...</div>;
@@ -81,10 +94,17 @@ export default function LastWorkoutWidget({ widget }: Props) {
   return (
     <div className="h-full">
       {title && <div className="shrink-0 truncate text-sm font-medium text-gray-700">{title}</div>}
-      <p className="mb-1 text-xs text-gray-500">
-        {workout.title}{workout.instructor ? ` · ${workout.instructor}` : ""}
-      </p>
-      <div ref={chartRef} className="w-full" />
+      <ChartCard
+        workout={workout}
+        ftp={ftp}
+        timeSeries={timeSeries}
+        cues={cues}
+        settings={settings}
+        displayName={displayName}
+        isPZ={isPZ}
+        showHeader={configShowHeader}
+        showFooter={configShowFooter}
+      />
     </div>
   );
 }

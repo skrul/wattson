@@ -388,7 +388,7 @@ export async function getShareableWorkouts(limit = 50): Promise<Workout[]> {
   const d = await getDb();
   return d.select<Workout[]>(
     `SELECT * FROM workouts
-     WHERE discipline = 'cycling' AND raw_performance_graph_json IS NOT NULL
+     WHERE discipline = 'cycling'
      ORDER BY date DESC LIMIT $1`,
     [limit],
   );

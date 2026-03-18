@@ -1,15 +1,16 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import type { Workout } from "../types";
 import { getShareableWorkouts } from "../lib/database";
-import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, renderRideDetailChart } from "../lib/charts";
+import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset } from "../lib/charts";
 import { renderExportPng } from "../lib/exportUtils";
 import { cachedFetchWorkoutDetail, cachedFetchPerformanceGraph, cachedFetchRideDetails } from "../lib/enrichmentCache";
 import { updateWorkoutMetrics, updateRideDetails } from "../lib/database";
 import { useShareChartStore, resolveDisplayName } from "../stores/shareChartStore";
 import { useSessionStore } from "../stores/sessionStore";
 import ShareMenu from "./ShareMenu";
+import ChartCard from "./ChartCard";
 
 function formatPickerDate(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleDateString("en-US", {
@@ -18,19 +19,6 @@ function formatPickerDate(timestamp: number): string {
     year: "numeric",
   });
 }
-
-function formatDateTime(timestamp: number): string {
-  const d = new Date(timestamp * 1000);
-  return d.toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
 
 function parseWorkoutFtp(rawDetailJson: string | null | undefined): number | null {
   if (!rawDetailJson) return null;
@@ -106,28 +94,9 @@ function OverlayRow({ label, checked, onToggle, color, onColorChange }: OverlayR
   );
 }
 
-interface FooterStatProps {
-  label: string;
-  value: string | number | null | undefined;
-  unit?: string;
-}
-
-function FooterStat({ label, value, unit }: FooterStatProps) {
-  if (value == null) return null;
-  return (
-    <div className="flex flex-col items-center">
-      <span className="text-sm font-semibold">
-        {value}{unit ? ` ${unit}` : ""}
-      </span>
-      <span className="text-[10px] text-gray-500">{label}</span>
-    </div>
-  );
-}
-
 export default function StudioTab() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const chartRef = useRef<HTMLDivElement>(null);
 
   const settings = useShareChartStore((s) => s.settings);
   const updateOverlay = useShareChartStore((s) => s.updateOverlay);
@@ -229,38 +198,6 @@ export default function StudioTab() {
 
     return () => { cancelled = true; };
   }, [workout?.id, session?.accessToken]);
-
-  // Track container width via ResizeObserver so chart re-renders when tab becomes visible
-  const [chartWidth, setChartWidth] = useState(0);
-  const hasChart = !!(workout && timeSeries);
-  useEffect(() => {
-    const el = chartRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width ?? 0;
-      if (w > 0) setChartWidth(w);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [hasChart]);
-
-  // Render chart
-  useEffect(() => {
-    if (!chartRef.current || !timeSeries || chartWidth === 0) return;
-    const el = chartRef.current;
-    const chart = renderRideDetailChart(timeSeries, ftp, {
-      width: chartWidth,
-      durationSeconds: workout?.duration_seconds ?? undefined,
-      overlays: settings.overlays,
-      overlayColors: settings.overlayColors,
-      cueColor: settings.cueColor,
-      showZoneBands: settings.zoneBands === "always" || (settings.zoneBands === "pz-only" && isPZ),
-      showInstructorCues: settings.showInstructorCues,
-      showYAxis: settings.showYAxis,
-    }, cues);
-    el.replaceChildren(chart);
-    return () => { el.replaceChildren(); };
-  }, [timeSeries, ftp, cues, settings, workout?.duration_seconds, chartWidth]);
 
   const filename = workout
     ? `${workout.title?.replace(/[^a-zA-Z0-9]/g, "-") ?? "workout"}-${workout.id.slice(0, 8)}`
@@ -383,49 +320,22 @@ export default function StudioTab() {
       {/* Right panel — Live Preview */}
       <div className="min-w-0 flex-1">
         {workout && timeSeries ? (
-          <div className="select-none rounded-lg border border-gray-200 bg-white p-4">
-            {/* Header */}
-            {settings.showHeader && (
-              <div className="mb-3 flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-semibold">{workout.title}</p>
-                  <p className="text-xs text-gray-500">
-                    {workout.instructor && <>{workout.instructor} · </>}
-                    {formatPickerDate(workout.date)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  {displayName && <p className="text-sm font-semibold text-gray-500">{displayName}</p>}
-                  <p className="text-xs text-gray-500">{formatDateTime(workout.date)}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Chart */}
-            <div ref={chartRef} className="w-full" />
-
-            {/* Footer stats */}
-            <div className="mt-3 flex flex-wrap justify-center gap-x-6 gap-y-2 border-t border-gray-100 pt-3">
-              {st.avgPower && <FooterStat label="Avg Power" value={workout.avg_output} unit="w" />}
-              {st.totalOutput && <FooterStat label="Total Output" value={workout.total_work != null ? Math.round(workout.total_work / 1000) : null} unit="kj" />}
-              {st.calories && <FooterStat label="Calories" value={workout.calories} unit="kcal" />}
-              {st.distance && <FooterStat label="Distance" value={workout.distance != null ? workout.distance.toFixed(2) : null} unit="mi" />}
-              {st.avgCadence && <FooterStat label="Avg Cadence" value={workout.avg_cadence} unit="rpm" />}
-              {st.avgResistance && <FooterStat label="Avg Resistance" value={workout.avg_resistance != null ? `${workout.avg_resistance}%` : null} />}
-              {st.avgSpeed && <FooterStat label="Avg Speed" value={workout.avg_speed != null ? workout.avg_speed.toFixed(1) : null} unit="mph" />}
-              {st.avgHR && <FooterStat label="Avg HR" value={workout.avg_heart_rate} unit="bpm" />}
-              {st.striveScore && <FooterStat label="Strive Score" value={workout.strive_score != null ? workout.strive_score.toFixed(1) : null} />}
-              {st.ftp && ftp ? <FooterStat label="FTP" value={ftp} unit="w" /> : null}
-            </div>
-
-            {/* Export buttons */}
+          <ChartCard
+            workout={workout}
+            ftp={ftp}
+            timeSeries={timeSeries}
+            cues={cues}
+            settings={settings}
+            displayName={displayName}
+            isPZ={isPZ}
+          >
             <div className="mt-4 flex justify-end">
               <ShareMenu onCopy={handleCopy} onSave={handleSave} />
             </div>
-          </div>
+          </ChartCard>
         ) : (
           <div className="flex h-64 items-center justify-center rounded-lg border border-gray-200 text-gray-400">
-            {workouts.length === 0 ? "No cycling workouts with chart data available" : "Select a workout"}
+            {workouts.length === 0 ? "No cycling workouts available" : "Select a workout"}
           </div>
         )}
       </div>

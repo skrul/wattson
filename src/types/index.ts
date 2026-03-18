@@ -197,6 +197,8 @@ export interface LastWorkoutWidgetConfig {
   type: "last_workout";
   title: string;
   filters: FilterCondition[];
+  showHeader?: boolean;
+  showFooter?: boolean;
 }
 
 export interface SectionWidgetConfig {

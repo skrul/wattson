@@ -16,9 +16,11 @@ export default function LastWorkoutConfig({ widget }: Props) {
 
   const [title, setTitle] = useState(existing?.title ?? "");
   const [filters, setFilters] = useState<FilterCondition[]>(existing?.filters ?? []);
+  const [showHeader, setShowHeader] = useState(existing?.showHeader ?? true);
+  const [showFooter, setShowFooter] = useState(existing?.showFooter ?? true);
 
   const handleSave = () => {
-    const config: LastWorkoutWidgetConfig = { type: "last_workout", title, filters };
+    const config: LastWorkoutWidgetConfig = { type: "last_workout", title, filters, showHeader, showFooter };
 
     if (widget) {
       updateWidgetConfig(widget.id, config);
@@ -51,6 +53,30 @@ export default function LastWorkoutConfig({ widget }: Props) {
           onUpdate={(id, updates) => setFilters((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)))}
           onRemove={(id) => setFilters((prev) => prev.filter((c) => c.id !== id))}
         />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Display Options</label>
+        <div className="space-y-1">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={showHeader}
+              onChange={(e) => setShowHeader(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-gray-300"
+            />
+            Show header (title, instructor, date)
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={showFooter}
+              onChange={(e) => setShowFooter(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-gray-300"
+            />
+            Show footer stats
+          </label>
+        </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">

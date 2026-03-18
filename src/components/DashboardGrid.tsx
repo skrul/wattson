@@ -12,7 +12,7 @@ interface Props {
 export default function DashboardGrid({ dashboard }: Props) {
   const mode = useDashboardStore((s) => s.mode);
   const enterEditMode = useDashboardStore((s) => s.enterEditMode);
-  const save = useDashboardStore((s) => s.save);
+  const exitEditMode = useDashboardStore((s) => s.exitEditMode);
   const updateLayouts = useDashboardStore((s) => s.updateLayouts);
 
   const { width, containerRef } = useContainerWidth({ initialWidth: 1200 });
@@ -48,7 +48,7 @@ export default function DashboardGrid({ dashboard }: Props) {
             <>
               <AddWidgetMenu />
               <button
-                onClick={save}
+                onClick={exitEditMode}
                 className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
               >
                 Done

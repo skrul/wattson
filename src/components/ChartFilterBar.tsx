@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { FIELD_DEFS, FIELD_MAP, OPERATOR_LABELS } from "../lib/fields";
 import { useEnrichmentStore } from "../stores/enrichmentStore";
@@ -15,18 +16,6 @@ import {
   EnumMultiSelect,
 } from "./FilterEditors";
 
-function useClickOutside(ref: React.RefObject<HTMLElement | null>, onClose: () => void) {
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose();
-      }
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [ref, onClose]);
-}
-
 function FilterChip({
   condition,
   defaultOpen = false,
@@ -39,9 +28,43 @@ function FilterChip({
   onRemove: (id: string) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-  useClickOutside(containerRef, close);
+  const chipRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  // Position the floating panel relative to the chip
+  useEffect(() => {
+    if (!open || !chipRef.current) return;
+    function update() {
+      if (!chipRef.current) return;
+      const rect = chipRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, left: rect.left });
+    }
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open]);
+
+  // Close on click outside (union of chip + portal panel).
+  // Use pointerdown in capture phase so it fires before Headless UI can stop propagation.
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: PointerEvent) {
+      const target = e.target as Node;
+      if (
+        chipRef.current && !chipRef.current.contains(target) &&
+        panelRef.current && !panelRef.current.contains(target)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", handler, true);
+    return () => document.removeEventListener("pointerdown", handler, true);
+  }, [open]);
 
   const field = FIELD_MAP[condition.field];
   if (!field) return null;
@@ -55,8 +78,8 @@ function FilterChip({
     : "inline-flex items-center gap-1 rounded-md border border-gray-300 bg-gray-50 px-2.5 py-1 text-sm text-gray-500 shadow-sm hover:bg-gray-100";
 
   return (
-    <div className="relative" ref={containerRef}>
-      <button onClick={() => setOpen(!open)} className={chipClasses}>
+    <div className="relative">
+      <button ref={chipRef} onClick={() => setOpen(!open)} className={chipClasses}>
         <span className={active ? "text-blue-400" : "text-gray-400"}>≡</span>
         <span className="font-medium">{field.label}:</span>
         <span className={active ? "text-blue-600" : "text-gray-400"}>
@@ -67,8 +90,12 @@ function FilterChip({
         </svg>
       </button>
 
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+      {open && pos && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: "fixed", top: pos.top, left: pos.left }}
+          className="z-[100] w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
+        >
           <div className="space-y-3">
             <div className="text-sm font-medium text-gray-700">{field.label}</div>
 
@@ -124,7 +151,8 @@ function FilterChip({
               Delete filter
             </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

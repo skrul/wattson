@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useSessionStore } from "../stores/sessionStore";
-import type { UserProfile } from "../types";
 
 // --- Mocks ---
 
@@ -53,7 +52,7 @@ function setUserProfile(totalWorkouts: number) {
       user_id: "u1",
       total_workouts: totalWorkouts,
       raw_json: "{}",
-    } as UserProfile,
+    } as any,
   });
 }
 

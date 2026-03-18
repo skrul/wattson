@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import ApiSync from "./components/ApiSync";
 import WorkoutList from "./components/WorkoutList";
 import DashboardTab from "./components/DashboardTab";
-import InsightsTab from "./components/InsightsTab";
-import InsightsNewTab from "./components/InsightsNewTab";
+import InsightsTab from "./components/InsightsNewTab";
 import StudioTab from "./components/StudioTab";
 import SetupWizard from "./components/SetupWizard";
 import ReauthModal from "./components/ReauthModal";
@@ -101,7 +100,6 @@ function App() {
       }
       return "Account";
     }
-    if (tab === "insights_new") return "Insights New";
     return tab.charAt(0).toUpperCase() + tab.slice(1);
   }
 
@@ -141,7 +139,7 @@ function App() {
           )}
         </div>
         <nav className="flex gap-2">
-          {(["dashboard", "workouts", "insights", "insights_new", "studio", "profile"] as Tab[]).map((tab) => (
+          {(["dashboard", "workouts", "insights", "studio", "profile"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -166,9 +164,6 @@ function App() {
       </div>
       <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "insights" ? "" : "hidden"}`}>
         <InsightsTab />
-      </div>
-      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "insights_new" ? "" : "hidden"}`}>
-        <InsightsNewTab />
       </div>
       <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "studio" ? "" : "hidden"}`}>
         <StudioTab />

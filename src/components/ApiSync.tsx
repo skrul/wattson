@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Dialog, DialogPanel } from "@headlessui/react";
 import { login } from "../lib/api";
 import { syncWorkouts } from "../lib/sync";
-import { deleteAllData, getSetting, setSetting } from "../lib/database";
+import { deleteAllData } from "../lib/database";
 import { clearCache } from "../lib/enrichmentCache";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
@@ -42,7 +42,6 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [cacheStatus, setCacheStatus] = useState("");
   const [autoSync, setAutoSync] = useState(() => localStorage.getItem(AUTO_SYNC_KEY) !== "false");
-  const [experimentalInsights, setExperimentalInsights] = useState(false);
 
   const session = useSessionStore((s) => s.session);
   const userProfile = useSessionStore((s) => s.userProfile);
@@ -59,11 +58,6 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const pauseBackfill = useEnrichmentStore((s) => s.pauseBackfill);
   const resetEnrichment = useEnrichmentStore((s) => s.reset);
 
-  useEffect(() => {
-    if (session) {
-      getSetting("experimental_insights").then((v) => setExperimentalInsights(v === "true")).catch(() => {});
-    }
-  }, [session]);
 
   const handleLogin = async () => {
     setError("");
@@ -283,26 +277,6 @@ export default function ApiSync({ onDataDeleted }: Props) {
           </div>
         </div>
       )}
-
-      {/* Experimental Insights */}
-      <div className="space-y-1">
-        <label className="flex items-center gap-2 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={experimentalInsights}
-            onChange={(e) => {
-              const enabled = e.target.checked;
-              setExperimentalInsights(enabled);
-              setSetting("experimental_insights", enabled ? "true" : "false");
-            }}
-            className="rounded border-gray-300"
-          />
-          Enable experimental insights
-        </label>
-        <p className="pl-6 text-xs text-gray-500">
-          Show experimental analysis sections in the Insights tab
-        </p>
-      </div>
 
       {/* Actions */}
       <div className="space-y-2 border-t border-gray-200 pt-4">

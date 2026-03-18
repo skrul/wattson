@@ -270,14 +270,16 @@ export async function updateWorkoutMetrics(
   await d.execute(
     `UPDATE workouts SET calories=$1, distance=$2, avg_output=$3, avg_cadence=$4,
      avg_resistance=$5, avg_speed=$6, avg_heart_rate=$7,
-     raw_detail_json=$8, raw_performance_graph_json=$9,
-     detail_fetched_at=$10, perf_graph_fetched_at=$11
-     WHERE id=$12`,
+     raw_detail_json = COALESCE($8, raw_detail_json),
+     raw_performance_graph_json = COALESCE($9, raw_performance_graph_json),
+     detail_fetched_at = CASE WHEN $8 IS NOT NULL THEN $10 ELSE detail_fetched_at END,
+     perf_graph_fetched_at = CASE WHEN $9 IS NOT NULL THEN $10 ELSE perf_graph_fetched_at END
+     WHERE id=$11`,
     [
       metrics.calories, metrics.distance, metrics.avg_output, metrics.avg_cadence,
       metrics.avg_resistance, metrics.avg_speed, metrics.avg_heart_rate,
       rawDetailJson, rawPerformanceGraphJson,
-      now, now, workoutId,
+      now, workoutId,
     ],
   );
 }
@@ -811,6 +813,42 @@ export async function getOrCreateDashboard(): Promise<Dashboard> {
   return { ...dashboard, widgets };
 }
 
+/** Load or create a dashboard by name. */
+export async function getOrCreateDashboardByName(name: string): Promise<Dashboard> {
+  const d = await getDb();
+  const rows = await d.select<DashboardRow[]>(
+    "SELECT * FROM dashboards WHERE name = $1 LIMIT 1",
+    [name],
+  );
+
+  let dashboard: DashboardRow;
+  if (rows.length === 0) {
+    const now = Date.now();
+    const id = crypto.randomUUID();
+    await d.execute(
+      "INSERT INTO dashboards (id, name, created_at, updated_at) VALUES ($1, $2, $3, $4)",
+      [id, name, now, now],
+    );
+    dashboard = { id, name, created_at: now, updated_at: now };
+  } else {
+    dashboard = rows[0];
+  }
+
+  const widgetRows = await d.select<DashboardWidgetRow[]>(
+    "SELECT * FROM dashboard_widgets WHERE dashboard_id = $1 ORDER BY sort_order ASC",
+    [dashboard.id],
+  );
+
+  const widgets: DashboardWidget[] = widgetRows.map((r) => ({
+    id: r.id,
+    widget_type: r.widget_type as DashboardWidget["widget_type"],
+    config: JSON.parse(r.config_json),
+    layout: JSON.parse(r.layout_json),
+  }));
+
+  return { ...dashboard, widgets };
+}
+
 /** Save all widgets for a dashboard (delete + re-insert). */
 export async function saveDashboardWidgets(
   dashboardId: string,
@@ -827,6 +865,68 @@ export async function saveDashboardWidgets(
     );
   }
   await d.execute("UPDATE dashboards SET updated_at = $1 WHERE id = $2", [Date.now(), dashboardId]);
+}
+
+/** Get the top workout for a metric, with filter support. */
+export async function getTopFilteredWorkout(
+  metric: string,
+  filters: FilterCondition[],
+): Promise<Workout | null> {
+  if (!METRIC_ALLOWLIST.has(metric)) {
+    throw new Error(`Metric "${metric}" is not allowed`);
+  }
+
+  const params: unknown[] = [];
+  const idx = { val: 1 };
+  const clauses: string[] = [`${metric} IS NOT NULL`];
+
+  for (const cond of filters) {
+    const clause = buildConditionClause(cond, params, idx);
+    if (clause) clauses.push(clause);
+  }
+
+  const where = clauses.join(" AND ");
+  const d = await getDb();
+  const rows = await d.select<Workout[]>(
+    `SELECT * FROM workouts WHERE ${where} ORDER BY ${metric} DESC LIMIT 1`,
+    params,
+  );
+  return rows[0] ?? null;
+}
+
+/** Most repeated rides with filter support, returning full Workout rows plus repeat count. */
+export async function getMostRepeatedFilteredWorkouts(
+  limit: number,
+  filters: FilterCondition[],
+): Promise<RepeatedRideWorkout[]> {
+  const params: unknown[] = [];
+  const idx = { val: 1 };
+  const clauses: string[] = ["ride_id IS NOT NULL", "ride_id != ''"];
+
+  for (const cond of filters) {
+    const clause = buildConditionClause(cond, params, idx);
+    if (clause) clauses.push(clause);
+  }
+
+  const where = clauses.join(" AND ");
+  params.push(limit);
+  const limitParam = `$${idx.val++}`;
+
+  const d = await getDb();
+  return d.select<RepeatedRideWorkout[]>(
+    `SELECT w.*, g.count as repeat_count
+     FROM workouts w
+     INNER JOIN (
+       SELECT ride_id, COUNT(*) as count, MAX(date) as max_date
+       FROM workouts
+       WHERE ${where}
+       GROUP BY ride_id
+       HAVING count > 1
+     ) g ON w.ride_id = g.ride_id AND w.date = g.max_date
+     ORDER BY g.count DESC, g.max_date DESC
+     LIMIT ${limitParam}`,
+    params,
+  );
 }
 
 const METRIC_SQL: Record<string, string> = {

@@ -1,5 +1,7 @@
+import { useRef } from "react";
 import type { DashboardWidget } from "../../types";
 import { useDashboardContext } from "../../stores/DashboardContext";
+import { WidgetToolbarContext } from "./WidgetToolbarContext";
 import ChartWidget from "./ChartWidget";
 import MetricTotalWidget from "./MetricTotalWidget";
 import LastWorkoutWidget from "./LastWorkoutWidget";
@@ -19,6 +21,7 @@ export default function WidgetWrapper({ widget }: Props) {
   const expandWidget = useStore((s) => s.expandWidget);
   const startConfiguring = useStore((s) => s.startConfiguring);
 
+  const toolbarSlotRef = useRef<HTMLDivElement | null>(null);
   const isSection = widget.config.type === "section";
 
   return (
@@ -41,6 +44,7 @@ export default function WidgetWrapper({ widget }: Props) {
       <div className={`absolute right-1 top-1 z-10 flex items-center gap-0.5 rounded bg-white/80 shadow-sm backdrop-blur transition-opacity ${
         mode === "edit" ? "opacity-100" : "opacity-0 group-hover:opacity-100"
       }`}>
+        <div ref={toolbarSlotRef} className="flex items-center" />
         {mode === "view" && !isSection && (
           <button
             onClick={() => expandWidget(widget.id)}
@@ -55,6 +59,7 @@ export default function WidgetWrapper({ widget }: Props) {
         {mode === "edit" && (
           <>
             <button
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={() => startConfiguring(widget.id)}
               className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               title="Configure"
@@ -65,9 +70,8 @@ export default function WidgetWrapper({ widget }: Props) {
               </svg>
             </button>
             <button
-              onClick={() => {
-                if (window.confirm("Remove this widget?")) removeWidget(widget.id);
-              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={async () => { if (await window.confirm("Remove this widget?")) removeWidget(widget.id); }}
               className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
               title="Remove"
             >
@@ -80,15 +84,17 @@ export default function WidgetWrapper({ widget }: Props) {
       </div>
 
       {/* Widget content — fills entire card */}
-      <div className="h-full rounded-lg p-3">
-        {widget.config.type === "chart" && <ChartWidget widget={widget} />}
-        {widget.config.type === "metric_total" && <MetricTotalWidget widget={widget} />}
-        {widget.config.type === "last_workout" && <LastWorkoutWidget widget={widget} />}
-        {widget.config.type === "section" && <SectionWidget widget={widget} />}
-        {widget.config.type === "activity_grid" && <ActivityGridWidget widget={widget} />}
-        {widget.config.type === "personal_record" && <PersonalRecordWidget widget={widget} />}
-        {widget.config.type === "most_repeated" && <MostRepeatedWidget widget={widget} />}
-      </div>
+      <WidgetToolbarContext.Provider value={toolbarSlotRef}>
+        <div className={`h-full rounded-lg ${isSection ? "" : widget.config.type === "personal_record" ? "px-1 pt-1" : widget.config.type === "activity_grid" ? "px-3 pt-3 pb-1" : "p-3"}`}>
+          {widget.config.type === "chart" && <ChartWidget widget={widget} />}
+          {widget.config.type === "metric_total" && <MetricTotalWidget widget={widget} />}
+          {widget.config.type === "last_workout" && <LastWorkoutWidget widget={widget} />}
+          {widget.config.type === "section" && <SectionWidget widget={widget} />}
+          {widget.config.type === "activity_grid" && <ActivityGridWidget widget={widget} />}
+          {widget.config.type === "personal_record" && <PersonalRecordWidget widget={widget} />}
+          {widget.config.type === "most_repeated" && <MostRepeatedWidget widget={widget} />}
+        </div>
+      </WidgetToolbarContext.Provider>
     </div>
   );
 }

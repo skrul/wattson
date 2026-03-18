@@ -211,6 +211,7 @@ export interface LastWorkoutWidgetConfig {
   filters: FilterCondition[];
   showHeader?: boolean;
   showFooter?: boolean;
+  chartStyleId?: string;
 }
 
 export interface SectionWidgetConfig {

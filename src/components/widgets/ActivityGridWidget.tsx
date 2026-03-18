@@ -5,10 +5,12 @@ import type { DailyMetricValue } from "../../lib/database";
 import { renderActivityGrid, ACTIVITY_GRID_LAYOUT } from "../../lib/charts";
 import { ACTIVITY_GRID_METRICS } from "../../lib/dashboardDefaults";
 import { useNavigationStore } from "../../stores/navigationStore";
+import { useWorkoutStore } from "../../stores/workoutStore";
 
 interface Props {
   widget: DashboardWidget;
   fullscreen?: boolean;
+  preview?: boolean;
 }
 
 const DAY_LABELS: { day: number; label: string }[] = [
@@ -17,11 +19,12 @@ const DAY_LABELS: { day: number; label: string }[] = [
   { day: 5, label: "Fri" },
 ];
 
-export default function ActivityGridWidget({ widget }: Props) {
+export default function ActivityGridWidget({ widget, preview }: Props) {
   const [data, setData] = useState<DailyMetricValue[] | null>(null);
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigateToFilteredWorkouts = useNavigationStore((s) => s.navigateToFilteredWorkouts);
+  const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
 
   const handleDayClick = useCallback((date: string) => {
     navigateToFilteredWorkouts({
@@ -39,11 +42,11 @@ export default function ActivityGridWidget({ widget }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    getDailyMetricValues(0, metric, filters)
+    getDailyMetricValues(preview ? 365 : 0, metric, filters)
       .then((v) => setData(v))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, [metric, JSON.stringify(filters)]);
+  }, [metric, preview, JSON.stringify(filters), syncGeneration]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -112,7 +115,7 @@ export default function ActivityGridWidget({ widget }: Props) {
   return (
     <div className="flex h-full flex-col">
       {title && (
-        <span className="mb-1 text-xs font-medium text-gray-500">{title}</span>
+        <span className="text-sm font-medium text-gray-700">{title}</span>
       )}
       <div className="relative min-h-0 flex-1 flex">
         {/* Fixed day-of-week labels */}

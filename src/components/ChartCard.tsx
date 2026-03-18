@@ -50,20 +50,24 @@ interface ChartCardProps {
   isPZ: boolean;
   showHeader?: boolean;
   showFooter?: boolean;
+  fitHeight?: boolean;
   children?: ReactNode;
 }
 
-export default function ChartCard({ workout, ftp, timeSeries, cues, settings, displayName, isPZ, showHeader, showFooter, children }: ChartCardProps) {
+export default function ChartCard({ workout, ftp, timeSeries, cues, settings, displayName, isPZ, showHeader, showFooter, fitHeight, children }: ChartCardProps) {
   const chartRef = useRef<HTMLDivElement>(null);
 
-  // Track container width via ResizeObserver for correct sizing
+  // Track container size via ResizeObserver for correct sizing
   const [chartWidth, setChartWidth] = useState(0);
+  const [chartHeight, setChartHeight] = useState(0);
   useEffect(() => {
     const el = chartRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width ?? 0;
-      if (w > 0) setChartWidth(w);
+      const rect = entries[0]?.contentRect;
+      if (!rect) return;
+      if (rect.width > 0) setChartWidth(rect.width);
+      if (rect.height > 0) setChartHeight(rect.height);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -72,9 +76,11 @@ export default function ChartCard({ workout, ftp, timeSeries, cues, settings, di
   // Render chart SVG
   useEffect(() => {
     if (!chartRef.current || chartWidth === 0) return;
+    if (fitHeight && chartHeight === 0) return;
     const el = chartRef.current;
     const chart = renderRideDetailChart(timeSeries, ftp, {
       width: chartWidth,
+      height: fitHeight ? chartHeight : undefined,
       durationSeconds: workout.duration_seconds ?? undefined,
       overlays: settings.overlays,
       overlayColors: settings.overlayColors,
@@ -85,17 +91,17 @@ export default function ChartCard({ workout, ftp, timeSeries, cues, settings, di
     }, cues);
     el.replaceChildren(chart);
     return () => { el.replaceChildren(); };
-  }, [timeSeries, ftp, cues, settings, workout.duration_seconds, chartWidth, isPZ]);
+  }, [timeSeries, ftp, cues, settings, workout.duration_seconds, chartWidth, chartHeight, fitHeight, isPZ]);
 
   const st = settings.stats;
   const headerVisible = showHeader ?? settings.showHeader;
   const footerVisible = showFooter ?? true;
 
   return (
-    <div className="select-none rounded-lg border border-gray-200 bg-white p-4">
+    <div className={`select-none rounded-lg border border-gray-200 bg-white p-4${fitHeight ? " flex h-full flex-col" : ""}`}>
       {/* Header */}
       {headerVisible && (
-        <div className="mb-3 flex items-start justify-between">
+        <div className="mb-3 flex shrink-0 items-start justify-between">
           <div>
             <p className="text-sm font-semibold">{workout.title}</p>
             <p className="text-xs text-gray-500">
@@ -111,11 +117,11 @@ export default function ChartCard({ workout, ftp, timeSeries, cues, settings, di
       )}
 
       {/* Chart */}
-      <div ref={chartRef} className="w-full" />
+      <div ref={chartRef} className={`w-full${fitHeight ? " min-h-0 flex-1" : ""}`} />
 
       {/* Footer stats */}
       {footerVisible && (
-        <div className="mt-3 flex flex-wrap justify-center gap-x-6 gap-y-2 border-t border-gray-100 pt-3">
+        <div className="mt-3 flex shrink-0 flex-wrap justify-center gap-x-6 gap-y-2 border-t border-gray-100 pt-3">
           {st.avgPower && <FooterStat label="Avg Power" value={workout.avg_output} unit="w" />}
           {st.totalOutput && <FooterStat label="Total Output" value={workout.total_work != null ? Math.round(workout.total_work / 1000) : null} unit="kj" />}
           {st.calories && <FooterStat label="Calories" value={workout.calories} unit="kcal" />}

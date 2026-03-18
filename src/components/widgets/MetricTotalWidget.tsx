@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import type { DashboardWidget } from "../../types";
 import { getMetricValue } from "../../lib/database";
 import { PREDEFINED_METRICS } from "../../lib/dashboardDefaults";
+import { useWorkoutStore } from "../../stores/workoutStore";
 
 interface Props {
   widget: DashboardWidget;
@@ -11,6 +12,7 @@ interface Props {
 export default function MetricTotalWidget({ widget }: Props) {
   const [value, setValue] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
 
   if (widget.config.type !== "metric_total") return null;
   const { metric, filters, label } = widget.config;
@@ -23,7 +25,7 @@ export default function MetricTotalWidget({ widget }: Props) {
       .then((v) => setValue(v))
       .catch(() => setValue(null))
       .finally(() => setLoading(false));
-  }, [metric, JSON.stringify(filters)]);
+  }, [metric, JSON.stringify(filters), syncGeneration]);
 
   const formatted = value != null && metricDef ? metricDef.format(value) : "—";
 
@@ -34,7 +36,7 @@ export default function MetricTotalWidget({ widget }: Props) {
       ) : (
         <>
           <span className="text-3xl font-bold text-gray-900">{formatted}</span>
-          <span className="mt-1 text-xs text-gray-500">{label || metricDef?.label || metric}</span>
+          <span className="mt-1 text-sm font-medium text-gray-700">{label || metricDef?.label || metric}</span>
         </>
       )}
     </div>

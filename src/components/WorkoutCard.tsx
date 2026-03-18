@@ -118,8 +118,8 @@ export default function WorkoutCard({ workout, isSelected, onClick, sortField, l
       }`}
     >
       {label && (
-        <div className={`px-4 pt-2 text-xs font-medium uppercase tracking-wide ${
-          isSelected ? "text-gray-400" : "text-gray-500"
+        <div className={`px-4 pt-2 text-sm font-medium ${
+          isSelected ? "text-gray-400" : "text-gray-700"
         }`}>
           {label}
         </div>

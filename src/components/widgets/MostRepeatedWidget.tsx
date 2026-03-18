@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import type { DashboardWidget } from "../../types";
 import { getMostRepeatedFilteredWorkouts, type RepeatedRideWorkout } from "../../lib/database";
 import { useNavigationStore } from "../../stores/navigationStore";
+import { useWorkoutStore } from "../../stores/workoutStore";
 import WorkoutCard from "../WorkoutCard";
 
 interface Props {
@@ -13,6 +14,7 @@ export default function MostRepeatedWidget({ widget }: Props) {
   const [rides, setRides] = useState<RepeatedRideWorkout[]>([]);
   const [loading, setLoading] = useState(true);
   const navigateToWorkout = useNavigationStore((s) => s.navigateToWorkout);
+  const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
 
   if (widget.config.type !== "most_repeated") return null;
   const { limit, filters, title } = widget.config;
@@ -23,7 +25,7 @@ export default function MostRepeatedWidget({ widget }: Props) {
       .then((r) => setRides(r))
       .catch(() => setRides([]))
       .finally(() => setLoading(false));
-  }, [limit, JSON.stringify(filters)]);
+  }, [limit, JSON.stringify(filters), syncGeneration]);
 
   if (loading) {
     return (
@@ -35,7 +37,7 @@ export default function MostRepeatedWidget({ widget }: Props) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-2 text-xs font-medium text-gray-500 truncate">
+      <div className="mb-2 text-sm font-medium text-gray-700 truncate">
         {title || "Most Repeated"}
       </div>
 

@@ -4,9 +4,10 @@ import { useClickOutside } from "../lib/hooks";
 interface ShareMenuProps {
   onCopy: () => Promise<void>;
   onSave: () => Promise<void>;
+  compact?: boolean;
 }
 
-export default function ShareMenu({ onCopy, onSave }: ShareMenuProps) {
+export default function ShareMenu({ onCopy, onSave, compact }: ShareMenuProps) {
   const [open, setOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copying" | "copied" | "error">("idle");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,10 +43,13 @@ export default function ShareMenu({ onCopy, onSave }: ShareMenuProps) {
     <div className="relative" ref={containerRef}>
       <button
         onClick={() => setOpen(!open)}
-        className="rounded bg-gray-100 p-1.5 text-gray-600 hover:bg-gray-200"
+        className={compact
+          ? "rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          : "rounded bg-gray-100 p-1.5 text-gray-600 hover:bg-gray-200"
+        }
         title="Share"
       >
-        <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M4 8V13C4 13.5523 4.44772 14 5 14H11C11.5523 14 12 13.5523 12 13V8" />
           <path d="M8 2V10" />
           <path d="M5 5L8 2L11 5" />

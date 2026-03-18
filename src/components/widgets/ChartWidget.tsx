@@ -3,6 +3,7 @@ import type { DashboardWidget, ChartDefinition, Workout, FilterCondition } from 
 import { queryWorkouts, chartFiltersToWorkoutFilters } from "../../lib/database";
 import { isConditionActive } from "../FilterEditors";
 import { useNavigationStore } from "../../stores/navigationStore";
+import { useWorkoutStore } from "../../stores/workoutStore";
 import ChartPlot from "../ChartPlot";
 
 interface Props {
@@ -15,6 +16,7 @@ let condId = 0;
 export default function ChartWidget({ widget }: Props) {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const navigateToFilteredWorkouts = useNavigationStore((s) => s.navigateToFilteredWorkouts);
+  const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
   if (widget.config.type !== "chart") return null;
   const chartConfig = widget.config.chart;
 
@@ -35,7 +37,7 @@ export default function ChartWidget({ widget }: Props) {
     const filters = chartFiltersToWorkoutFilters(conditions);
     const data = await queryWorkouts(filters);
     setWorkouts(data);
-  }, [activeFiltersKey]);
+  }, [activeFiltersKey, syncGeneration]);
 
   useEffect(() => {
     fetchData();

@@ -60,8 +60,8 @@ function buildDefaultInsightsWidgets(): DashboardWidget[] {
     metric: "workout_count",
     color: "#216e39",
     filters: [],
-  }, 0, y, 24, 6));
-  y += 6;
+  }, 0, y, 24, 5));
+  y += 5;
 
   // Section: Personal Records
   widgets.push(makeWidget("section", { type: "section", title: "Personal Records" }, 0, y));
@@ -79,9 +79,9 @@ function buildDefaultInsightsWidgets(): DashboardWidget[] {
       metric: records[i].metric,
       title: records[i].title,
       filters: [],
-    }, i * 6, y, 6, 5));
+    }, i * 8, y, 8, 4));
   }
-  y += 5;
+  y += 4;
 
   // Section: Favorites
   widgets.push(makeWidget("section", { type: "section", title: "Favorites" }, 0, y));

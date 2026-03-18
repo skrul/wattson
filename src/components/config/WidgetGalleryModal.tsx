@@ -38,11 +38,11 @@ function WidgetPreview({ widget }: { widget: DashboardWidget }) {
     case "personal_record":
       return <PersonalRecordWidget widget={widget} />;
     case "activity_grid":
-      return <ActivityGridWidget widget={widget} />;
+      return <ActivityGridWidget widget={widget} preview />;
     case "most_repeated":
       return <MostRepeatedWidget widget={widget} />;
     case "last_workout":
-      return <LastWorkoutWidget widget={widget} />;
+      return <LastWorkoutWidget widget={widget} preview />;
     default:
       return null;
   }
@@ -52,8 +52,8 @@ function WidgetPreview({ widget }: { widget: DashboardWidget }) {
 const CARD_SIZES: Record<WidgetType, { width: string; height: string; cols: string }> = {
   metric_total:    { width: "200px", height: "120px", cols: "repeat(auto-fill, minmax(200px, 1fr))" },
   chart:           { width: "280px", height: "200px", cols: "repeat(auto-fill, minmax(280px, 1fr))" },
-  personal_record: { width: "200px", height: "160px", cols: "repeat(auto-fill, minmax(200px, 1fr))" },
-  activity_grid:   { width: "100%",  height: "140px", cols: "1fr" },
+  personal_record: { width: "280px", height: "140px", cols: "repeat(auto-fill, minmax(280px, 1fr))" },
+  activity_grid:   { width: "100%",  height: "190px", cols: "1fr" },
   most_repeated:   { width: "280px", height: "200px", cols: "repeat(auto-fill, minmax(280px, 1fr))" },
   last_workout:    { width: "280px", height: "200px", cols: "repeat(auto-fill, minmax(280px, 1fr))" },
   section:         { width: "200px", height: "120px", cols: "repeat(auto-fill, minmax(200px, 1fr))" },

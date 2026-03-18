@@ -9,6 +9,7 @@ interface WorkoutState {
   detailTab: DetailTab;
   filters: WorkoutFilters;
   isLoading: boolean;
+  syncGeneration: number;
 
   setWorkouts: (workouts: Workout[]) => void;
   selectWorkout: (id: string | null) => void;
@@ -33,8 +34,9 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
   detailTab: "summary",
   filters: { conditions: [], sort: DEFAULT_SORT, search: "" },
   isLoading: false,
+  syncGeneration: 0,
 
-  setWorkouts: (workouts) => set({ workouts }),
+  setWorkouts: (workouts) => set((state) => ({ workouts, syncGeneration: state.syncGeneration + 1 })),
   selectWorkout: (id) => set({ selectedWorkoutId: id, detailTab: "summary" }),
   setDetailTab: (detailTab) => set({ detailTab }),
   setFilters: (filters) => set({ filters }),

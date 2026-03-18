@@ -12,8 +12,8 @@ export const WIDGET_DEFAULTS: Record<WidgetType, WidgetDefaults> = {
   metric_total: { defaultW: 4, defaultH: 3, minW: 3, minH: 3 },
   last_workout: { defaultW: 12, defaultH: 10, minW: 8, minH: 8 },
   section: { defaultW: 24, defaultH: 2, minW: 8, minH: 2 },
-  activity_grid: { defaultW: 24, defaultH: 6, minW: 12, minH: 4 },
-  personal_record: { defaultW: 6, defaultH: 5, minW: 4, minH: 4 },
+  activity_grid: { defaultW: 24, defaultH: 5, minW: 4, minH: 4 },
+  personal_record: { defaultW: 8, defaultH: 4, minW: 4, minH: 3 },
   most_repeated: { defaultW: 8, defaultH: 8, minW: 6, minH: 6 },
 };
 

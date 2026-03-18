@@ -3,6 +3,7 @@ import type { DashboardWidget, Workout } from "../../types";
 import { getTopFilteredWorkout } from "../../lib/database";
 import { PERSONAL_RECORD_METRICS } from "../../lib/dashboardDefaults";
 import { useNavigationStore } from "../../stores/navigationStore";
+import { useWorkoutStore } from "../../stores/workoutStore";
 import WorkoutCard from "../WorkoutCard";
 
 interface Props {
@@ -14,6 +15,7 @@ export default function PersonalRecordWidget({ widget }: Props) {
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(true);
   const navigateToFilteredWorkouts = useNavigationStore((s) => s.navigateToFilteredWorkouts);
+  const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
 
   if (widget.config.type !== "personal_record") return null;
   const { metric, filters, title } = widget.config;
@@ -26,7 +28,7 @@ export default function PersonalRecordWidget({ widget }: Props) {
       .then((w) => setWorkout(w))
       .catch(() => setWorkout(null))
       .finally(() => setLoading(false));
-  }, [metric, JSON.stringify(filters)]);
+  }, [metric, JSON.stringify(filters), syncGeneration]);
 
   const handleClick = () => {
     navigateToFilteredWorkouts({

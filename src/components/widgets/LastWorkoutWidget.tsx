@@ -1,23 +1,39 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import type { DashboardWidget, Workout, FilterCondition } from "../../types";
 import { queryWorkouts, getDb } from "../../lib/database";
 import { isConditionActive } from "../FilterEditors";
 import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, isPowerZoneRide } from "../../lib/charts";
+import { renderExportPng } from "../../lib/exportUtils";
 import { useShareChartStore, resolveDisplayName } from "../../stores/shareChartStore";
 import { useSessionStore } from "../../stores/sessionStore";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeFile } from "@tauri-apps/plugin-fs";
+import { useWorkoutStore } from "../../stores/workoutStore";
 import ChartCard from "../ChartCard";
+import ShareMenu from "../ShareMenu";
+import { useWidgetToolbarSlot } from "./WidgetToolbarContext";
 
 interface Props {
   widget: DashboardWidget;
   fullscreen?: boolean;
+  preview?: boolean;
 }
 
-export default function LastWorkoutWidget({ widget }: Props) {
+export default function LastWorkoutWidget({ widget, preview }: Props) {
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(true);
+  const toolbarSlotRef = useWidgetToolbarSlot();
+  const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
 
-  const settings = useShareChartStore((s) => s.settings);
+  const chartStyles = useShareChartStore((s) => s.styles);
+  const activeSettings = useShareChartStore((s) => s.settings);
   const userProfile = useSessionStore((s) => s.userProfile);
+
+  if (widget.config.type !== "last_workout") return null;
+  const { title, filters, showHeader: configShowHeader, showFooter: configShowFooter, chartStyleId } = widget.config;
+
+  const settings = (chartStyleId && chartStyles.find((s) => s.id === chartStyleId)?.settings) || activeSettings;
 
   const pelotonUsername = useMemo(() => {
     if (!userProfile?.raw_json) return null;
@@ -25,9 +41,6 @@ export default function LastWorkoutWidget({ widget }: Props) {
   }, [userProfile?.raw_json]);
 
   const displayName = resolveDisplayName(settings, pelotonUsername);
-
-  if (widget.config.type !== "last_workout") return null;
-  const { title, filters, showHeader: configShowHeader, showFooter: configShowFooter } = widget.config;
 
   const activeFiltersKey = useMemo(
     () => JSON.stringify((filters ?? []).filter(isConditionActive)),
@@ -51,7 +64,7 @@ export default function LastWorkoutWidget({ widget }: Props) {
       setWorkout(null);
     }
     setLoading(false);
-  }, [activeFiltersKey]);
+  }, [activeFiltersKey, syncGeneration]);
 
   useEffect(() => {
     fetchWorkout();
@@ -79,6 +92,30 @@ export default function LastWorkoutWidget({ widget }: Props) {
 
   const isPZ = workout ? isPowerZoneRide(workout) : false;
 
+  const filename = workout
+    ? `${workout.title?.replace(/[^a-zA-Z0-9]/g, "-") ?? "workout"}-${workout.id.slice(0, 8)}`
+    : "chart";
+
+  const handleCopy = useCallback(async () => {
+    if (!workout || !timeSeries) return;
+    const blobPromise = renderExportPng(workout, ftp, timeSeries, cues, settings, displayName);
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": blobPromise }),
+    ]);
+  }, [workout, ftp, timeSeries, cues, settings, displayName]);
+
+  const handleSave = useCallback(async () => {
+    if (!workout || !timeSeries) return;
+    const filePath = await save({
+      defaultPath: `${filename}.png`,
+      filters: [{ name: "PNG Image", extensions: ["png"] }],
+    });
+    if (!filePath) return;
+    const blob = await renderExportPng(workout, ftp, timeSeries, cues, settings, displayName);
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    await writeFile(filePath, bytes);
+  }, [workout, ftp, timeSeries, cues, settings, displayName, filename]);
+
   if (loading) {
     return <div className="flex h-full items-center justify-center text-sm text-gray-400">Loading...</div>;
   }
@@ -92,19 +129,26 @@ export default function LastWorkoutWidget({ widget }: Props) {
   }
 
   return (
-    <div className="h-full">
+    <div className="flex h-full flex-col">
       {title && <div className="shrink-0 truncate text-sm font-medium text-gray-700">{title}</div>}
-      <ChartCard
-        workout={workout}
-        ftp={ftp}
-        timeSeries={timeSeries}
-        cues={cues}
-        settings={settings}
-        displayName={displayName}
-        isPZ={isPZ}
-        showHeader={configShowHeader}
-        showFooter={configShowFooter}
-      />
+      <div className="min-h-0 flex-1">
+        <ChartCard
+          workout={workout}
+          ftp={ftp}
+          timeSeries={timeSeries}
+          cues={cues}
+          settings={settings}
+          displayName={displayName}
+          isPZ={isPZ}
+          showHeader={preview ? false : configShowHeader}
+          showFooter={preview ? false : configShowFooter}
+          fitHeight
+        />
+      </div>
+      {toolbarSlotRef?.current && createPortal(
+        <ShareMenu onCopy={handleCopy} onSave={handleSave} compact />,
+        toolbarSlotRef.current,
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { DashboardWidget, LastWorkoutWidgetConfig, FilterCondition } from "../../types";
 import { useDashboardContext } from "../../stores/DashboardContext";
+import { useShareChartStore } from "../../stores/shareChartStore";
 import { FilterBar } from "../ChartFilterBar";
 
 interface Props {
@@ -13,15 +14,19 @@ export default function LastWorkoutConfig({ widget }: Props) {
   const updateWidgetConfig = useStore((s) => s.updateWidgetConfig);
   const cancelConfiguring = useStore((s) => s.cancelConfiguring);
 
+  const chartStyles = useShareChartStore((s) => s.styles);
+  const activeStyleId = useShareChartStore((s) => s.activeStyleId);
+
   const existing = widget?.config.type === "last_workout" ? widget.config : null;
 
   const [title, setTitle] = useState(existing?.title ?? "");
   const [filters, setFilters] = useState<FilterCondition[]>(existing?.filters ?? []);
   const [showHeader, setShowHeader] = useState(existing?.showHeader ?? true);
   const [showFooter, setShowFooter] = useState(existing?.showFooter ?? true);
+  const [chartStyleId, setChartStyleId] = useState(existing?.chartStyleId ?? "");
 
   const handleSave = () => {
-    const config: LastWorkoutWidgetConfig = { type: "last_workout", title, filters, showHeader, showFooter };
+    const config: LastWorkoutWidgetConfig = { type: "last_workout", title, filters, showHeader, showFooter, chartStyleId: chartStyleId || undefined };
 
     if (widget) {
       updateWidgetConfig(widget.id, config);
@@ -78,6 +83,23 @@ export default function LastWorkoutConfig({ widget }: Props) {
             Show footer stats
           </label>
         </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Chart Style</label>
+        <select
+          value={chartStyleId}
+          onChange={(e) => setChartStyleId(e.target.value)}
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        >
+          <option value="">Active style ({chartStyles.find((s) => s.id === activeStyleId)?.name ?? "Default"})</option>
+          {chartStyles.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-gray-500">
+          Chart styles can be configured in the Studio tab.
+        </p>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">

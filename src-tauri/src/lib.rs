@@ -64,7 +64,10 @@ pub fn run() {
                 class_type TEXT,
                 class_type_version INTEGER,
                 class_subtype TEXT,
-                ride_id TEXT
+                ride_id TEXT,
+                detail_fetched_at INTEGER,
+                perf_graph_fetched_at INTEGER,
+                ride_details_fetched_at INTEGER
             );
 
             CREATE TABLE user_profile (
@@ -82,6 +85,9 @@ pub fn run() {
                 group_by TEXT,
                 filters_json TEXT NOT NULL DEFAULT '[]',
                 x_axis_mode TEXT NOT NULL DEFAULT 'date',
+                x_axis_field TEXT,
+                x_axis_sequential INTEGER NOT NULL DEFAULT 0,
+                agg_function TEXT,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
             );
@@ -91,37 +97,7 @@ pub fn run() {
                 value TEXT NOT NULL
             );
 
-            CREATE INDEX idx_workouts_date ON workouts(date);
-            CREATE INDEX idx_workouts_duration ON workouts(duration_seconds);
-            CREATE INDEX idx_workouts_ride_id ON workouts(ride_id);",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 2,
-            description: "add_chart_aggregation_columns",
-            sql: "ALTER TABLE chart_definitions ADD COLUMN x_axis_field TEXT;
-                  ALTER TABLE chart_definitions ADD COLUMN agg_function TEXT;",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 3,
-            description: "add_chart_sequential_column",
-            sql: "ALTER TABLE chart_definitions ADD COLUMN x_axis_sequential INTEGER NOT NULL DEFAULT 0;
-                  UPDATE chart_definitions SET x_axis_sequential = 1, x_axis_mode = 'date' WHERE x_axis_mode = 'workout';",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 4,
-            description: "add_enrichment_timestamps",
-            sql: "ALTER TABLE workouts ADD COLUMN detail_fetched_at INTEGER;
-                  ALTER TABLE workouts ADD COLUMN perf_graph_fetched_at INTEGER;
-                  ALTER TABLE workouts ADD COLUMN ride_details_fetched_at INTEGER;",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 5,
-            description: "create_dashboard_tables",
-            sql: "CREATE TABLE dashboards (
+            CREATE TABLE dashboards (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL DEFAULT 'My Dashboard',
                 created_at INTEGER NOT NULL,
@@ -135,7 +111,11 @@ pub fn run() {
                 config_json TEXT NOT NULL DEFAULT '{}',
                 layout_json TEXT NOT NULL DEFAULT '{}',
                 sort_order INTEGER NOT NULL DEFAULT 0
-            );",
+            );
+
+            CREATE INDEX idx_workouts_date ON workouts(date);
+            CREATE INDEX idx_workouts_duration ON workouts(duration_seconds);
+            CREATE INDEX idx_workouts_ride_id ON workouts(ride_id);",
             kind: MigrationKind::Up,
         },
     ];

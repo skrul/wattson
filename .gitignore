@@ -26,3 +26,6 @@ examples/
 
 # Local Tauri dev config for running a second instance
 src-tauri/tauri.dev2.conf.json
+
+# Claude Code worktrees
+.claude/worktrees/

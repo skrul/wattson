@@ -13,6 +13,7 @@ When working inside a git worktree (`.claude/worktrees/`), follow these rules st
 1. **Never `cd` to the main worktree.** Every git command must run from the worktree directory. The shell working directory must always be inside the worktree (e.g. `.claude/worktrees/<name>/`).
 2. **Create branches in the worktree:** `git checkout -b <name> <base-ref>` — this creates a new branch from any ref and checks it out in the current worktree without touching the main worktree.
 3. **Merge into main:** Use `git -C <main-worktree-path> merge <branch>` — this runs the merge in the main worktree without changing our shell directory.
+4. **Verify before merging:** Before any `git -C <main-worktree-path> merge`, run `git -C <main-worktree-path> rev-parse --abbrev-ref HEAD` and confirm it returns `main`. If it doesn't, stop and alert the user — merging will land on the wrong branch.
 5. **Never check out `main` in the worktree** — it's already checked out in the main worktree and git will refuse.
 6. **Never switch branches in the main worktree** — it should always stay on `main`.
 

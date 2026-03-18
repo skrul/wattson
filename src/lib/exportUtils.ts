@@ -1,4 +1,4 @@
-import { renderRideDetailChart, type InstructorCue } from "./charts";
+import { renderRideDetailChart, isPowerZoneRide, type InstructorCue } from "./charts";
 import type { Workout, PerformanceTimeSeries, ShareChartSettings } from "../types";
 
 /** Render an SVG element to a canvas-drawable image. */
@@ -76,7 +76,7 @@ export async function renderExportPng(
   displayName?: string | null,
 ): Promise<Blob> {
   // Render chart SVG at export width
-  const isPZ = workout.class_type === "Power Zone";
+  const isPZ = isPowerZoneRide(workout);
   const chartEl = renderRideDetailChart(timeSeries, ftp || null, {
     width: CHART_WIDTH,
     height: CHART_HEIGHT,

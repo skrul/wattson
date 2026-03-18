@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import type { DashboardWidget, Workout, FilterCondition } from "../../types";
 import { queryWorkouts, getDb } from "../../lib/database";
 import { isConditionActive } from "../FilterEditors";
-import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset } from "../../lib/charts";
+import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, isPowerZoneRide } from "../../lib/charts";
 import { useShareChartStore, resolveDisplayName } from "../../stores/shareChartStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import ChartCard from "../ChartCard";
@@ -77,7 +77,7 @@ export default function LastWorkoutWidget({ widget }: Props) {
     return parseTargetMetrics(workout.raw_performance_graph_json, offset);
   }, [workout?.raw_performance_graph_json, workout?.raw_ride_details_json]);
 
-  const isPZ = workout?.class_type === "Power Zone";
+  const isPZ = workout ? isPowerZoneRide(workout) : false;
 
   if (loading) {
     return <div className="flex h-full items-center justify-center text-sm text-gray-400">Loading...</div>;

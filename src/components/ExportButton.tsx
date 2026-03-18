@@ -2,7 +2,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import type { InstructorCue } from "../lib/charts";
 import { renderExportPng } from "../lib/exportUtils";
-import type { Workout, PerformanceTimeSeries } from "../types";
+import type { Workout, PerformanceTimeSeries, ShareChartSettings } from "../types";
 import { useShareChartStore } from "../stores/shareChartStore";
 import ShareMenu from "./ShareMenu";
 
@@ -13,10 +13,12 @@ interface ExportButtonProps {
   timeSeries: PerformanceTimeSeries;
   cues?: InstructorCue[] | null;
   displayName?: string | null;
+  settings?: ShareChartSettings;
 }
 
-export default function ExportButton({ filename, workout, ftp, timeSeries, cues, displayName }: ExportButtonProps) {
-  const settings = useShareChartStore((s) => s.settings);
+export default function ExportButton({ filename, workout, ftp, timeSeries, cues, displayName, settings: settingsProp }: ExportButtonProps) {
+  const storeSettings = useShareChartStore((s) => s.settings);
+  const settings = settingsProp ?? storeSettings;
 
   async function handleCopy() {
     const blobPromise = renderExportPng(workout, ftp, timeSeries, cues, settings, displayName);

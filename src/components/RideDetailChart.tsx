@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { Workout } from "../types";
-import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset } from "../lib/charts";
+import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, isPowerZoneRide } from "../lib/charts";
 import { useShareChartStore, resolveDisplayName } from "../stores/shareChartStore";
 import { useSessionStore } from "../stores/sessionStore";
 import ExportButton from "./ExportButton";
@@ -12,8 +12,22 @@ interface RideDetailChartProps {
 }
 
 export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) {
-  const settings = useShareChartStore((s) => s.settings);
+  const styles = useShareChartStore((s) => s.styles);
+  const activeStyleId = useShareChartStore((s) => s.activeStyleId);
   const userProfile = useSessionStore((s) => s.userProfile);
+
+  const [selectedStyleId, setSelectedStyleId] = useState(activeStyleId);
+
+  // Sync when activeStyleId changes externally (e.g. edited in Studio)
+  useEffect(() => {
+    setSelectedStyleId(activeStyleId);
+  }, [activeStyleId]);
+
+  const selectedStyle = useMemo(
+    () => styles.find((s) => s.id === selectedStyleId) ?? styles[0],
+    [styles, selectedStyleId],
+  );
+  const settings = selectedStyle.settings;
 
   const pelotonUsername = useMemo(() => {
     if (!userProfile?.raw_json) return null;
@@ -33,7 +47,7 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
     return parseTargetMetrics(workout.raw_performance_graph_json, offset);
   }, [workout.raw_performance_graph_json, workout.raw_ride_details_json]);
 
-  const isPZ = workout.class_type === "Power Zone";
+  const isPZ = isPowerZoneRide(workout);
 
   if (!timeSeries) return null;
 
@@ -42,7 +56,20 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
   return (
     <div className="mt-6">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700">Shareable Chart</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-gray-700">Shareable Chart</h3>
+          {styles.length > 1 && (
+            <select
+              value={selectedStyleId}
+              onChange={(e) => setSelectedStyleId(e.target.value)}
+              className="rounded border border-gray-300 px-1.5 py-0.5 text-xs"
+            >
+              {styles.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
         <ExportButton
           filename={filename}
           workout={workout}
@@ -50,6 +77,7 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
           timeSeries={timeSeries}
           cues={cues}
           displayName={displayName}
+          settings={settings}
         />
       </div>
 

@@ -1,12 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import type { Workout } from "../types";
 import { getShareableWorkouts } from "../lib/database";
-import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset } from "../lib/charts";
+import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, isPowerZoneRide } from "../lib/charts";
 import { renderExportPng } from "../lib/exportUtils";
 import { cachedFetchWorkoutDetail, cachedFetchPerformanceGraph, cachedFetchRideDetails } from "../lib/enrichmentCache";
-import { updateWorkoutMetrics, updateRideDetails } from "../lib/database";
+import { updateWorkoutMetrics, updateWorkoutDetail, updateRideDetails } from "../lib/database";
 import { useShareChartStore, resolveDisplayName } from "../stores/shareChartStore";
 import { useSessionStore } from "../stores/sessionStore";
 import ShareMenu from "./ShareMenu";
@@ -99,10 +99,21 @@ export default function StudioTab() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const settings = useShareChartStore((s) => s.settings);
+  const styles = useShareChartStore((s) => s.styles);
+  const activeStyleId = useShareChartStore((s) => s.activeStyleId);
+  const setActiveStyle = useShareChartStore((s) => s.setActiveStyle);
+  const createStyle = useShareChartStore((s) => s.createStyle);
+  const duplicateStyle = useShareChartStore((s) => s.duplicateStyle);
+  const renameStyle = useShareChartStore((s) => s.renameStyle);
+  const deleteStyle = useShareChartStore((s) => s.deleteStyle);
   const updateOverlay = useShareChartStore((s) => s.updateOverlay);
   const updateOverlayColor = useShareChartStore((s) => s.updateOverlayColor);
   const updateStat = useShareChartStore((s) => s.updateStat);
   const update = useShareChartStore((s) => s.update);
+
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
   const session = useSessionStore((s) => s.session);
   const userProfile = useSessionStore((s) => s.userProfile);
 
@@ -139,7 +150,7 @@ export default function StudioTab() {
     return parseTargetMetrics(workout.raw_performance_graph_json, offset);
   }, [workout?.raw_performance_graph_json, workout?.raw_ride_details_json]);
 
-  const isPZ = workout?.class_type === "Power Zone";
+  const isPZ = workout ? isPowerZoneRide(workout) : false;
 
   // On-demand enrichment: fetch detail, performance graph, and ride details
   useEffect(() => {
@@ -147,14 +158,15 @@ export default function StudioTab() {
 
     const accessToken = session.accessToken;
     const needsMetrics = workout.raw_performance_graph_json == null;
+    const needsDetail = workout.raw_detail_json == null;
     const needsRideDetails = workout.raw_ride_details_json == null;
-    if (!needsMetrics && !needsRideDetails) return;
+    if (!needsMetrics && !needsDetail && !needsRideDetails) return;
 
     let cancelled = false;
 
     const rideId = workout.ride_id;
 
-    const detailPromise = needsMetrics
+    const detailPromise = needsDetail
       ? cachedFetchWorkoutDetail(workout.id, accessToken).catch(() => null)
       : Promise.resolve(null);
 
@@ -173,12 +185,18 @@ export default function StudioTab() {
 
         if (needsMetrics && perfResult) {
           const { rawJson: rawPerfJson, ...metrics } = perfResult;
-          const rawDetailJson = detailResult?.rawJson ?? null;
-          await updateWorkoutMetrics(workout.id, metrics, rawDetailJson, rawPerfJson);
+          await updateWorkoutMetrics(workout.id, metrics, detailResult?.rawJson ?? null, rawPerfJson);
           Object.assign(patch, metrics, {
-            raw_detail_json: rawDetailJson,
             raw_performance_graph_json: rawPerfJson,
           });
+        }
+
+        if (needsDetail && detailResult) {
+          if (!needsMetrics) {
+            // Detail fetched independently — persist just the detail JSON
+            await updateWorkoutDetail(workout.id, detailResult.rawJson);
+          }
+          patch.raw_detail_json = detailResult.rawJson;
         }
 
         await updateRideDetails(workout.id, rideResult?.rawJson ?? null);
@@ -229,6 +247,76 @@ export default function StudioTab() {
     <div className="flex gap-6">
       {/* Left panel — Controls */}
       <div className="w-64 shrink-0 space-y-5">
+        {/* Chart Style */}
+        <div>
+          <label className="mb-1 block text-xs font-medium uppercase text-gray-500">Chart Style</label>
+          {renamingId ? (
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  if (renameValue.trim()) renameStyle(renamingId, renameValue.trim());
+                  setRenamingId(null);
+                } else if (e.key === "Escape") {
+                  setRenamingId(null);
+                }
+              }}
+              onBlur={() => {
+                if (renameValue.trim()) renameStyle(renamingId, renameValue.trim());
+                setRenamingId(null);
+              }}
+              className="w-full rounded border border-blue-400 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+            />
+          ) : (
+            <select
+              value={activeStyleId}
+              onChange={(e) => setActiveStyle(e.target.value)}
+              className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+            >
+              {styles.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          )}
+          <div className="mt-1.5 flex gap-1">
+            <button
+              onClick={() => createStyle("New Style")}
+              className="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
+              title="New style"
+            >+</button>
+            <button
+              onClick={() => duplicateStyle(activeStyleId, `${styles.find((s) => s.id === activeStyleId)?.name ?? "Style"} Copy`)}
+              className="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50"
+              title="Duplicate"
+            >Dup</button>
+            <button
+              onClick={() => {
+                const style = styles.find((s) => s.id === activeStyleId);
+                if (!style || activeStyleId === "default") return;
+                setRenameValue(style.name);
+                setRenamingId(activeStyleId);
+                setTimeout(() => renameInputRef.current?.select(), 0);
+              }}
+              disabled={activeStyleId === "default"}
+              className="rounded border border-gray-300 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+              title="Rename"
+            >Rename</button>
+            <button
+              onClick={() => {
+                if (activeStyleId === "default") return;
+                const style = styles.find((s) => s.id === activeStyleId);
+                if (style && window.confirm(`Delete "${style.name}"?`)) deleteStyle(activeStyleId);
+              }}
+              disabled={activeStyleId === "default"}
+              className="rounded border border-gray-300 px-2 py-0.5 text-xs text-red-500 hover:bg-red-50 disabled:opacity-40"
+              title="Delete"
+            >Del</button>
+          </div>
+        </div>
+
         {/* Workout picker */}
         <div>
           <label className="mb-1 block text-xs font-medium uppercase text-gray-500">Workout</label>

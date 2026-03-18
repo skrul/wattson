@@ -270,8 +270,10 @@ export async function updateWorkoutMetrics(
   await d.execute(
     `UPDATE workouts SET calories=$1, distance=$2, avg_output=$3, avg_cadence=$4,
      avg_resistance=$5, avg_speed=$6, avg_heart_rate=$7,
-     raw_detail_json=$8, raw_performance_graph_json=$9,
-     detail_fetched_at=$10, perf_graph_fetched_at=$11
+     raw_detail_json=COALESCE($8, raw_detail_json),
+     raw_performance_graph_json=COALESCE($9, raw_performance_graph_json),
+     detail_fetched_at=CASE WHEN $8 IS NOT NULL THEN $10 ELSE detail_fetched_at END,
+     perf_graph_fetched_at=CASE WHEN $9 IS NOT NULL THEN $11 ELSE perf_graph_fetched_at END
      WHERE id=$12`,
     [
       metrics.calories, metrics.distance, metrics.avg_output, metrics.avg_cadence,
@@ -279,6 +281,16 @@ export async function updateWorkoutMetrics(
       rawDetailJson, rawPerformanceGraphJson,
       now, now, workoutId,
     ],
+  );
+}
+
+/** Update only the workout detail JSON (for FTP info). */
+export async function updateWorkoutDetail(workoutId: string, rawDetailJson: string): Promise<void> {
+  const d = await getDb();
+  const now = Math.floor(Date.now() / 1000);
+  await d.execute(
+    `UPDATE workouts SET raw_detail_json=$1, detail_fetched_at=$2 WHERE id=$3`,
+    [rawDetailJson, now, workoutId],
   );
 }
 

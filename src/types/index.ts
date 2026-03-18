@@ -156,6 +156,18 @@ export interface ShareChartSettings {
   };
 }
 
+export interface ChartStyle {
+  id: string;
+  name: string;
+  settings: ShareChartSettings;
+}
+
+export interface ChartStylesData {
+  version: 2;
+  activeStyleId: string;
+  styles: ChartStyle[];
+}
+
 /** Row shape as stored in SQLite (JSON fields are strings). */
 export interface ChartDefinitionRow {
   id: string;

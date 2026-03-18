@@ -60,6 +60,22 @@ export function parsePerformanceGraph(rawJson: string): PerformanceTimeSeries | 
 }
 
 /**
+ * Check if a workout is a Power Zone ride.
+ * Prefers `is_power_zone_ride` from ride details (available after enrichment),
+ * falls back to title-based `class_type` before enrichment.
+ */
+export function isPowerZoneRide(workout: { class_type: string | null; raw_ride_details_json: string | null }): boolean {
+  if (workout.class_type === "Power Zone") return true;
+  if (workout.raw_ride_details_json) {
+    try {
+      const data = JSON.parse(workout.raw_ride_details_json);
+      if (data.is_power_zone_class === true) return true;
+    } catch { /* fall through */ }
+  }
+  return false;
+}
+
+/**
  * Extract the pedaling start offset from raw ride details JSON.
  * This is the number of seconds from ride/video start until pedaling begins.
  */

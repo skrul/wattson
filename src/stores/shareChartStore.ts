@@ -1,8 +1,9 @@
 import { create } from "zustand";
-import type { ShareChartSettings } from "../types";
+import type { ShareChartSettings, ChartStyle, ChartStylesData } from "../types";
 import { getSetting, setSetting } from "../lib/database";
 
 const SETTINGS_KEY = "share_chart_settings";
+const DEFAULT_STYLE_ID = "default";
 
 const DEFAULT_SETTINGS: ShareChartSettings = {
   overlays: {
@@ -55,7 +56,26 @@ function deepMerge(defaults: ShareChartSettings, partial: Partial<ShareChartSett
   };
 }
 
+function makeDefaultStyle(): ChartStyle {
+  return { id: DEFAULT_STYLE_ID, name: "Default", settings: { ...DEFAULT_SETTINGS, overlays: { ...DEFAULT_SETTINGS.overlays }, overlayColors: { ...DEFAULT_SETTINGS.overlayColors }, stats: { ...DEFAULT_SETTINGS.stats } } };
+}
+
+function generateId(): string {
+  return crypto.randomUUID();
+}
+
+function cloneSettings(s: ShareChartSettings): ShareChartSettings {
+  return {
+    ...s,
+    overlays: { ...s.overlays },
+    overlayColors: { ...s.overlayColors },
+    stats: { ...s.stats },
+  };
+}
+
 interface ShareChartState {
+  styles: ChartStyle[];
+  activeStyleId: string;
   settings: ShareChartSettings;
   loaded: boolean;
   load: () => Promise<void>;
@@ -63,9 +83,32 @@ interface ShareChartState {
   updateOverlay: (key: keyof ShareChartSettings["overlays"], value: boolean) => void;
   updateOverlayColor: (key: keyof ShareChartSettings["overlayColors"], value: string) => void;
   updateStat: (key: keyof ShareChartSettings["stats"], value: boolean) => void;
+  createStyle: (name: string) => string;
+  duplicateStyle: (sourceId: string, name: string) => string;
+  renameStyle: (id: string, name: string) => void;
+  deleteStyle: (id: string) => void;
+  setActiveStyle: (id: string) => void;
+}
+
+function getActiveSettings(styles: ChartStyle[], activeStyleId: string): ShareChartSettings {
+  const style = styles.find((s) => s.id === activeStyleId);
+  return style ? style.settings : styles[0].settings;
+}
+
+function persist(state: { styles: ChartStyle[]; activeStyleId: string }) {
+  const data: ChartStylesData = {
+    version: 2,
+    activeStyleId: state.activeStyleId,
+    styles: state.styles,
+  };
+  setSetting(SETTINGS_KEY, JSON.stringify(data)).catch((e) =>
+    console.error("Failed to save share chart settings:", e),
+  );
 }
 
 export const useShareChartStore = create<ShareChartState>((set, get) => ({
+  styles: [makeDefaultStyle()],
+  activeStyleId: DEFAULT_STYLE_ID,
   settings: DEFAULT_SETTINGS,
   loaded: false,
 
@@ -73,8 +116,23 @@ export const useShareChartStore = create<ShareChartState>((set, get) => ({
     try {
       const raw = await getSetting(SETTINGS_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as Partial<ShareChartSettings>;
-        set({ settings: deepMerge(DEFAULT_SETTINGS, parsed), loaded: true });
+        const parsed = JSON.parse(raw);
+        if (parsed.version === 2) {
+          const data = parsed as ChartStylesData;
+          const styles = data.styles.map((s) => ({
+            ...s,
+            settings: deepMerge(DEFAULT_SETTINGS, s.settings),
+          }));
+          const activeStyleId = styles.find((s) => s.id === data.activeStyleId) ? data.activeStyleId : styles[0].id;
+          set({ styles, activeStyleId, settings: getActiveSettings(styles, activeStyleId), loaded: true });
+        } else {
+          // v1: old single-settings format — migrate
+          const oldSettings = deepMerge(DEFAULT_SETTINGS, parsed as Partial<ShareChartSettings>);
+          const defaultStyle: ChartStyle = { id: DEFAULT_STYLE_ID, name: "Default", settings: oldSettings };
+          const state = { styles: [defaultStyle], activeStyleId: DEFAULT_STYLE_ID };
+          set({ ...state, settings: oldSettings, loaded: true });
+          persist(state);
+        }
       } else {
         set({ loaded: true });
       }
@@ -85,12 +143,13 @@ export const useShareChartStore = create<ShareChartState>((set, get) => ({
   },
 
   update: (patch) => {
-    const current = get().settings;
-    const next = deepMerge(current, patch);
-    set({ settings: next });
-    setSetting(SETTINGS_KEY, JSON.stringify(next)).catch((e) =>
-      console.error("Failed to save share chart settings:", e),
+    const { styles, activeStyleId } = get();
+    const next = styles.map((s) =>
+      s.id === activeStyleId ? { ...s, settings: deepMerge(s.settings, patch) } : s,
     );
+    const settings = getActiveSettings(next, activeStyleId);
+    set({ styles: next, settings });
+    persist({ styles: next, activeStyleId });
   },
 
   updateOverlay: (key, value) => {
@@ -106,6 +165,52 @@ export const useShareChartStore = create<ShareChartState>((set, get) => ({
   updateStat: (key, value) => {
     const { settings, update } = get();
     update({ stats: { ...settings.stats, [key]: value } });
+  },
+
+  createStyle: (name) => {
+    const id = generateId();
+    const newStyle: ChartStyle = { id, name, settings: cloneSettings(DEFAULT_SETTINGS) };
+    const { styles } = get();
+    const next = [...styles, newStyle];
+    set({ styles: next, activeStyleId: id, settings: newStyle.settings });
+    persist({ styles: next, activeStyleId: id });
+    return id;
+  },
+
+  duplicateStyle: (sourceId, name) => {
+    const { styles } = get();
+    const source = styles.find((s) => s.id === sourceId);
+    if (!source) return sourceId;
+    const id = generateId();
+    const newStyle: ChartStyle = { id, name, settings: cloneSettings(source.settings) };
+    const next = [...styles, newStyle];
+    set({ styles: next, activeStyleId: id, settings: newStyle.settings });
+    persist({ styles: next, activeStyleId: id });
+    return id;
+  },
+
+  renameStyle: (id, name) => {
+    if (id === DEFAULT_STYLE_ID) return;
+    const { styles, activeStyleId } = get();
+    const next = styles.map((s) => (s.id === id ? { ...s, name } : s));
+    set({ styles: next });
+    persist({ styles: next, activeStyleId });
+  },
+
+  deleteStyle: (id) => {
+    if (id === DEFAULT_STYLE_ID) return;
+    const { styles, activeStyleId } = get();
+    const next = styles.filter((s) => s.id !== id);
+    const newActiveId = id === activeStyleId ? DEFAULT_STYLE_ID : activeStyleId;
+    set({ styles: next, activeStyleId: newActiveId, settings: getActiveSettings(next, newActiveId) });
+    persist({ styles: next, activeStyleId: newActiveId });
+  },
+
+  setActiveStyle: (id) => {
+    const { styles } = get();
+    if (!styles.find((s) => s.id === id)) return;
+    set({ activeStyleId: id, settings: getActiveSettings(styles, id) });
+    persist({ styles, activeStyleId: id });
   },
 }));
 

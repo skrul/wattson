@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import type { DashboardWidget, Workout, FilterCondition } from "../../types";
 import { queryWorkouts, getDb } from "../../lib/database";
 import { isConditionActive } from "../FilterEditors";
-import { parsePerformanceGraph, parseInstructorCues, renderRideDetailChart } from "../../lib/charts";
+import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, renderRideDetailChart } from "../../lib/charts";
 
 interface Props {
   widget: DashboardWidget;
@@ -51,9 +51,10 @@ export default function LastWorkoutWidget({ widget }: Props) {
   }, [workout?.raw_performance_graph_json]);
 
   const cues = useMemo(() => {
-    if (!workout?.raw_ride_details_json) return null;
-    return parseInstructorCues(workout.raw_ride_details_json);
-  }, [workout?.raw_ride_details_json]);
+    if (!workout?.raw_performance_graph_json) return null;
+    const offset = parsePedalingStartOffset(workout.raw_ride_details_json);
+    return parseTargetMetrics(workout.raw_performance_graph_json, offset);
+  }, [workout?.raw_performance_graph_json, workout?.raw_ride_details_json]);
 
   useEffect(() => {
     if (!chartRef.current || !timeSeries || !workout) return;

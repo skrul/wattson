@@ -9,6 +9,8 @@ interface ChartPlotProps {
   height?: number;
   /** Fill the parent's dimensions via ResizeObserver */
   fillContainer?: boolean;
+  /** Callback when a category bar is clicked (label is the raw category value) */
+  onCategoryClick?: (label: string) => void;
 }
 
 function useContainerSize(ref: React.RefObject<HTMLDivElement | null>, enabled: boolean) {
@@ -34,7 +36,7 @@ function useContainerSize(ref: React.RefObject<HTMLDivElement | null>, enabled: 
   return size;
 }
 
-export default function ChartPlot({ chart, workouts, width, height = 400, fillContainer }: ChartPlotProps) {
+export default function ChartPlot({ chart, workouts, width, height = 400, fillContainer, onCategoryClick }: ChartPlotProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const containerSize = useContainerSize(containerRef, !!fillContainer);
 
@@ -64,9 +66,9 @@ export default function ChartPlot({ chart, workouts, width, height = 400, fillCo
     const h = fillContainer ? (containerSize.h || height) : height;
     if (w <= 0 || h <= 0) return;
 
-    const svg = renderCustomChart(workouts, chart, w, h);
+    const svg = renderCustomChart(workouts, chart, w, h, onCategoryClick);
     el.replaceChildren(svg);
-  }, [chart, workouts, width, height, fillContainer, containerSize, ownWidth]);
+  }, [chart, workouts, width, height, fillContainer, containerSize, ownWidth, onCategoryClick]);
 
   if (chart.y_fields.length === 0) {
     return (

@@ -1,20 +1,23 @@
 import type { DashboardWidget } from "../../types";
-import { useDashboardStore } from "../../stores/dashboardStore";
+import { useDashboardContext } from "../../stores/DashboardContext";
 import ChartWidget from "./ChartWidget";
 import MetricTotalWidget from "./MetricTotalWidget";
 import LastWorkoutWidget from "./LastWorkoutWidget";
 import SectionWidget from "./SectionWidget";
 import ActivityGridWidget from "./ActivityGridWidget";
+import PersonalRecordWidget from "./PersonalRecordWidget";
+import MostRepeatedWidget from "./MostRepeatedWidget";
 
 interface Props {
   widget: DashboardWidget;
 }
 
 export default function WidgetWrapper({ widget }: Props) {
-  const mode = useDashboardStore((s) => s.mode);
-  const removeWidget = useDashboardStore((s) => s.removeWidget);
-  const expandWidget = useDashboardStore((s) => s.expandWidget);
-  const startConfiguring = useDashboardStore((s) => s.startConfiguring);
+  const useStore = useDashboardContext();
+  const mode = useStore((s) => s.mode);
+  const removeWidget = useStore((s) => s.removeWidget);
+  const expandWidget = useStore((s) => s.expandWidget);
+  const startConfiguring = useStore((s) => s.startConfiguring);
 
   const isSection = widget.config.type === "section";
 
@@ -77,12 +80,14 @@ export default function WidgetWrapper({ widget }: Props) {
       </div>
 
       {/* Widget content — fills entire card */}
-      <div className="h-full overflow-hidden rounded-lg p-3">
+      <div className="h-full rounded-lg p-3">
         {widget.config.type === "chart" && <ChartWidget widget={widget} />}
         {widget.config.type === "metric_total" && <MetricTotalWidget widget={widget} />}
         {widget.config.type === "last_workout" && <LastWorkoutWidget widget={widget} />}
         {widget.config.type === "section" && <SectionWidget widget={widget} />}
         {widget.config.type === "activity_grid" && <ActivityGridWidget widget={widget} />}
+        {widget.config.type === "personal_record" && <PersonalRecordWidget widget={widget} />}
+        {widget.config.type === "most_repeated" && <MostRepeatedWidget widget={widget} />}
       </div>
     </div>
   );

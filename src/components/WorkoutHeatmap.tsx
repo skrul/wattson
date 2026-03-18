@@ -42,8 +42,7 @@ export default function WorkoutHeatmap({ refreshKey }: { refreshKey: number }) {
     const el = containerRef.current;
     if (!el || !data) return;
 
-    const w = el.clientWidth || 800;
-    const svg = renderWorkoutHeatmap(data, w, 160, handleDayClick);
+    const svg = renderWorkoutHeatmap(data, handleDayClick);
     el.replaceChildren(svg);
   }, [data, handleDayClick]);
 

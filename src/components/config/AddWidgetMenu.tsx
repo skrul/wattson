@@ -1,5 +1,5 @@
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
-import { useDashboardStore } from "../../stores/dashboardStore";
+import { useDashboardContext } from "../../stores/DashboardContext";
 import type { WidgetType } from "../../types";
 
 const WIDGET_TYPES: { type: WidgetType; label: string; description: string }[] = [
@@ -7,11 +7,14 @@ const WIDGET_TYPES: { type: WidgetType; label: string; description: string }[] =
   { type: "chart", label: "Chart", description: "Custom chart with the chart builder" },
   { type: "last_workout", label: "Last Workout", description: "Performance chart for the most recent matching workout" },
   { type: "activity_grid", label: "Activity Grid", description: "GitHub-style heatmap of daily activity" },
+  { type: "personal_record", label: "Personal Record", description: "Top workout for a metric" },
+  { type: "most_repeated", label: "Most Repeated", description: "Rides you've taken multiple times" },
   { type: "section", label: "Section", description: "Full-width separator to organize widgets" },
 ];
 
 export default function AddWidgetMenu({ primary }: { primary?: boolean }) {
-  const startAddingWidget = useDashboardStore((s) => s.startAddingWidget);
+  const useStore = useDashboardContext();
+  const startAddingWidget = useStore((s) => s.startAddingWidget);
 
   const buttonClass = primary
     ? "inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"

@@ -174,7 +174,7 @@ export interface ChartDefinitionRow {
 
 // --- Dashboard definitions ---
 
-export type WidgetType = "chart" | "metric_total" | "last_workout" | "section" | "activity_grid";
+export type WidgetType = "chart" | "metric_total" | "last_workout" | "section" | "activity_grid" | "personal_record" | "most_repeated";
 
 export interface WidgetLayout {
   x: number; y: number; w: number; h: number;
@@ -214,7 +214,21 @@ export interface ActivityGridWidgetConfig {
   filters: FilterCondition[];
 }
 
-export type WidgetConfig = ChartWidgetConfig | MetricTotalWidgetConfig | LastWorkoutWidgetConfig | SectionWidgetConfig | ActivityGridWidgetConfig;
+export interface PersonalRecordWidgetConfig {
+  type: "personal_record";
+  title: string;
+  metric: string;
+  filters: FilterCondition[];
+}
+
+export interface MostRepeatedWidgetConfig {
+  type: "most_repeated";
+  title: string;
+  limit: number;
+  filters: FilterCondition[];
+}
+
+export type WidgetConfig = ChartWidgetConfig | MetricTotalWidgetConfig | LastWorkoutWidgetConfig | SectionWidgetConfig | ActivityGridWidgetConfig | PersonalRecordWidgetConfig | MostRepeatedWidgetConfig;
 
 export interface DashboardWidget {
   id: string;

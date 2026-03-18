@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { DashboardWidget, LastWorkoutWidgetConfig, FilterCondition } from "../../types";
+import type { DashboardWidget, MostRepeatedWidgetConfig, FilterCondition } from "../../types";
 import { useDashboardContext } from "../../stores/DashboardContext";
 import { FilterBar } from "../ChartFilterBar";
 
@@ -7,26 +7,30 @@ interface Props {
   widget: DashboardWidget | null;
 }
 
-export default function LastWorkoutConfig({ widget }: Props) {
+export default function MostRepeatedConfig({ widget }: Props) {
   const useStore = useDashboardContext();
   const addWidget = useStore((s) => s.addWidget);
   const updateWidgetConfig = useStore((s) => s.updateWidgetConfig);
   const cancelConfiguring = useStore((s) => s.cancelConfiguring);
 
-  const existing = widget?.config.type === "last_workout" ? widget.config : null;
+  const existing = widget?.config.type === "most_repeated" ? widget.config : null;
 
   const [title, setTitle] = useState(existing?.title ?? "");
+  const [limit, setLimit] = useState(existing?.limit ?? 10);
   const [filters, setFilters] = useState<FilterCondition[]>(existing?.filters ?? []);
-  const [showHeader, setShowHeader] = useState(existing?.showHeader ?? true);
-  const [showFooter, setShowFooter] = useState(existing?.showFooter ?? true);
 
   const handleSave = () => {
-    const config: LastWorkoutWidgetConfig = { type: "last_workout", title, filters, showHeader, showFooter };
+    const config: MostRepeatedWidgetConfig = {
+      type: "most_repeated",
+      title: title || "Most Repeated",
+      limit: Math.max(1, Math.min(50, limit)),
+      filters,
+    };
 
     if (widget) {
       updateWidgetConfig(widget.id, config);
     } else {
-      addWidget("last_workout", config);
+      addWidget("most_repeated", config);
     }
   };
 
@@ -38,46 +42,31 @@ export default function LastWorkoutConfig({ widget }: Props) {
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Last Workout"
+          placeholder="Most Repeated"
           className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
         />
       </div>
 
       <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Number of rides</label>
+        <input
+          type="number"
+          value={limit}
+          onChange={(e) => setLimit(Number(e.target.value))}
+          min={1}
+          max={50}
+          className="w-32 rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        />
+      </div>
+
+      <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Filters (optional)</label>
-        <p className="mb-2 text-xs text-gray-500">
-          Shows the most recent workout matching these filters. Leave empty to show the latest workout overall.
-        </p>
         <FilterBar
           filters={filters}
           onAdd={(c) => setFilters((prev) => [...prev, c])}
           onUpdate={(id, updates) => setFilters((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)))}
           onRemove={(id) => setFilters((prev) => prev.filter((c) => c.id !== id))}
         />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Display Options</label>
-        <div className="space-y-1">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={showHeader}
-              onChange={(e) => setShowHeader(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-gray-300"
-            />
-            Show header (title, instructor, date)
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={showFooter}
-              onChange={(e) => setShowFooter(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-gray-300"
-            />
-            Show footer stats
-          </label>
-        </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">

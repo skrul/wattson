@@ -1,6 +1,6 @@
 import { GridLayout, verticalCompactor, useContainerWidth, type Layout, type LayoutItem } from "react-grid-layout";
 import type { Dashboard } from "../types";
-import { useDashboardStore } from "../stores/dashboardStore";
+import { useDashboardContext } from "../stores/DashboardContext";
 import { WIDGET_DEFAULTS } from "../lib/dashboardDefaults";
 import WidgetWrapper from "./widgets/WidgetWrapper";
 import AddWidgetMenu from "./config/AddWidgetMenu";
@@ -10,10 +10,11 @@ interface Props {
 }
 
 export default function DashboardGrid({ dashboard }: Props) {
-  const mode = useDashboardStore((s) => s.mode);
-  const enterEditMode = useDashboardStore((s) => s.enterEditMode);
-  const exitEditMode = useDashboardStore((s) => s.exitEditMode);
-  const updateLayouts = useDashboardStore((s) => s.updateLayouts);
+  const useStore = useDashboardContext();
+  const mode = useStore((s) => s.mode);
+  const enterEditMode = useStore((s) => s.enterEditMode);
+  const exitEditMode = useStore((s) => s.exitEditMode);
+  const updateLayouts = useStore((s) => s.updateLayouts);
 
   const { width, containerRef } = useContainerWidth({ initialWidth: 1200 });
 

@@ -704,21 +704,27 @@ export async function getDailyMetricValues(
   const agg = DAILY_METRIC_SQL[metric];
   if (!agg) throw new Error(`Unknown daily metric "${metric}"`);
 
-  const sinceTs = Math.floor(Date.now() / 1000) - days * 86400;
-  const params: unknown[] = [sinceTs];
-  const idx = { val: 2 };
-  const clauses: string[] = ["date >= $1"];
+  const params: unknown[] = [];
+  const idx = { val: 1 };
+  const clauses: string[] = [];
+
+  if (days > 0) {
+    const sinceTs = Math.floor(Date.now() / 1000) - days * 86400;
+    params.push(sinceTs);
+    idx.val = 2;
+    clauses.push("date >= $1");
+  }
 
   for (const cond of filters) {
     const clause = buildConditionClause(cond, params, idx);
     if (clause) clauses.push(clause);
   }
 
-  const where = clauses.join(" AND ");
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
   const d = await getDb();
   return d.select<DailyMetricValue[]>(
     `SELECT date(date, 'unixepoch', 'localtime') as workout_date, ${agg} as value
-     FROM workouts WHERE ${where}
+     FROM workouts ${where}
      GROUP BY workout_date ORDER BY workout_date ASC`,
     params,
   );

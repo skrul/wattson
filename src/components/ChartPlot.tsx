@@ -38,6 +38,7 @@ function useContainerSize(ref: React.RefObject<HTMLDivElement | null>, enabled: 
 
 export default function ChartPlot({ chart, workouts, width, height = 400, fillContainer, onCategoryClick }: ChartPlotProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<HTMLDivElement>(null);
   const containerSize = useContainerSize(containerRef, !!fillContainer);
 
   // For non-fillContainer mode, observe own width only
@@ -54,37 +55,34 @@ export default function ChartPlot({ chart, workouts, width, height = 400, fillCo
   }, [fillContainer]);
 
   useEffect(() => {
-    const el = containerRef.current;
+    const el = svgRef.current;
     if (!el) return;
 
-    if (chart.y_fields.length === 0 || workouts.length === 0) {
-      el.replaceChildren();
-      return;
-    }
-
-    const w = width ?? ((fillContainer ? containerSize.w : ownWidth) || (el.clientWidth || 800));
-    const h = fillContainer ? (containerSize.h || height) : height;
+    const w = width ?? ((fillContainer ? containerSize.w : ownWidth) || (containerRef.current?.clientWidth || 800));
+    const h = fillContainer ? containerSize.h : height;
     if (w <= 0 || h <= 0) return;
 
     const svg = renderCustomChart(workouts, chart, w, h, onCategoryClick);
+    svg.style.overflow = "visible";
     el.replaceChildren(svg);
   }, [chart, workouts, width, height, fillContainer, containerSize, ownWidth, onCategoryClick]);
 
-  if (chart.y_fields.length === 0) {
-    return (
-      <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-400">
-        Select at least one Y-axis field to preview
-      </div>
-    );
-  }
+  const hasFields = chart.y_fields.length > 0;
+  const hasData = workouts.length > 0;
 
-  if (workouts.length === 0) {
-    return (
-      <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-400">
-        No matching workouts
-      </div>
-    );
-  }
-
-  return <div ref={containerRef} className="h-full w-full overflow-hidden" />;
+  return (
+    <div ref={containerRef} className="h-full w-full">
+      {!hasFields ? (
+        <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-400">
+          Select at least one Y-axis field to preview
+        </div>
+      ) : !hasData ? (
+        <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-400">
+          No matching workouts
+        </div>
+      ) : (
+        <div ref={svgRef} className="h-full w-full" />
+      )}
+    </div>
+  );
 }

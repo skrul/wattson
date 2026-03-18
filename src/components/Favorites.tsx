@@ -1,98 +1,96 @@
-import { useEffect, useState } from "react";
-import {
-  getTopInstructors,
-  getTopClassTypes,
-  type InstructorCount,
-  type ClassTypeCount,
-} from "../lib/database";
+import { useEffect, useState, useCallback } from "react";
+import { queryWorkouts } from "../lib/database";
 import { useNavigationStore } from "../stores/navigationStore";
-import type { FilterCondition } from "../types";
+import type { ChartDefinition, FilterCondition, Workout } from "../types";
+import ChartPlot from "./ChartPlot";
 
 let condId = 0;
 function mkCondition(field: string, values: string[]): FilterCondition {
   return { id: `fav-${condId++}`, field, operator: "equals", value: "", values };
 }
 
+const INSTRUCTOR_CHART: ChartDefinition = {
+  id: "fav-instructors",
+  name: "",
+  mark_type: "bar",
+  x_axis_mode: "category",
+  x_axis_field: "instructor",
+  x_axis_sequential: false,
+  agg_function: "count",
+  y_fields: [{ field: "avg_output", side: "left" }],
+  group_by: null,
+  filters: [],
+  created_at: 0,
+  updated_at: 0,
+};
+
+const CLASS_TYPE_CHART: ChartDefinition = {
+  id: "fav-class-types",
+  name: "",
+  mark_type: "bar",
+  x_axis_mode: "category",
+  x_axis_field: "class_type",
+  x_axis_sequential: false,
+  agg_function: "count",
+  y_fields: [{ field: "avg_output", side: "left" }],
+  group_by: null,
+  filters: [],
+  created_at: 0,
+  updated_at: 0,
+};
+
 export default function Favorites({ refreshKey }: { refreshKey: number }) {
-  const [instructors, setInstructors] = useState<InstructorCount[]>([]);
-  const [classTypes, setClassTypes] = useState<ClassTypeCount[]>([]);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
   const navigateToFilteredWorkouts = useNavigationStore((s) => s.navigateToFilteredWorkouts);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      getTopInstructors(5),
-      getTopClassTypes(5),
-    ]).then(([ins, cts]) => {
+    queryWorkouts({ conditions: [], sort: { field: "date", direction: "asc" }, search: "" }).then((rows) => {
       if (!cancelled) {
-        setInstructors(ins);
-        setClassTypes(cts);
+        setWorkouts(rows);
         setLoading(false);
       }
     });
     return () => { cancelled = true; };
   }, [refreshKey]);
 
+  const onInstructorClick = useCallback((label: string) => {
+    navigateToFilteredWorkouts({
+      workoutId: "",
+      conditions: [mkCondition("instructor", [label])],
+      sort: { field: "date", direction: "desc" },
+    });
+  }, [navigateToFilteredWorkouts]);
+
+  const onClassTypeClick = useCallback((label: string) => {
+    navigateToFilteredWorkouts({
+      workoutId: "",
+      conditions: [mkCondition("class_type", [label])],
+      sort: { field: "date", direction: "desc" },
+    });
+  }, [navigateToFilteredWorkouts]);
+
   if (loading) {
     return <p className="text-sm text-gray-400">Loading favorites...</p>;
   }
 
-  const hasData = instructors.length > 0 || classTypes.length > 0;
-  if (!hasData) {
+  if (workouts.length === 0) {
     return null;
   }
 
   return (
     <section>
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Favorites</h2>
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {instructors.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Top Instructors</h3>
-            <ul className="space-y-1">
-              {instructors.map((ins) => (
-                <li key={ins.instructor} className="flex justify-between text-sm">
-                  <button
-                    className="text-blue-600 hover:underline"
-                    onClick={() => navigateToFilteredWorkouts({
-                      workoutId: "",
-                      conditions: [mkCondition("instructor", [ins.instructor])],
-                      sort: { field: "date", direction: "desc" },
-                    })}
-                  >
-                    {ins.instructor}
-                  </button>
-                  <span className="text-gray-400">{ins.count}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {classTypes.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Top Class Types</h3>
-            <ul className="space-y-1">
-              {classTypes.map((ct) => (
-                <li key={ct.class_type} className="flex justify-between text-sm">
-                  <button
-                    className="text-blue-600 hover:underline"
-                    onClick={() => navigateToFilteredWorkouts({
-                      workoutId: "",
-                      conditions: [mkCondition("class_type", [ct.class_type])],
-                      sort: { field: "date", direction: "desc" },
-                    })}
-                  >
-                    {ct.class_type}
-                  </button>
-                  <span className="text-gray-400">{ct.count}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div>
+          <h3 className="text-sm font-medium text-gray-500 mb-2">Top Instructors</h3>
+          <ChartPlot chart={INSTRUCTOR_CHART} workouts={workouts} height={250} onCategoryClick={onInstructorClick} />
+        </div>
+        <div>
+          <h3 className="text-sm font-medium text-gray-500 mb-2">Top Class Types</h3>
+          <ChartPlot chart={CLASS_TYPE_CHART} workouts={workouts} height={250} onCategoryClick={onClassTypeClick} />
+        </div>
       </div>
     </section>
   );

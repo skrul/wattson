@@ -1455,9 +1455,24 @@ export function renderCustomChart(
   chart: ChartDefinition,
   width = 800,
   height = 400,
+  onCategoryClick?: (label: string) => void,
 ): SVGElement | HTMLElement {
   if (chart.y_fields.length >= 2) {
     return renderDualAxisChart(workouts, chart, width, height);
   }
-  return renderSingleAxisChart(workouts, chart, width, height);
+  const svg = renderSingleAxisChart(workouts, chart, width, height);
+
+  if (onCategoryClick && chart.x_axis_mode === "category" && chart.mark_type === "bar") {
+    const data = prepareChartData(workouts, chart);
+    const rects = svg.querySelectorAll('[aria-label="bar"] rect');
+    rects.forEach((rect, i) => {
+      const d = data[i];
+      if (d && d.label) {
+        (rect as SVGRectElement).style.cursor = "pointer";
+        rect.addEventListener("click", () => onCategoryClick(d.label!));
+      }
+    });
+  }
+
+  return svg;
 }

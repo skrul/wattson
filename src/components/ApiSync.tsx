@@ -48,6 +48,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const userProfile = useSessionStore((s) => s.userProfile);
   const sessionLogin = useSessionStore((s) => s.login);
   const sessionLogout = useSessionStore((s) => s.logout);
+  const isSyncing = useSessionStore((s) => s.isSyncing);
   const setWorkouts = useWorkoutStore((s) => s.setWorkouts);
 
   const countsLoaded = useEnrichmentStore((s) => s.countsLoaded);
@@ -246,6 +247,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
               Fetching workouts... {progress.fetched} / {progress.total}
             </p>
           )}
+          {!status && isSyncing && !progress && <p className="text-xs text-gray-500">Checking for new workouts...</p>}
           {status && <p className="text-xs text-green-600">{status}</p>}
           {error && <p className="text-xs text-red-600">{error}</p>}
 
@@ -253,10 +255,10 @@ export default function ApiSync({ onDataDeleted }: Props) {
           <div className="flex items-center gap-2">
             <button
               onClick={handleSync}
-              disabled={loading}
+              disabled={loading || isSyncing}
               className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
             >
-              {loading ? "Syncing..." : "Sync Now"}
+              {loading || isSyncing ? "Syncing..." : "Sync Now"}
             </button>
             {backfillStatus !== "complete" && (
               <button

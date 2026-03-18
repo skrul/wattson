@@ -17,6 +17,8 @@ export async function syncWorkouts(
   const session = useSessionStore.getState().session;
   if (!session) throw new Error("Not logged in");
 
+  useSessionStore.getState().setIsSyncing(true);
+
   const cachedProfile = useSessionStore.getState().userProfile;
   const totalWorkouts = cachedProfile?.total_workouts ?? undefined;
 
@@ -62,6 +64,11 @@ export async function syncWorkouts(
   if (newWorkouts.length > 0) {
     await insertWorkouts(newWorkouts);
 
+    const filters = useWorkoutStore.getState().filters;
+    const updated = await queryWorkouts(filters);
+    useWorkoutStore.getState().setWorkouts(updated);
+    useSessionStore.getState().setIsSyncing(false);
+
     // Inline enrichment: fetch performance_graph for each new workout
     for (const w of newWorkouts) {
       try {
@@ -72,10 +79,8 @@ export async function syncWorkouts(
       }
     }
     await useEnrichmentStore.getState().refreshCounts();
-
-    const filters = useWorkoutStore.getState().filters;
-    const updated = await queryWorkouts(filters);
-    useWorkoutStore.getState().setWorkouts(updated);
+  } else {
+    useSessionStore.getState().setIsSyncing(false);
   }
 
   // Fetch and cache user profile

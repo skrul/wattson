@@ -30,6 +30,7 @@ function App() {
   const loaded = useSessionStore((s) => s.loaded);
   const session = useSessionStore((s) => s.session);
   const userProfile = useSessionStore((s) => s.userProfile);
+  const isSyncing = useSessionStore((s) => s.isSyncing);
 
   useEffect(() => {
     loadFromKeychain();
@@ -45,8 +46,16 @@ function App() {
     if (!loaded) return;
     if (session) {
       setDataState("has_data");
-      getUserProfile(session.userId).then((profile) => {
+      getUserProfile(session.userId).then(async (profile) => {
         if (profile) useSessionStore.getState().setUserProfile(profile);
+        // Auto-sync after profile is loaded so early-stop optimization works
+        if (!autoSyncRan.current && !showWizard) {
+          const pref = localStorage.getItem(AUTO_SYNC_KEY);
+          if (pref !== "false") {
+            autoSyncRan.current = true;
+            syncWorkouts().catch((e) => { console.error("Auto-sync failed:", e); });
+          }
+        }
       }).catch((e) => console.error("Failed to load cached profile:", e));
     } else if (dataState === "checking") {
       // Only check DB on first load — sign-out keeps existing dataState
@@ -59,18 +68,6 @@ function App() {
       });
     }
   }, [loaded, session]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-sync on launch when preference is enabled (skip while wizard is open)
-  useEffect(() => {
-    if (!loaded || !session || autoSyncRan.current || showWizard) return;
-    const pref = localStorage.getItem(AUTO_SYNC_KEY);
-    if (pref === "false") return;
-    autoSyncRan.current = true;
-
-    syncWorkouts().catch((e) => {
-      console.error("Auto-sync failed:", e);
-    });
-  }, [loaded, session, showWizard]);
 
   // Auto-resume enrichment backfill once on launch when session is available
   const autoResumeRan = useRef(false);
@@ -126,7 +123,23 @@ function App() {
 
       {/* Header */}
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-        <h1 className="text-xl font-bold">Wattson</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold">Wattson</h1>
+          {isSyncing && (
+            <button
+              onClick={() => setActiveTab("profile")}
+              className="text-gray-400 hover:text-gray-600"
+              title="Syncing... Click to view"
+            >
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M2.5 8a5.5 5.5 0 0 1 9.3-4" />
+                <path d="M13.5 8a5.5 5.5 0 0 1-9.3 4" />
+                <path d="M11.8 4l1.2-.8L13.5 4.8" />
+                <path d="M4.2 12l-1.2.8L2.5 11.2" />
+              </svg>
+            </button>
+          )}
+        </div>
         <nav className="flex gap-2">
           {(["dashboard", "workouts", "insights", "insights_new", "studio", "profile"] as Tab[]).map((tab) => (
             <button

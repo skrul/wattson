@@ -13,18 +13,21 @@ interface SessionState {
   session: Session | null;
   loaded: boolean;
   userProfile: UserProfile | null;
+  isSyncing: boolean;
 
   loadFromKeychain: () => Promise<void>;
   login: (session: Session) => Promise<void>;
   logout: () => Promise<void>;
   updateCredentials: (accessToken: string, password: string) => Promise<void>;
   setUserProfile: (profile: UserProfile | null) => void;
+  setIsSyncing: (syncing: boolean) => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
   session: null,
   loaded: false,
   userProfile: null,
+  isSyncing: false,
 
   loadFromKeychain: async () => {
     try {
@@ -80,4 +83,5 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   setUserProfile: (profile) => set({ userProfile: profile }),
+  setIsSyncing: (syncing) => set({ isSyncing: syncing }),
 }));

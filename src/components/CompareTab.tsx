@@ -146,6 +146,15 @@ function MetricCell({ label, value, unit }: { label: string; value: string | num
   );
 }
 
+function parseFtp(rawDetailJson: string | null | undefined): number | null {
+  if (!rawDetailJson) return null;
+  try {
+    const raw = JSON.parse(rawDetailJson);
+    const ftp = raw?.ftp_info?.ftp;
+    return typeof ftp === "number" ? ftp : null;
+  } catch { return null; }
+}
+
 const MAX_AUTO_SELECT = 10;
 const AUTO_SELECT_RECENT = 5;
 
@@ -165,10 +174,17 @@ export default function CompareTab({ workouts: initialWorkouts, currentId, acces
   const updateWorkout = useWorkoutStore((s) => s.updateWorkout);
   const storeWorkouts = useWorkoutStore((s) => s.workouts);
 
-  // Use store data for fresh field values, falling back to prop data
+  // Merge store data (fresh metrics) with initial data (has raw JSON fields the store omits)
   const workouts = useMemo(() => {
     const storeMap = new Map(storeWorkouts.map((w) => [w.id, w]));
-    return initialWorkouts.map((w) => storeMap.get(w.id) ?? w);
+    return initialWorkouts.map((w) => {
+      const sw = storeMap.get(w.id);
+      return sw ? {
+        ...w, ...sw,
+        raw_performance_graph_json: sw.raw_performance_graph_json ?? w.raw_performance_graph_json,
+        raw_detail_json: sw.raw_detail_json ?? w.raw_detail_json,
+      } : w;
+    });
   }, [initialWorkouts, storeWorkouts]);
   const [fetchingIds, setFetchingIds] = useState<Set<string>>(new Set());
   const [fetchProgress, setFetchProgress] = useState<{ done: number; total: number } | null>(null);
@@ -235,10 +251,11 @@ export default function CompareTab({ workouts: initialWorkouts, currentId, acces
     return () => { cancelled = true; };
   }, [workouts.map((w) => w.id).join(","), accessToken]);
 
-  // Build chart rides from selected workouts that have performance data
+  // Build chart rides from selected workouts that have performance data, sorted by date
   const chartRides = useMemo(() => {
-    return workouts
+    return [...workouts]
       .filter((w) => selectedIds.has(w.id) && w.raw_performance_graph_json != null)
+      .sort((a, b) => a.date - b.date)
       .map((w) => {
         const ts = parsePerformanceGraph(w.raw_performance_graph_json!);
         if (!ts) return null;
@@ -379,12 +396,13 @@ export default function CompareTab({ workouts: initialWorkouts, currentId, acces
                 <span className="text-xs text-gray-400">Loading details...</span>
               )}
             </div>
-            <div className="grid grid-cols-5 gap-4">
+            <div className="grid grid-cols-6 gap-4">
               <MetricCell label="Output" value={w.total_work != null ? Math.round(w.total_work / 1000) : null} unit="kj" />
               <MetricCell label="Calories" value={w.calories} unit="kcal" />
               <MetricCell label="Distance" value={w.distance != null ? w.distance.toFixed(2) : null} unit="mi" />
               <MetricCell label="Avg HR" value={w.avg_heart_rate} unit="bpm" />
               <MetricCell label="Strive" value={w.strive_score != null ? w.strive_score.toFixed(1) : null} />
+              <MetricCell label="FTP" value={parseFtp(w.raw_detail_json)} unit="w" />
             </div>
           </div>
         );

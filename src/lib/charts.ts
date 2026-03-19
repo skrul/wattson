@@ -1103,7 +1103,7 @@ export function renderCompareChart(
       label: metricLabel,
       grid: true,
     },
-    color: { legend: true },
+    color: { legend: true, domain: rideLabels },
     marks,
   });
 

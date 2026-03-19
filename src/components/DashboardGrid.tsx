@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { GridLayout, verticalCompactor, useContainerWidth, type Layout, type LayoutItem } from "react-grid-layout";
 import type { Dashboard } from "../types";
 import { useDashboardContext } from "../stores/DashboardContext";
+import { useDashboardRegistryStore } from "../stores/dashboardRegistryStore";
 import { WIDGET_DEFAULTS } from "../lib/dashboardDefaults";
 import WidgetWrapper from "./widgets/WidgetWrapper";
 import AddWidgetMenu from "./config/AddWidgetMenu";
+import ManageDashboardsModal from "./config/ManageDashboardsModal";
 
 interface Props {
   dashboard: Dashboard;
@@ -12,9 +15,13 @@ interface Props {
 export default function DashboardGrid({ dashboard }: Props) {
   const useStore = useDashboardContext();
   const mode = useStore((s) => s.mode);
+  const displayName = useDashboardRegistryStore(
+    (s) => s.dashboards.find((d) => d.id === dashboard.id)?.name ?? dashboard.name,
+  );
   const enterEditMode = useStore((s) => s.enterEditMode);
   const exitEditMode = useStore((s) => s.exitEditMode);
   const updateLayouts = useStore((s) => s.updateLayouts);
+  const [manageOpen, setManageOpen] = useState(false);
 
   const { width, containerRef } = useContainerWidth({ initialWidth: 1200 });
 
@@ -46,11 +53,17 @@ export default function DashboardGrid({ dashboard }: Props) {
     <div ref={containerRef}>
       {/* Toolbar */}
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">{dashboard.name}</h2>
+        <h2 className="text-lg font-semibold text-gray-900">{displayName}</h2>
         <div className="flex items-center gap-2">
           {mode === "edit" ? (
             <>
               <AddWidgetMenu />
+              <button
+                onClick={() => setManageOpen(true)}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Manage Dashboards
+              </button>
               <button
                 onClick={exitEditMode}
                 className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
@@ -106,6 +119,7 @@ export default function DashboardGrid({ dashboard }: Props) {
           ))}
         </GridLayout>
       </div>
+      <ManageDashboardsModal open={manageOpen} onClose={() => setManageOpen(false)} />
     </div>
   );
 }

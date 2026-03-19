@@ -1,22 +1,51 @@
-import { useEffect } from "react";
-import { useDashboardStore } from "../stores/dashboardStore";
+import { useEffect, useRef } from "react";
+import { getDashboardStore, useDashboardRegistryStore } from "../stores/dashboardRegistryStore";
 import { DashboardContext } from "../stores/DashboardContext";
+import { saveDashboardWidgets } from "../lib/database";
+import { buildDefaultInsightsWidgets } from "../lib/dashboardDefaults";
 import DashboardEmptyState from "./DashboardEmptyState";
 import DashboardGrid from "./DashboardGrid";
 import WidgetFullscreen from "./widgets/WidgetFullscreen";
 import WidgetConfigModal from "./config/WidgetConfigModal";
 
-export default function DashboardTab() {
-  const dashboard = useDashboardStore((s) => s.dashboard);
-  const expandedWidgetId = useDashboardStore((s) => s.expandedWidgetId);
-  const mode = useDashboardStore((s) => s.mode);
-  const configuringWidgetId = useDashboardStore((s) => s.configuringWidgetId);
-  const addingWidgetType = useDashboardStore((s) => s.addingWidgetType);
-  const loadDashboard = useDashboardStore((s) => s.loadDashboard);
+interface Props {
+  dashboardId: string;
+}
+
+export default function DashboardTab({ dashboardId }: Props) {
+  const useStore = getDashboardStore(dashboardId);
+  const dashboard = useStore((s) => s.dashboard);
+  const expandedWidgetId = useStore((s) => s.expandedWidgetId);
+  const mode = useStore((s) => s.mode);
+  const configuringWidgetId = useStore((s) => s.configuringWidgetId);
+  const addingWidgetType = useStore((s) => s.addingWidgetType);
+  const loadDashboard = useStore((s) => s.loadDashboard);
+  const populated = useRef(false);
 
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  // Auto-populate Insights dashboard with default widgets on first load when empty
+  const defaultKey = useDashboardRegistryStore(
+    (s) => s.dashboards.find((d) => d.id === dashboardId)?.default_key,
+  );
+
+  useEffect(() => {
+    if (!dashboard || populated.current) return;
+    if (dashboard.widgets.length > 0 || defaultKey !== "insights") {
+      populated.current = true;
+      return;
+    }
+    populated.current = true;
+
+    const defaultWidgets = buildDefaultInsightsWidgets();
+    const updatedDashboard = { ...dashboard, widgets: defaultWidgets };
+    useStore.setState({ dashboard: updatedDashboard });
+    saveDashboardWidgets(dashboard.id, defaultWidgets).catch((err) =>
+      console.error("Failed to save insights dashboard:", err),
+    );
+  }, [dashboard, defaultKey, useStore]);
 
   if (!dashboard) {
     return (
@@ -29,7 +58,7 @@ export default function DashboardTab() {
   if (expandedWidgetId) {
     const widget = dashboard.widgets.find((w) => w.id === expandedWidgetId);
     if (widget) return (
-      <DashboardContext.Provider value={useDashboardStore}>
+      <DashboardContext.Provider value={useStore}>
         <WidgetFullscreen widget={widget} />
       </DashboardContext.Provider>
     );
@@ -37,14 +66,14 @@ export default function DashboardTab() {
 
   if (dashboard.widgets.length === 0 && mode === "view") {
     return (
-      <DashboardContext.Provider value={useDashboardStore}>
+      <DashboardContext.Provider value={useStore}>
         <DashboardEmptyState />
       </DashboardContext.Provider>
     );
   }
 
   return (
-    <DashboardContext.Provider value={useDashboardStore}>
+    <DashboardContext.Provider value={useStore}>
       {dashboard.widgets.length === 0 ? <DashboardEmptyState /> : <DashboardGrid dashboard={dashboard} />}
       {(configuringWidgetId || addingWidgetType) && <WidgetConfigModal />}
     </DashboardContext.Provider>

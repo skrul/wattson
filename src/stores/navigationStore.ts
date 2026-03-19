@@ -1,7 +1,21 @@
 import { create } from "zustand";
 import type { FilterCondition, SortSpec } from "../types";
 
-export type Tab = "dashboard" | "workouts" | "insights" | "studio" | "profile";
+export type Tab = string;
+
+const DASHBOARD_PREFIX = "dashboard:";
+
+export function isDashboardTab(tab: Tab): boolean {
+  return tab.startsWith(DASHBOARD_PREFIX);
+}
+
+export function dashboardTabId(tab: Tab): string {
+  return tab.slice(DASHBOARD_PREFIX.length);
+}
+
+export function makeDashboardTab(id: string): Tab {
+  return `${DASHBOARD_PREFIX}${id}`;
+}
 
 interface PendingWorkoutNav {
   workoutId: string;
@@ -22,7 +36,7 @@ interface NavigationState {
 }
 
 export const useNavigationStore = create<NavigationState>((set, get) => ({
-  activeTab: "dashboard",
+  activeTab: "workouts", // temporary default until registry sets first dashboard tab
   previousTab: null,
   pendingWorkoutNav: null,
 

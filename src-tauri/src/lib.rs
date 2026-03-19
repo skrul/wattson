@@ -118,6 +118,14 @@ pub fn run() {
             CREATE INDEX idx_workouts_ride_id ON workouts(ride_id);",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 2,
+            description: "add_dashboard_default_key",
+            sql: "ALTER TABLE dashboards ADD COLUMN default_key TEXT;
+            UPDATE dashboards SET default_key = 'home' WHERE name IN ('Home', 'My Dashboard', 'Dashboard');
+            UPDATE dashboards SET default_key = 'insights' WHERE name = 'Insights';",
+            kind: MigrationKind::Up,
+        },
     ];
 
     let mut builder = tauri::Builder::default()

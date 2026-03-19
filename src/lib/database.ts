@@ -781,6 +781,7 @@ export async function getMostRepeatedRideWorkoutsByDiscipline(
 interface DashboardRow {
   id: string;
   name: string;
+  default_key: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -792,6 +793,56 @@ interface DashboardWidgetRow {
   config_json: string;
   layout_json: string;
   sort_order: number;
+}
+
+/** Get all dashboards (without widgets). */
+export async function getAllDashboards(): Promise<{ id: string; name: string; default_key: string | null; created_at: number; updated_at: number }[]> {
+  const d = await getDb();
+  return d.select<DashboardRow[]>("SELECT * FROM dashboards ORDER BY created_at ASC");
+}
+
+/** Load a dashboard by ID (with widgets). */
+export async function getDashboardById(id: string): Promise<Dashboard> {
+  const d = await getDb();
+  const rows = await d.select<DashboardRow[]>("SELECT * FROM dashboards WHERE id = $1", [id]);
+  if (rows.length === 0) throw new Error(`Dashboard not found: ${id}`);
+  const dashboard = rows[0];
+  const widgetRows = await d.select<DashboardWidgetRow[]>(
+    "SELECT * FROM dashboard_widgets WHERE dashboard_id = $1 ORDER BY sort_order ASC",
+    [dashboard.id],
+  );
+  const widgets: DashboardWidget[] = widgetRows.map((r) => ({
+    id: r.id,
+    widget_type: r.widget_type as DashboardWidget["widget_type"],
+    config: JSON.parse(r.config_json),
+    layout: JSON.parse(r.layout_json),
+  }));
+  return { ...dashboard, widgets };
+}
+
+/** Create a new dashboard with no widgets. */
+export async function createDashboard(name: string, defaultKey?: string): Promise<Dashboard> {
+  const d = await getDb();
+  const now = Date.now();
+  const id = crypto.randomUUID();
+  await d.execute(
+    "INSERT INTO dashboards (id, name, default_key, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)",
+    [id, name, defaultKey ?? null, now, now],
+  );
+  return { id, name, widgets: [], created_at: now, updated_at: now };
+}
+
+/** Delete a dashboard and its widgets (cascade via FK or manual). */
+export async function deleteDashboard(id: string): Promise<void> {
+  const d = await getDb();
+  await d.execute("DELETE FROM dashboard_widgets WHERE dashboard_id = $1", [id]);
+  await d.execute("DELETE FROM dashboards WHERE id = $1", [id]);
+}
+
+/** Rename a dashboard. */
+export async function renameDashboard(id: string, name: string): Promise<void> {
+  const d = await getDb();
+  await d.execute("UPDATE dashboards SET name = $1, updated_at = $2 WHERE id = $3", [name, Date.now(), id]);
 }
 
 /** Load the default dashboard (create if none exists). */
@@ -807,9 +858,9 @@ export async function getOrCreateDashboard(): Promise<Dashboard> {
     const id = crypto.randomUUID();
     await d.execute(
       "INSERT INTO dashboards (id, name, created_at, updated_at) VALUES ($1, $2, $3, $4)",
-      [id, "My Dashboard", now, now],
+      [id, "Home", now, now],
     );
-    dashboard = { id, name: "My Dashboard", created_at: now, updated_at: now };
+    dashboard = { id, name: "Home", default_key: null, created_at: now, updated_at: now };
   } else {
     dashboard = rows[0];
   }
@@ -845,7 +896,7 @@ export async function getOrCreateDashboardByName(name: string): Promise<Dashboar
       "INSERT INTO dashboards (id, name, created_at, updated_at) VALUES ($1, $2, $3, $4)",
       [id, name, now, now],
     );
-    dashboard = { id, name, created_at: now, updated_at: now };
+    dashboard = { id, name, default_key: null, created_at: now, updated_at: now };
   } else {
     dashboard = rows[0];
   }

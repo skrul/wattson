@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import ApiSync from "./components/ApiSync";
 import WorkoutList from "./components/WorkoutList";
 import DashboardTab from "./components/DashboardTab";
-import InsightsTab from "./components/InsightsNewTab";
 import StudioTab from "./components/StudioTab";
 import SetupWizard from "./components/SetupWizard";
 import ReauthModal from "./components/ReauthModal";
@@ -11,8 +10,9 @@ import { syncWorkouts } from "./lib/sync";
 import { getUserProfile, hasWorkouts } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
 import { useEnrichmentStore } from "./stores/enrichmentStore";
-import { useNavigationStore, type Tab } from "./stores/navigationStore";
+import { useNavigationStore, isDashboardTab, makeDashboardTab } from "./stores/navigationStore";
 import { useShareChartStore } from "./stores/shareChartStore";
+import { useDashboardRegistryStore } from "./stores/dashboardRegistryStore";
 
 const AUTO_SYNC_KEY = "wattson:autoSyncOnLaunch";
 
@@ -31,6 +31,9 @@ function App() {
   const userProfile = useSessionStore((s) => s.userProfile);
   const isSyncing = useSessionStore((s) => s.isSyncing);
 
+  const dashboards = useDashboardRegistryStore((s) => s.dashboards);
+  const registryLoaded = useDashboardRegistryStore((s) => s.loaded);
+
   useEffect(() => {
     loadFromKeychain();
     checkForUpdate().then((status) => {
@@ -38,7 +41,19 @@ function App() {
     });
     useEnrichmentStore.getState().loadState().catch((e) => console.error("Enrichment state load failed:", e));
     useShareChartStore.getState().load().catch((e) => console.error("Share chart settings load failed:", e));
+    useDashboardRegistryStore.getState().loadRegistry().catch((e) => console.error("Dashboard registry load failed:", e));
   }, []);
+
+  // After registry loads, set activeTab to first dashboard tab if current tab is invalid
+  useEffect(() => {
+    if (!registryLoaded || dashboards.length === 0) return;
+    const { activeTab } = useNavigationStore.getState();
+    const fixedTabs = ["workouts", "studio", "profile"];
+    const validDashboardTab = isDashboardTab(activeTab) && dashboards.some((d) => makeDashboardTab(d.id) === activeTab);
+    if (!validDashboardTab && !fixedTabs.includes(activeTab)) {
+      setActiveTab(makeDashboardTab(dashboards[0].id));
+    }
+  }, [registryLoaded, dashboards, setActiveTab]);
 
   // On initial load, determine data state; load cached profile when session exists
   useEffect(() => {
@@ -89,14 +104,23 @@ function App() {
     }
   };
 
-  function tabLabel(tab: Tab): string {
+  // Build tab array: dashboard tabs first, then fixed tabs
+  const fixedTabs = ["workouts", "studio", "profile"] as const;
+  const allTabs: string[] = [
+    ...dashboards.map((d) => makeDashboardTab(d.id)),
+    ...fixedTabs,
+  ];
+
+  function tabLabel(tab: string): string {
+    if (isDashboardTab(tab)) {
+      const d = dashboards.find((d) => makeDashboardTab(d.id) === tab);
+      return d?.name ?? "Dashboard";
+    }
     if (tab === "profile") {
       if (userProfile) {
         const raw = JSON.parse(userProfile.raw_json);
         const username = raw.username as string | undefined;
-        if (username) {
-          return username;
-        }
+        if (username) return username;
       }
       return "Account";
     }
@@ -114,7 +138,7 @@ function App() {
             disabled={updating}
             className="rounded bg-white px-3 py-1 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
           >
-            {updating ? "Updating…" : "Update & Restart"}
+            {updating ? "Updating\u2026" : "Update & Restart"}
           </button>
         </div>
       )}
@@ -139,7 +163,7 @@ function App() {
           )}
         </div>
         <nav className="flex gap-2">
-          {(["dashboard", "workouts", "insights", "studio", "profile"] as Tab[]).map((tab) => (
+          {allTabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -155,21 +179,32 @@ function App() {
         </nav>
       </header>
 
-      {/* Content — all tabs stay mounted to preserve scroll position and avoid re-fetching */}
-      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "dashboard" ? "" : "hidden"}`}>
-        <DashboardTab />
-      </div>
-      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "workouts" ? "" : "hidden"}`}>
-        <WorkoutList />
-      </div>
-      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "insights" ? "" : "hidden"}`}>
-        <InsightsTab />
-      </div>
-      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "studio" ? "" : "hidden"}`}>
-        <StudioTab />
-      </div>
-      <div className={`flex-1 overflow-y-auto p-6 ${activeTab === "profile" ? "" : "hidden"}`}>
-        <ApiSync onDataDeleted={() => { setDataState("empty"); setShowWizard(true); }} />
+      {/* Content — all tabs stay mounted to preserve scroll position and avoid re-fetching.
+           Dashboard tabs use visibility+absolute instead of display:none so that
+           react-grid-layout always has a real container width and items don't
+           animate on tab switch. */}
+      <div className="relative flex-1">
+        {dashboards.map((d) => {
+          const tab = makeDashboardTab(d.id);
+          const active = activeTab === tab;
+          return (
+            <div
+              key={d.id}
+              className={`absolute inset-0 overflow-y-auto p-6 ${active ? "visible z-10" : "invisible z-0"}`}
+            >
+              <DashboardTab dashboardId={d.id} />
+            </div>
+          );
+        })}
+        <div className={`absolute inset-0 overflow-y-auto p-6 ${activeTab === "workouts" ? "visible z-10" : "invisible z-0"}`}>
+          <WorkoutList />
+        </div>
+        <div className={`absolute inset-0 overflow-y-auto p-6 ${activeTab === "studio" ? "visible z-10" : "invisible z-0"}`}>
+          <StudioTab />
+        </div>
+        <div className={`absolute inset-0 overflow-y-auto p-6 ${activeTab === "profile" ? "visible z-10" : "invisible z-0"}`}>
+          <ApiSync onDataDeleted={() => { setDataState("empty"); setShowWizard(true); }} />
+        </div>
       </div>
 
       <SetupWizard open={showWizard} onComplete={() => { setShowWizard(false); setDataState("has_data"); }} />

@@ -1,4 +1,4 @@
-import type { WidgetType } from "../types";
+import type { DashboardWidget, WidgetConfig, WidgetType } from "../types";
 
 export interface WidgetDefaults {
   defaultW: number;
@@ -64,3 +64,119 @@ export const PERSONAL_RECORD_METRICS: PersonalRecordMetric[] = [
   { key: "avg_cadence", label: "Avg Cadence", unit: "rpm", format: (v) => Math.round(v).toLocaleString() },
   { key: "avg_speed", label: "Avg Speed", unit: "mph", format: (v) => v.toFixed(1) },
 ];
+
+/** Build a widget at position (x, y) with auto-sized defaults. */
+export function makeWidget(type: WidgetType, config: WidgetConfig, x: number, y: number, wOverride?: number, hOverride?: number): DashboardWidget {
+  const defaults = WIDGET_DEFAULTS[type];
+  return {
+    id: crypto.randomUUID(),
+    widget_type: type,
+    config,
+    layout: {
+      x,
+      y,
+      w: wOverride ?? defaults.defaultW,
+      h: hOverride ?? defaults.defaultH,
+      minW: defaults.minW,
+      minH: defaults.minH,
+    },
+  };
+}
+
+export function buildDefaultInsightsWidgets(): DashboardWidget[] {
+  const widgets: DashboardWidget[] = [];
+  let y = 0;
+
+  widgets.push(makeWidget("section", { type: "section", title: "Overview" }, 0, y));
+  y += 2;
+
+  const metrics = [
+    { metric: "total_workouts", label: "Total Workouts" },
+    { metric: "total_hours", label: "Total Hours" },
+    { metric: "total_calories", label: "Total Calories" },
+    { metric: "total_output_kj", label: "Total Output (kj)" },
+    { metric: "total_distance", label: "Total Distance" },
+  ];
+  for (let i = 0; i < metrics.length; i++) {
+    widgets.push(makeWidget("metric_total", {
+      type: "metric_total",
+      metric: metrics[i].metric,
+      label: metrics[i].label,
+      filters: [],
+    }, i * 4, y, 4, 3));
+  }
+  y += 3;
+
+  widgets.push(makeWidget("activity_grid", {
+    type: "activity_grid",
+    title: "Workout Activity",
+    metric: "workout_count",
+    color: "#216e39",
+    filters: [],
+  }, 0, y, 24, 5));
+  y += 5;
+
+  widgets.push(makeWidget("section", { type: "section", title: "Personal Records" }, 0, y));
+  y += 2;
+
+  const records = [
+    { metric: "total_work", title: "Highest Output" },
+    { metric: "calories", title: "Most Calories" },
+    { metric: "strive_score", title: "Best Strive Score" },
+  ];
+  for (let i = 0; i < records.length; i++) {
+    widgets.push(makeWidget("personal_record", {
+      type: "personal_record",
+      metric: records[i].metric,
+      title: records[i].title,
+      filters: [],
+    }, i * 8, y, 8, 4));
+  }
+  y += 4;
+
+  widgets.push(makeWidget("section", { type: "section", title: "Favorites" }, 0, y));
+  y += 2;
+
+  widgets.push(makeWidget("chart", {
+    type: "chart",
+    chart: {
+      name: "Top Instructors",
+      mark_type: "bar",
+      y_fields: [{ field: "avg_output", side: "left" }],
+      group_by: null,
+      filters: [],
+      x_axis_mode: "category",
+      x_axis_field: "instructor",
+      x_axis_sequential: false,
+      agg_function: "count",
+    },
+  }, 0, y, 12, 12));
+
+  widgets.push(makeWidget("chart", {
+    type: "chart",
+    chart: {
+      name: "Top Class Types",
+      mark_type: "bar",
+      y_fields: [{ field: "avg_output", side: "left" }],
+      group_by: null,
+      filters: [],
+      x_axis_mode: "category",
+      x_axis_field: "class_type",
+      x_axis_sequential: false,
+      agg_function: "count",
+    },
+  }, 12, y, 12, 12));
+  y += 12;
+
+  widgets.push(makeWidget("section", { type: "section", title: "Most Repeated" }, 0, y));
+  y += 2;
+
+  widgets.push(makeWidget("most_repeated", {
+    type: "most_repeated",
+    title: "Most Repeated Rides",
+    limit: 10,
+    filters: [],
+  }, 0, y, 12, 10));
+
+  return widgets;
+}

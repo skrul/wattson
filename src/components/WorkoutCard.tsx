@@ -85,7 +85,7 @@ interface MetricOverride {
 interface WorkoutCardProps {
   workout: Workout;
   isSelected: boolean;
-  onClick: () => void;
+  onClick?: () => void;
   sortField?: string;
   label?: string;
   metricOverride?: MetricOverride;
@@ -114,7 +114,7 @@ export default function WorkoutCard({ workout, isSelected, onClick, sortField, l
       className={`flex w-full flex-col text-left transition-colors ${
         isSelected
           ? "bg-gray-800 text-white"
-          : "hover:bg-gray-50"
+          : onClick ? "hover:bg-gray-50 cursor-pointer" : "cursor-default"
       }`}
     >
       {label && (

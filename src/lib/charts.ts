@@ -558,6 +558,14 @@ function prepareChartData(
     result.push(point);
   }
 
+  // HAVING-like filter: drop buckets below min_value
+  if (chart.min_value != null) {
+    const min = chart.min_value;
+    for (let i = result.length - 1; i >= 0; i--) {
+      if (result[i].y < min) result.splice(i, 1);
+    }
+  }
+
   // Sort: temporal by date, categorical by numeric prefix then alphabetically
   if (isTemporalAggregation(chart.x_axis_mode)) {
     result.sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -597,8 +605,10 @@ function tooltipTitle(d: WorkoutPoint, yFieldKey: string, chart: ChartDefinition
   const val = yValue ?? d.y;
   const rounded = Number.isInteger(val) ? val : +val.toFixed(2);
   const aggregated = isAggregatedMode(chart.x_axis_mode);
-  const prefix = aggregated && chart.agg_function ? `${AGG_LABEL[chart.agg_function]} ` : "";
-  let text = `${xLabel}\n${prefix}${fieldLabel(yFieldKey)}: ${rounded}`;
+  const isCount = aggregated && chart.agg_function === "count";
+  const prefix = aggregated && chart.agg_function && !isCount ? `${AGG_LABEL[chart.agg_function]} ` : "";
+  const metric = isCount ? "Count" : `${prefix}${fieldLabel(yFieldKey)}`;
+  let text = `${xLabel}\n${metric}: ${rounded}`;
   if (d.group) text += `\n${d.group}`;
   return text;
 }
@@ -746,7 +756,7 @@ export function renderSingleAxisChart(
     return Plot.plot({ width, height, marks: [] });
   }
 
-  const color = chart.group_by ? "group" : "#2563eb";
+  const color = chart.group_by ? "group" : (chart.color ?? "#2563eb");
   const aggregated = isAggregatedMode(chart.x_axis_mode);
   const temporal = isTemporalAggregation(chart.x_axis_mode);
   const categorical = chart.x_axis_mode === "category" || chart.x_axis_sequential;
@@ -773,12 +783,14 @@ export function renderSingleAxisChart(
         return a.group.localeCompare(b.group);
       });
     }
-    const prefix = aggregated && chart.agg_function ? `${AGG_LABEL[chart.agg_function]} ` : "";
+    const isCount = aggregated && chart.agg_function === "count";
+    const prefix = aggregated && chart.agg_function && !isCount ? `${AGG_LABEL[chart.agg_function]} ` : "";
+    const metricLabel = isCount ? "Count" : `${prefix}${fieldLabel(yField.field)}`;
     groupedBarTitleFn = (d: WorkoutPoint) => {
       const key = d.label ?? d.date.toISOString();
       const groups = groupsByX.get(key) ?? [];
       const xLabel = d.label ?? d.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
-      let text = `${xLabel}\n${prefix}${fieldLabel(yField.field)}`;
+      let text = `${xLabel}\n${metricLabel}`;
       for (const g of groups) {
         const rounded = Number.isInteger(g.y) ? g.y : +g.y.toFixed(2);
         text += `\n${g.group}: ${rounded}`;
@@ -787,19 +799,31 @@ export function renderSingleAxisChart(
     };
   }
 
+  const transposed = chart.transposed && chart.mark_type === "bar" && categorical;
   const chartMarks: Plot.Markish[] = [];
   if (chart.mark_type === "bar") {
     const barTip = groupedBarTitleFn
       ? { tip: true, title: groupedBarTitleFn }
       : {};
     if (categorical) {
-      chartMarks.push(Plot.barY(data, {
-        x: "label",
-        y: "y",
-        fill: color,
-        ...(chart.group_by ? {} : { fillOpacity: 0.8 }),
-        ...barTip,
-      }));
+      if (transposed) {
+        chartMarks.push(Plot.barX(data, {
+          y: "label",
+          x: "y",
+          fill: color,
+          ...(chart.group_by ? {} : { fillOpacity: 0.8 }),
+          sort: { y: "x", reverse: true },
+          ...barTip,
+        }));
+      } else {
+        chartMarks.push(Plot.barY(data, {
+          x: "label",
+          y: "y",
+          fill: color,
+          ...(chart.group_by ? {} : { fillOpacity: 0.8 }),
+          ...barTip,
+        }));
+      }
     } else {
       const halfWidth = (temporal && TEMPORAL_BAR_HALF_WIDTH[chart.x_axis_mode]) || HALF_DAY_MS;
       const barData = data.map((d) => ({
@@ -818,10 +842,10 @@ export function renderSingleAxisChart(
     }
     if (!chart.group_by) {
       chartMarks.push(Plot.tip(data, Plot.pointer({
-        x: xKey,
-        y: "y",
-        anchor: "bottom",
-        dy: -6,
+        x: transposed ? "y" : xKey,
+        y: transposed ? "label" : "y",
+        anchor: transposed ? "left" : "bottom",
+        ...(transposed ? { dx: -6 } : { dy: -6 }),
         title: titleFn,
       })));
     }
@@ -836,7 +860,7 @@ export function renderSingleAxisChart(
   }
 
   const isCategoryMode = chart.x_axis_mode === "category";
-  const xConfig: Record<string, unknown> = categorical
+  const catConfig: Record<string, unknown> = categorical
     ? workoutXConfig(data, isCategoryMode, width)
     : temporal
       ? temporalAggXConfig(data, chart.x_axis_mode, width)
@@ -845,19 +869,37 @@ export function renderSingleAxisChart(
   // Y-axis label: prepend aggregation function name when active
   let yLabel = fieldLabel(yField.field);
   if (aggregated && chart.agg_function) {
-    yLabel = `${AGG_LABEL[chart.agg_function]} ${yLabel}`;
+    yLabel = chart.agg_function === "count" ? "Count" : `${AGG_LABEL[chart.agg_function]} ${yLabel}`;
   }
 
-  const plotConfig = {
-    width,
-    height,
-    marginRight: 40,
-    marginBottom: (xConfig as Record<string, unknown>).tickRotate ? 60 : undefined,
-    x: xConfig,
-    y: { label: yLabel, grid: true },
-    color: chart.group_by ? { legend: true, domain: sortedGroups(data) } : undefined,
-    marks: chartMarks,
-  };
+  // Estimate left margin for transposed charts based on longest label
+  let marginLeft: number | undefined;
+  if (transposed) {
+    const maxLen = Math.max(...data.map((d) => (d.label ?? "").length));
+    marginLeft = Math.min(200, maxLen * 7 + 20);
+  }
+
+  const plotConfig = transposed
+    ? {
+        width,
+        height,
+        marginLeft,
+        marginRight: 40,
+        x: { label: yLabel, grid: true } as Record<string, unknown>,
+        y: { ...catConfig, tickRotate: 0, label: null } as Record<string, unknown>,
+        color: chart.group_by ? { legend: true, domain: sortedGroups(data) } : undefined,
+        marks: chartMarks,
+      }
+    : {
+        width,
+        height,
+        marginRight: 40,
+        marginBottom: (catConfig as Record<string, unknown>).tickRotate ? 60 : undefined,
+        x: catConfig,
+        y: { label: yLabel, grid: true },
+        color: chart.group_by ? { legend: true, domain: sortedGroups(data) } : undefined,
+        marks: chartMarks,
+      };
 
   return Plot.plot(plotConfig);
 }
@@ -903,7 +945,7 @@ export function renderDualAxisChart(
     }));
 
   const marks: Plot.Markish[] = [];
-  const leftColor = "#2563eb";
+  const leftColor = chart.color ?? "#2563eb";
   const rightColor = "#dc2626";
   const aggregated = isAggregatedMode(chart.x_axis_mode);
   const temporal = isTemporalAggregation(chart.x_axis_mode);
@@ -987,9 +1029,14 @@ export function renderDualAxisChart(
   let leftLabel = fieldLabel(leftField.field);
   let rightLabel = fieldLabel(rightField.field);
   if (aggregated && chart.agg_function) {
-    const prefix = AGG_LABEL[chart.agg_function];
-    leftLabel = `${prefix} ${leftLabel}`;
-    rightLabel = `${prefix} ${rightLabel}`;
+    if (chart.agg_function === "count") {
+      leftLabel = "Count";
+      rightLabel = "Count";
+    } else {
+      const prefix = AGG_LABEL[chart.agg_function];
+      leftLabel = `${prefix} ${leftLabel}`;
+      rightLabel = `${prefix} ${rightLabel}`;
+    }
   }
 
   return Plot.plot({
@@ -1536,10 +1583,10 @@ export function renderCustomChart(
     });
   }
 
-  // For non-aggregated charts, attach click handlers to data points
-  if (onWorkoutClick && !isAggregatedMode(chart.x_axis_mode)) {
+  // For non-aggregated charts, attach click handlers and visual data-point circles
+  if (!isAggregatedMode(chart.x_axis_mode)) {
     const data = prepareChartData(workouts, chart);
-    if (chart.mark_type === "dot") {
+    if (chart.mark_type === "dot" && onWorkoutClick) {
       const circles = svg.querySelectorAll('[aria-label="dot"] circle');
       circles.forEach((circle, i) => {
         const d = data[i];
@@ -1548,7 +1595,7 @@ export function renderCustomChart(
           circle.addEventListener("click", () => onWorkoutClick(d._workout!.id));
         }
       });
-    } else if (chart.mark_type === "bar") {
+    } else if (chart.mark_type === "bar" && onWorkoutClick) {
       // Non-aggregated bars (rectY with x1/x2)
       const rects = svg.querySelectorAll('[aria-label="rect"] rect');
       rects.forEach((rect, i) => {
@@ -1558,8 +1605,8 @@ export function renderCustomChart(
           rect.addEventListener("click", () => onWorkoutClick(d._workout!.id));
         }
       });
-    } else {
-      // Line chart — add invisible hit-target circles on each data point
+    } else if (chart.mark_type === "line") {
+      // Line chart — always show data-point circles; optionally clickable
       const categorical = chart.x_axis_mode === "category" || chart.x_axis_sequential;
       attachLineClickTargets(svg, data, onWorkoutClick, categorical);
     }
@@ -1568,11 +1615,11 @@ export function renderCustomChart(
   return svg;
 }
 
-/** Add invisible but clickable circles over each data point on a line chart. */
+/** Add circles over each data point on a line chart; optionally clickable. */
 function attachLineClickTargets(
   svg: SVGElement | HTMLElement,
   data: WorkoutPoint[],
-  onClick: (workoutId: string) => void,
+  onClick: ((workoutId: string) => void) | undefined,
   categorical: boolean,
 ) {
   // Observable Plot exposes computed scales via .scale() on the returned element
@@ -1588,8 +1635,6 @@ function attachLineClickTargets(
   if (!plotArea) return;
 
   for (const d of data) {
-    if (!d?._workout) continue;
-
     const xVal = categorical ? d.label : d.date;
     const cx = xScale.apply(xVal);
     const cy = yScale.apply(d.y);
@@ -1600,8 +1645,10 @@ function attachLineClickTargets(
     circle.setAttribute("cy", String(cy));
     circle.setAttribute("r", "3");
     circle.setAttribute("fill", "currentColor");
-    circle.style.cursor = "pointer";
-    circle.addEventListener("click", () => onClick(d._workout!.id));
+    if (onClick && d._workout) {
+      circle.style.cursor = "pointer";
+      circle.addEventListener("click", () => onClick(d._workout!.id));
+    }
     plotArea.appendChild(circle);
   }
 }

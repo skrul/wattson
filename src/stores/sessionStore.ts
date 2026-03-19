@@ -9,11 +9,17 @@ interface Session {
   password: string;
 }
 
+export interface SyncProgress {
+  fetched: number;
+  total: number;
+}
+
 interface SessionState {
   session: Session | null;
   loaded: boolean;
   userProfile: UserProfile | null;
   isSyncing: boolean;
+  syncProgress: SyncProgress | null;
 
   loadFromKeychain: () => Promise<void>;
   login: (session: Session) => Promise<void>;
@@ -21,6 +27,7 @@ interface SessionState {
   updateCredentials: (accessToken: string, password: string) => Promise<void>;
   setUserProfile: (profile: UserProfile | null) => void;
   setIsSyncing: (syncing: boolean) => void;
+  setSyncProgress: (progress: SyncProgress | null) => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -28,6 +35,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   loaded: false,
   userProfile: null,
   isSyncing: false,
+  syncProgress: null,
 
   loadFromKeychain: async () => {
     try {
@@ -83,5 +91,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   setUserProfile: (profile) => set({ userProfile: profile }),
-  setIsSyncing: (syncing) => set({ isSyncing: syncing }),
+  setIsSyncing: (syncing) => set({ isSyncing: syncing, ...(!syncing ? { syncProgress: null } : {}) }),
+  setSyncProgress: (progress) => set({ syncProgress: progress }),
 }));

@@ -28,11 +28,16 @@ export async function syncWorkouts(
   // to catch gaps from interrupted syncs. Otherwise, enable early-stop.
   const isComplete = totalWorkouts != null && existingIds.size >= totalWorkouts;
 
+  const reportProgress = (fetched: number, total: number) => {
+    useSessionStore.getState().setSyncProgress({ fetched, total });
+    onProgress?.(fetched, total);
+  };
+
   const doFetch = async (userId: string, accessToken: string) => {
     return fetchAllWorkouts(
       userId,
       accessToken,
-      onProgress,
+      reportProgress,
       isComplete ? existingIds : undefined,
       totalWorkouts,
     );

@@ -3,6 +3,7 @@ import type { DashboardWidget } from "../../types";
 import { getMostRepeatedFilteredWorkouts, type RepeatedRideWorkout } from "../../lib/database";
 import { useNavigationStore } from "../../stores/navigationStore";
 import { useWorkoutStore } from "../../stores/workoutStore";
+import { useDashboardContext } from "../../stores/DashboardContext";
 import WorkoutCard from "../WorkoutCard";
 
 interface Props {
@@ -15,6 +16,8 @@ export default function MostRepeatedWidget({ widget }: Props) {
   const [loading, setLoading] = useState(true);
   const navigateToWorkout = useNavigationStore((s) => s.navigateToWorkout);
   const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
+  const useStore = useDashboardContext();
+  const mode = useStore((s) => s.mode);
 
   if (widget.config.type !== "most_repeated") return null;
   const { limit, filters, title } = widget.config;
@@ -52,7 +55,7 @@ export default function MostRepeatedWidget({ widget }: Props) {
               <WorkoutCard
                 workout={ride}
                 isSelected={false}
-                onClick={() => navigateToWorkout(ride.id)}
+                onClick={mode === "view" ? () => navigateToWorkout(ride.id) : undefined}
                 metricOverride={{ value: String(ride.repeat_count), unit: "times" }}
               />
             </div>

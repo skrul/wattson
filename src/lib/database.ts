@@ -318,6 +318,9 @@ function rowToChart(row: ChartDefinitionRow): ChartDefinition {
     x_axis_field: row.x_axis_field ?? null,
     x_axis_sequential: !!(row.x_axis_sequential),
     agg_function: (row.agg_function as AggregationFunction) ?? null,
+    transposed: !!(row.transposed),
+    color: row.color ?? null,
+    min_value: row.min_value ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -337,8 +340,8 @@ export async function saveChartDefinition(chart: ChartDefinition): Promise<void>
   const d = await getDb();
   await d.execute(
     `INSERT OR REPLACE INTO chart_definitions
-      (id, name, mark_type, y_fields_json, group_by, filters_json, x_axis_mode, x_axis_field, x_axis_sequential, agg_function, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      (id, name, mark_type, y_fields_json, group_by, filters_json, x_axis_mode, x_axis_field, x_axis_sequential, agg_function, transposed, color, min_value, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
     [
       chart.id,
       chart.name,
@@ -350,6 +353,9 @@ export async function saveChartDefinition(chart: ChartDefinition): Promise<void>
       chart.x_axis_field,
       chart.x_axis_sequential ? 1 : 0,
       chart.agg_function,
+      chart.transposed ? 1 : 0,
+      chart.color,
+      chart.min_value,
       chart.created_at,
       chart.updated_at,
     ],

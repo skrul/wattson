@@ -38,7 +38,6 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState<{ fetched: number; total: number } | null>(null);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [cacheStatus, setCacheStatus] = useState("");
   const [autoSync, setAutoSync] = useState(() => localStorage.getItem(AUTO_SYNC_KEY) !== "false");
@@ -48,6 +47,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const sessionLogin = useSessionStore((s) => s.login);
   const sessionLogout = useSessionStore((s) => s.logout);
   const isSyncing = useSessionStore((s) => s.isSyncing);
+  const progress = useSessionStore((s) => s.syncProgress);
   const setWorkouts = useWorkoutStore((s) => s.setWorkouts);
 
   const countsLoaded = useEnrichmentStore((s) => s.countsLoaded);
@@ -81,11 +81,8 @@ export default function ApiSync({ onDataDeleted }: Props) {
     setError("");
     setStatus("Fetching workouts...");
     setLoading(true);
-    setProgress(null);
     try {
-      const count = await syncWorkouts(
-        (fetched, total) => setProgress({ fetched, total }),
-      );
+      const count = await syncWorkouts();
       if (count === 0) {
         setStatus("Already up to date.");
       } else {
@@ -97,7 +94,6 @@ export default function ApiSync({ onDataDeleted }: Props) {
       setStatus("");
     } finally {
       setLoading(false);
-      setProgress(null);
     }
   };
 

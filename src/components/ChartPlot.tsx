@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import type { Workout, ChartDefinition } from "../types";
-import { renderCustomChart } from "../lib/charts";
+import { renderCustomChart, isAggregatedMode } from "../lib/charts";
 
 interface ChartPlotProps {
   chart: ChartDefinition;
@@ -69,7 +69,8 @@ export default function ChartPlot({ chart, workouts, width, height = 400, fillCo
     el.replaceChildren(svg);
   }, [chart, workouts, width, height, fillContainer, containerSize, ownWidth, onCategoryClick, onWorkoutClick]);
 
-  const hasFields = chart.y_fields.length > 0;
+  const isCount = isAggregatedMode(chart.x_axis_mode) && chart.agg_function === "count";
+  const hasFields = chart.y_fields.length > 0 || isCount;
   const hasData = workouts.length > 0;
 
   return (

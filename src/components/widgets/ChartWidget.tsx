@@ -4,6 +4,7 @@ import { queryWorkouts, chartFiltersToWorkoutFilters } from "../../lib/database"
 import { isConditionActive } from "../FilterEditors";
 import { useNavigationStore } from "../../stores/navigationStore";
 import { useWorkoutStore } from "../../stores/workoutStore";
+import { useDashboardContext } from "../../stores/DashboardContext";
 import ChartPlot from "../ChartPlot";
 
 interface Props {
@@ -18,6 +19,8 @@ export default function ChartWidget({ widget }: Props) {
   const navigateToFilteredWorkouts = useNavigationStore((s) => s.navigateToFilteredWorkouts);
   const navigateToWorkout = useNavigationStore((s) => s.navigateToWorkout);
   const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
+  const useStore = useDashboardContext();
+  const mode = useStore((s) => s.mode);
   if (widget.config.type !== "chart") return null;
   const chartConfig = widget.config.chart;
 
@@ -64,7 +67,7 @@ export default function ChartWidget({ widget }: Props) {
         <div className="shrink-0 truncate text-sm font-medium text-gray-700">{chartConfig.name}</div>
       )}
       <div className="min-h-0 flex-1">
-        <ChartPlot chart={chart} workouts={workouts} fillContainer onCategoryClick={handleCategoryClick} onWorkoutClick={handleWorkoutClick} />
+        <ChartPlot chart={chart} workouts={workouts} fillContainer onCategoryClick={mode === "view" ? handleCategoryClick : undefined} onWorkoutClick={mode === "view" ? handleWorkoutClick : undefined} />
       </div>
     </div>
   );

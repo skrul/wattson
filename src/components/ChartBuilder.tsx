@@ -178,7 +178,16 @@ export default function ChartBuilder({ chart, onChange }: ChartBuilderProps) {
               <label className="mb-1 block text-sm font-medium text-gray-700">Aggregation</label>
               <select
                 value={chart.agg_function ?? "avg"}
-                onChange={(e) => update({ agg_function: e.target.value as AggregationFunction })}
+                onChange={(e) => {
+                  const agg = e.target.value as AggregationFunction;
+                  const updates: Partial<ChartFields> = { agg_function: agg };
+                  // Count doesn't use the y-axis metric, but the chart renderer still
+                  // needs at least one y_field. Auto-add a placeholder if empty.
+                  if (agg === "count" && chart.y_fields.length === 0) {
+                    updates.y_fields = [{ field: NUMERIC_FIELDS[0].key, side: "left" as YAxisSide }];
+                  }
+                  update(updates);
+                }}
                 className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               >
                 <option value="avg">Average</option>
@@ -187,6 +196,18 @@ export default function ChartBuilder({ chart, onChange }: ChartBuilderProps) {
                 <option value="min">Min</option>
                 <option value="max">Max</option>
               </select>
+            </div>
+          )}
+          {isAggregatedMode(chart.x_axis_mode) && (
+            <div className="w-24">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Min</label>
+              <input
+                type="number"
+                value={chart.min_value ?? ""}
+                onChange={(e) => update({ min_value: e.target.value ? Number(e.target.value) : null })}
+                placeholder="None"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              />
             </div>
           )}
           {chart.x_axis_mode !== "category" && (
@@ -205,7 +226,8 @@ export default function ChartBuilder({ chart, onChange }: ChartBuilderProps) {
         </div>
       </fieldset>
 
-      {/* Section 3: Y-Axis */}
+      {/* Section 3: Y-Axis (hidden when count aggregation is active — count ignores the metric) */}
+      {!(isAggregatedMode(chart.x_axis_mode) && chart.agg_function === "count") && (
       <fieldset className="rounded-lg border border-gray-200 px-4 pb-3 pt-2">
         <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Y-Axis</legend>
         <div className="flex gap-4">
@@ -276,6 +298,7 @@ export default function ChartBuilder({ chart, onChange }: ChartBuilderProps) {
           </div>
         </div>
       </fieldset>
+      )}
 
       {/* Section 4: Filters */}
       <fieldset className="rounded-lg border border-gray-200 px-4 pb-3 pt-2">
@@ -286,6 +309,43 @@ export default function ChartBuilder({ chart, onChange }: ChartBuilderProps) {
           onUpdate={(id, updates) => update({ filters: chart.filters.map((c) => (c.id === id ? { ...c, ...updates } : c)) })}
           onRemove={(id) => update({ filters: chart.filters.filter((c) => c.id !== id) })}
         />
+      </fieldset>
+
+      {/* Section 5: Display options */}
+      <fieldset className="rounded-lg border border-gray-200 px-4 pb-3 pt-2">
+        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Display</legend>
+        <div className="flex flex-wrap items-center gap-4">
+          {chart.mark_type === "bar" && (chart.x_axis_mode === "category" || chart.x_axis_sequential) && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={chart.transposed}
+                onChange={(e) => update({ transposed: e.target.checked })}
+                className="text-blue-600"
+              />
+              <span className="whitespace-nowrap">Horizontal bars</span>
+            </label>
+          )}
+          {!chart.group_by && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Color</label>
+              <input
+                type="color"
+                value={chart.color ?? "#2563eb"}
+                onChange={(e) => update({ color: e.target.value })}
+                className="h-7 w-7 cursor-pointer rounded border border-gray-300"
+              />
+              {chart.color && (
+                <button
+                  onClick={() => update({ color: null })}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </fieldset>
 
       {/* Live preview */}

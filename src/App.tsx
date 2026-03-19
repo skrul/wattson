@@ -30,6 +30,7 @@ function App() {
   const session = useSessionStore((s) => s.session);
   const userProfile = useSessionStore((s) => s.userProfile);
   const isSyncing = useSessionStore((s) => s.isSyncing);
+  const syncProgress = useSessionStore((s) => s.syncProgress);
 
   const dashboards = useDashboardRegistryStore((s) => s.dashboards);
   const registryLoaded = useDashboardRegistryStore((s) => s.loaded);
@@ -159,15 +160,18 @@ function App() {
           {isSyncing && (
             <button
               onClick={() => setActiveTab("profile")}
-              className="text-gray-400 hover:text-gray-600"
-              title="Syncing... Click to view"
+              className="flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-200"
+              title="Click to view sync details"
             >
-              <svg className="h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                 <path d="M2.5 8a5.5 5.5 0 0 1 9.3-4" />
                 <path d="M13.5 8a5.5 5.5 0 0 1-9.3 4" />
                 <path d="M11.8 4l1.2-.8L13.5 4.8" />
                 <path d="M4.2 12l-1.2.8L2.5 11.2" />
               </svg>
+              {syncProgress
+                ? `Syncing ${syncProgress.fetched} / ${syncProgress.total}`
+                : "Syncing\u2026"}
             </button>
           )}
         </div>

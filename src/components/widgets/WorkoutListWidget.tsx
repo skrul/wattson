@@ -3,6 +3,7 @@ import type { DashboardWidget, Workout } from "../../types";
 import { getRecentFilteredWorkouts } from "../../lib/database";
 import { useNavigationStore } from "../../stores/navigationStore";
 import { useWorkoutStore } from "../../stores/workoutStore";
+import { useDashboardContext } from "../../stores/DashboardContext";
 import WorkoutCard from "../WorkoutCard";
 
 interface Props {
@@ -15,6 +16,8 @@ export default function WorkoutListWidget({ widget }: Props) {
   const [loading, setLoading] = useState(true);
   const navigateToWorkout = useNavigationStore((s) => s.navigateToWorkout);
   const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
+  const useStore = useDashboardContext();
+  const mode = useStore((s) => s.mode);
 
   if (widget.config.type !== "workout_list") return null;
   const { limit, filters, title } = widget.config;
@@ -52,7 +55,7 @@ export default function WorkoutListWidget({ widget }: Props) {
               <WorkoutCard
                 workout={workout}
                 isSelected={false}
-                onClick={() => navigateToWorkout(workout.id)}
+                onClick={mode === "view" ? () => navigateToWorkout(workout.id) : undefined}
               />
             </div>
           ))}

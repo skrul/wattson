@@ -88,6 +88,9 @@ pub fn run() {
                 x_axis_field TEXT,
                 x_axis_sequential INTEGER NOT NULL DEFAULT 0,
                 agg_function TEXT,
+                transposed INTEGER NOT NULL DEFAULT 0,
+                color TEXT,
+                min_value REAL,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
             );

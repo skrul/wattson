@@ -20,6 +20,9 @@ function makeEmptyChart(): ChartFields {
     x_axis_field: null,
     x_axis_sequential: false,
     agg_function: null,
+    transposed: false,
+    color: null,
+    min_value: null,
   };
 }
 

@@ -116,6 +116,9 @@ export interface ChartDefinition {
   x_axis_field: string | null;    // enum field key, only for "category" mode
   x_axis_sequential: boolean;     // evenly spaced categorical axis
   agg_function: AggregationFunction | null;
+  transposed: boolean;            // horizontal bars (swap x/y)
+  color: string | null;           // single-series color override
+  min_value: number | null;       // HAVING-like filter: hide aggregated buckets below this
   created_at: number;
   updated_at: number;
 }
@@ -180,6 +183,9 @@ export interface ChartDefinitionRow {
   x_axis_field: string | null;
   x_axis_sequential: number | null;
   agg_function: string | null;
+  transposed: number | null;
+  color: string | null;
+  min_value: number | null;
   created_at: number;
   updated_at: number;
 }

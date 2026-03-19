@@ -122,6 +122,9 @@ export function buildDefaultHomeWidgets(): DashboardWidget[] {
       x_axis_field: null,
       x_axis_sequential: true,
       agg_function: null,
+      transposed: false,
+      color: null,
+      min_value: null,
     },
   }, 0, 12, 12, 8));
 
@@ -139,6 +142,9 @@ export function buildDefaultHomeWidgets(): DashboardWidget[] {
       x_axis_field: null,
       x_axis_sequential: true,
       agg_function: null,
+      transposed: false,
+      color: null,
+      min_value: null,
     },
   }, 12, 12, 12, 8));
 
@@ -165,7 +171,7 @@ export function buildDefaultInsightsWidgets(): DashboardWidget[] {
       metric: metrics[i].metric,
       label: metrics[i].label,
       filters: [],
-    }, i * 4, y, 4, 3));
+    }, i * 5, y, 4, 3));
   }
   y += 3;
 
@@ -211,6 +217,9 @@ export function buildDefaultInsightsWidgets(): DashboardWidget[] {
       x_axis_field: "instructor",
       x_axis_sequential: false,
       agg_function: "count",
+      transposed: true,
+      color: null,
+      min_value: 5,
     },
   }, 0, y, 12, 12));
 
@@ -226,6 +235,9 @@ export function buildDefaultInsightsWidgets(): DashboardWidget[] {
       x_axis_field: "class_type",
       x_axis_sequential: false,
       agg_function: "count",
+      transposed: true,
+      color: null,
+      min_value: 5,
     },
   }, 12, y, 12, 12));
   y += 12;

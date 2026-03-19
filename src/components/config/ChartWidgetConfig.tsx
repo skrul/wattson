@@ -21,10 +21,7 @@ function makeEmptyChart(): ChartFields {
     x_axis_sequential: false,
     agg_function: null,
     transposed: false,
-    color: null,
     min_value: null,
-    trend_line: false,
-    trend_line_window: null,
   };
 }
 

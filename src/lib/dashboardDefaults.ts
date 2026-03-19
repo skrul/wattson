@@ -113,7 +113,7 @@ export function buildDefaultHomeWidgets(): DashboardWidget[] {
     chart: {
       name: "Avg Heart Rate",
       mark_type: "line",
-      y_fields: [{ field: "avg_heart_rate", side: "left" }],
+      y_fields: [{ field: "avg_heart_rate", side: "none", color: null, trend_line: true, trend_line_window: null }],
       group_by: null,
       filters: [
         { id: "home-hr-30d", field: "date", operator: "last_n_days", value: "30", values: [] },
@@ -123,10 +123,7 @@ export function buildDefaultHomeWidgets(): DashboardWidget[] {
       x_axis_sequential: true,
       agg_function: null,
       transposed: false,
-      color: null,
       min_value: null,
-      trend_line: false,
-      trend_line_window: null,
     },
   }, 0, 12, 12, 8));
 
@@ -135,7 +132,7 @@ export function buildDefaultHomeWidgets(): DashboardWidget[] {
     chart: {
       name: "Strive Score",
       mark_type: "line",
-      y_fields: [{ field: "strive_score", side: "left" }],
+      y_fields: [{ field: "strive_score", side: "left", trend_line: true }],
       group_by: null,
       filters: [
         { id: "home-ss-30d", field: "date", operator: "last_n_days", value: "30", values: [] },
@@ -145,10 +142,7 @@ export function buildDefaultHomeWidgets(): DashboardWidget[] {
       x_axis_sequential: true,
       agg_function: null,
       transposed: false,
-      color: null,
       min_value: null,
-      trend_line: false,
-      trend_line_window: null,
     },
   }, 12, 12, 12, 8));
 
@@ -222,10 +216,7 @@ export function buildDefaultInsightsWidgets(): DashboardWidget[] {
       x_axis_sequential: false,
       agg_function: "count",
       transposed: true,
-      color: null,
       min_value: 5,
-      trend_line: false,
-      trend_line_window: null,
     },
   }, 0, y, 12, 12));
 
@@ -242,10 +233,7 @@ export function buildDefaultInsightsWidgets(): DashboardWidget[] {
       x_axis_sequential: false,
       agg_function: "count",
       transposed: true,
-      color: null,
       min_value: 5,
-      trend_line: false,
-      trend_line_window: null,
     },
   }, 12, y, 12, 12));
   y += 12;

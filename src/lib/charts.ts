@@ -4,6 +4,15 @@ import { extent } from "d3-array";
 import type { PerformanceTimeSeries, Workout, ChartDefinition, ChartXAxisMode, AggregationFunction } from "../types";
 import { FIELD_MAP } from "./fields";
 
+export const SERIES_COLORS = [
+  "#2563eb", "#dc2626", "#16a34a", "#d97706",
+  "#7c3aed", "#db2777", "#0d9488", "#ea580c",
+];
+
+export function seriesColor(index: number, custom?: string | null): string {
+  return custom ?? SERIES_COLORS[index % SERIES_COLORS.length];
+}
+
 export interface PowerZone {
   zone: string;
   minPct: number;
@@ -328,8 +337,7 @@ export function renderRideDetailChart(
 interface WorkoutPoint {
   date: Date;
   label?: string;
-  y: number;
-  y2?: number;
+  ys: number[];
   group?: string;
   _workout?: Workout;
 }
@@ -462,25 +470,27 @@ function extractRawPoints(
   workouts: Workout[],
   chart: ChartDefinition,
 ): WorkoutPoint[] {
-  const yField = chart.y_fields[0]?.field;
-  const y2Field = chart.y_fields[1]?.field;
-  if (!yField) return [];
+  if (chart.y_fields.length === 0) return [];
+  const fieldKeys = chart.y_fields.map((f) => f.field);
 
   const points: WorkoutPoint[] = [];
   for (const w of workouts) {
-    const yVal = (w as unknown as Record<string, unknown>)[yField];
-    if (yVal == null) continue;
+    const rec = w as unknown as Record<string, unknown>;
+    // Require at least the first field to be non-null
+    const firstVal = rec[fieldKeys[0]];
+    if (firstVal == null) continue;
+    const ys: number[] = [];
+    for (const key of fieldKeys) {
+      const v = rec[key];
+      ys.push(v != null ? scaleValue(key, v as number) : NaN);
+    }
     const point: WorkoutPoint = {
       date: new Date(w.date * 1000),
-      y: scaleValue(yField, yVal as number),
+      ys,
       _workout: w,
     };
-    if (y2Field) {
-      const y2Val = (w as unknown as Record<string, unknown>)[y2Field];
-      if (y2Val != null) point.y2 = scaleValue(y2Field, y2Val as number);
-    }
     if (chart.group_by) {
-      const raw = String((w as unknown as Record<string, unknown>)[chart.group_by] ?? "Unknown");
+      const raw = String(rec[chart.group_by] ?? "Unknown");
       const displayFn = FIELD_MAP[chart.group_by]?.displayValue;
       point.group = displayFn ? displayFn(raw) : raw;
     }
@@ -506,9 +516,11 @@ function prepareChartData(
 
   const fn = chart.agg_function ?? "avg";
 
+  const fieldCount = chart.y_fields.length;
+
   // Group points into buckets
   // Compound key: bucketKey + group (if group_by is set)
-  const buckets = new Map<string, { yValues: number[]; y2Values: number[]; date: Date; label: string; group?: string }>();
+  const buckets = new Map<string, { ysValues: number[][]; date: Date; label: string; group?: string }>();
 
   for (const p of points) {
     let bucketKey: string;
@@ -536,33 +548,35 @@ function prepareChartData(
 
     let bucket = buckets.get(compoundKey);
     if (!bucket) {
-      bucket = { yValues: [], y2Values: [], date: bucketDate, label: bucketLabel, group: p.group };
+      bucket = { ysValues: Array.from({ length: fieldCount }, () => []), date: bucketDate, label: bucketLabel, group: p.group };
       buckets.set(compoundKey, bucket);
     }
-    bucket.yValues.push(p.y);
-    if (p.y2 != null) bucket.y2Values.push(p.y2);
+    for (let fi = 0; fi < fieldCount; fi++) {
+      const v = p.ys[fi];
+      if (!isNaN(v)) bucket.ysValues[fi].push(v);
+    }
   }
 
   // Aggregate and produce output points
   const result: WorkoutPoint[] = [];
   for (const bucket of buckets.values()) {
-    const point: WorkoutPoint = {
+    const ys: number[] = [];
+    for (let fi = 0; fi < fieldCount; fi++) {
+      ys.push(bucket.ysValues[fi].length > 0 ? aggregate(bucket.ysValues[fi], fn) : NaN);
+    }
+    result.push({
       date: bucket.date,
       label: bucket.label,
-      y: aggregate(bucket.yValues, fn),
+      ys,
       group: bucket.group,
-    };
-    if (bucket.y2Values.length > 0) {
-      point.y2 = aggregate(bucket.y2Values, fn);
-    }
-    result.push(point);
+    });
   }
 
-  // HAVING-like filter: drop buckets below min_value
+  // HAVING-like filter: drop buckets below min_value (based on first field)
   if (chart.min_value != null) {
     const min = chart.min_value;
     for (let i = result.length - 1; i >= 0; i--) {
-      if (result[i].y < min) result.splice(i, 1);
+      if (result[i].ys[0] < min) result.splice(i, 1);
     }
   }
 
@@ -600,9 +614,9 @@ function fieldLabel(fieldKey: string): string {
   return FIELD_MAP[fieldKey]?.label ?? fieldKey;
 }
 
-function tooltipTitle(d: WorkoutPoint, yFieldKey: string, chart: ChartDefinition, yValue?: number): string {
+function tooltipTitle(d: WorkoutPoint, yFieldKey: string, chart: ChartDefinition, yValue: number): string {
   const xLabel = d.label ?? d.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
-  const val = yValue ?? d.y;
+  const val = yValue;
   const rounded = Number.isInteger(val) ? val : +val.toFixed(2);
   const aggregated = isAggregatedMode(chart.x_axis_mode);
   const isCount = aggregated && chart.agg_function === "count";
@@ -743,20 +757,23 @@ function temporalAggXConfig(data: WorkoutPoint[], mode: ChartXAxisMode, chartWid
   return cfg;
 }
 
-/** Compute a rolling average over data points. */
-function computeRollingAverage(data: WorkoutPoint[], windowSize: number): WorkoutPoint[] {
-  const result: WorkoutPoint[] = [];
+/** Compute a rolling average over data points for a specific field index. Returns points with ys[0] = smoothed value. */
+function computeRollingAverage(data: WorkoutPoint[], windowSize: number, fieldIndex: number): { date: Date; label?: string; y: number }[] {
+  const result: { date: Date; label?: string; y: number }[] = [];
   for (let i = 0; i < data.length; i++) {
     const start = Math.max(0, i - windowSize + 1);
-    const slice = data.slice(start, i + 1);
-    const avg = slice.reduce((sum, d) => sum + d.y, 0) / slice.length;
-    result.push({ ...data[i], y: avg });
+    let sum = 0, count = 0;
+    for (let j = start; j <= i; j++) {
+      const v = data[j].ys[fieldIndex];
+      if (!isNaN(v)) { sum += v; count++; }
+    }
+    result.push({ date: data[i].date, label: data[i].label, y: count > 0 ? sum / count : 0 });
   }
   return result;
 }
 
-/** Render a chart with a single Y axis. */
-export function renderSingleAxisChart(
+/** Render a chart with N Y-axis fields, each independently scaled. */
+export function renderChart(
   workouts: Workout[],
   chart: ChartDefinition,
   width = 800,
@@ -768,25 +785,73 @@ export function renderSingleAxisChart(
     return Plot.plot({ width, height, marks: [] });
   }
 
-  const color = chart.group_by ? "group" : (chart.color ?? "#2563eb");
   const aggregated = isAggregatedMode(chart.x_axis_mode);
   const temporal = isTemporalAggregation(chart.x_axis_mode);
   const categorical = chart.x_axis_mode === "category" || chart.x_axis_sequential;
   const xKey = categorical ? "label" : "date";
+  const multiField = chart.y_fields.length >= 2 && !chart.group_by;
 
-  const titleFn = (d: WorkoutPoint) => tooltipTitle(d, yField.field, chart);
-  const pointTipOptions = { tip: { anchor: "bottom" as const, dy: -6 }, title: titleFn };
+  // --- Determine the primary field (first left-side, or field[0]) ---
+  const primaryIndex = chart.y_fields.findIndex((f) => f.side === "left");
+  const primaryIdx = primaryIndex >= 0 ? primaryIndex : 0;
 
-  // For grouped bars, build a title function that shows all groups at the same x-position
-  let groupedBarTitleFn: ((d: WorkoutPoint) => string) | undefined;
-  if (chart.mark_type === "bar" && chart.group_by) {
+  // --- Compute extents and scaling for each field ---
+  const fieldExtents: [number, number][] = chart.y_fields.map((_, fi) => {
+    const vals = data.map((d) => d.ys[fi]).filter((v) => !isNaN(v));
+    const ext = extent(vals) as [number, number];
+    return ext[0] != null ? ext : [0, 1];
+  });
+  const primaryExtent = fieldExtents[primaryIdx];
+
+  // Scale functions: map field[i] values into the primary extent for plotting
+  const fieldScales: ((v: number) => number)[] = chart.y_fields.map((_, fi) => {
+    if (fi === primaryIdx) return (v: number) => v;
+    const ext = fieldExtents[fi];
+    if (ext[0] === ext[1]) return () => (primaryExtent[0] + primaryExtent[1]) / 2;
+    const s = scaleLinear().domain(ext).range(primaryExtent);
+    return (v: number) => s(v);
+  });
+
+  // --- Build per-field flat data arrays (mapped into primary space) ---
+  interface FlatPoint {
+    date: Date;
+    label?: string;
+    y: number;          // mapped into primary extent
+    originalY: number;  // real value for tooltip
+    group?: string;
+    _workout?: Workout;
+  }
+  const fieldData: FlatPoint[][] = chart.y_fields.map((_, fi) =>
+    data
+      .filter((d) => !isNaN(d.ys[fi]))
+      .map((d) => ({
+        date: d.date,
+        label: d.label,
+        y: fieldScales[fi](d.ys[fi]),
+        originalY: d.ys[fi],
+        group: d.group,
+        _workout: d._workout,
+      })),
+  );
+
+  // --- For single-field + group_by, use the old color="group" approach ---
+  const singleFieldGrouped = chart.y_fields.length === 1 && !!chart.group_by;
+  const singleColor = singleFieldGrouped ? "group" : seriesColor(0, yField.color);
+
+  // --- Marks ---
+  const chartMarks: Plot.Markish[] = [];
+  const halfWidth = (temporal && TEMPORAL_BAR_HALF_WIDTH[chart.x_axis_mode]) || HALF_DAY_MS;
+  const transposed = chart.transposed && chart.mark_type === "bar" && categorical;
+
+  // For grouped bars (single field + group_by), build a combined tooltip
+  let groupedBarTitleFn: ((d: FlatPoint) => string) | undefined;
+  if (chart.mark_type === "bar" && singleFieldGrouped) {
     const groupsByX = new Map<string, { group: string; y: number }[]>();
-    for (const d of data) {
+    for (const d of fieldData[0]) {
       const key = d.label ?? d.date.toISOString();
       if (!groupsByX.has(key)) groupsByX.set(key, []);
-      groupsByX.get(key)!.push({ group: d.group ?? "Unknown", y: d.y });
+      groupsByX.get(key)!.push({ group: d.group ?? "Unknown", y: d.originalY });
     }
-    // Sort each group list numerically
     for (const groups of groupsByX.values()) {
       groups.sort((a, b) => {
         const aNum = parseFloat(a.group);
@@ -798,7 +863,7 @@ export function renderSingleAxisChart(
     const isCount = aggregated && chart.agg_function === "count";
     const prefix = aggregated && chart.agg_function && !isCount ? `${AGG_LABEL[chart.agg_function]} ` : "";
     const metricLabel = isCount ? "Count" : `${prefix}${fieldLabel(yField.field)}`;
-    groupedBarTitleFn = (d: WorkoutPoint) => {
+    groupedBarTitleFn = (d: FlatPoint) => {
       const key = d.label ?? d.date.toISOString();
       const groups = groupsByX.get(key) ?? [];
       const xLabel = d.label ?? d.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
@@ -811,245 +876,132 @@ export function renderSingleAxisChart(
     };
   }
 
-  const transposed = chart.transposed && chart.mark_type === "bar" && categorical;
-  const chartMarks: Plot.Markish[] = [];
-  if (chart.mark_type === "bar") {
-    const barTip = groupedBarTitleFn
-      ? { tip: true, title: groupedBarTitleFn }
-      : {};
-    if (categorical) {
-      if (transposed) {
-        chartMarks.push(Plot.barX(data, {
-          y: "label",
-          x: "y",
-          fill: color,
-          ...(chart.group_by ? {} : { fillOpacity: 0.8 }),
-          sort: { y: "x", reverse: true },
-          ...barTip,
-        }));
+  // Helper: add marks for one field
+  const addFieldMarks = (fi: number) => {
+    const fd = fieldData[fi];
+    const yf = chart.y_fields[fi];
+    const color = seriesColor(fi, yf.color);
+    const isPrimary = fi === primaryIdx;
+    const opacity = isPrimary || chart.y_fields.length === 1 ? 0.8 : 0.5;
+    const titleFn = (d: FlatPoint) => tooltipTitle(d as unknown as WorkoutPoint, yf.field, chart, d.originalY);
+    const pointTip = { tip: { anchor: "bottom" as const, dy: -6 }, title: titleFn };
+
+    if (chart.mark_type === "bar") {
+      const barTip = groupedBarTitleFn && fi === 0 ? { tip: true, title: groupedBarTitleFn } : {};
+      const fillColor = singleFieldGrouped ? singleColor : color;
+      if (categorical) {
+        if (transposed) {
+          chartMarks.push(Plot.barX(fd, {
+            y: "label", x: "y", fill: fillColor,
+            ...(singleFieldGrouped ? {} : { fillOpacity: opacity }),
+            sort: { y: "x", reverse: true },
+            ...barTip,
+          }));
+        } else {
+          chartMarks.push(Plot.barY(fd, {
+            x: "label", y: "y", fill: fillColor,
+            ...(singleFieldGrouped ? {} : { fillOpacity: opacity }),
+            ...barTip,
+          }));
+        }
       } else {
-        chartMarks.push(Plot.barY(data, {
-          x: "label",
-          y: "y",
-          fill: color,
-          ...(chart.group_by ? {} : { fillOpacity: 0.8 }),
+        const barData = fd.map((d) => ({
+          ...d,
+          x1: new Date(d.date.getTime() - halfWidth),
+          x2: new Date(d.date.getTime() + halfWidth),
+        }));
+        chartMarks.push(Plot.rectY(barData, {
+          x1: "x1", x2: "x2", y: "y", fill: fillColor,
+          ...(singleFieldGrouped ? {} : { fillOpacity: opacity }),
           ...barTip,
         }));
       }
-    } else {
-      const halfWidth = (temporal && TEMPORAL_BAR_HALF_WIDTH[chart.x_axis_mode]) || HALF_DAY_MS;
-      const barData = data.map((d) => ({
-        ...d,
-        x1: new Date(d.date.getTime() - halfWidth),
-        x2: new Date(d.date.getTime() + halfWidth),
-      }));
-      chartMarks.push(Plot.rectY(barData, {
-        x1: "x1",
-        x2: "x2",
-        y: "y",
-        fill: color,
-        ...(chart.group_by ? {} : { fillOpacity: 0.8 }),
-        ...barTip,
-      }));
-    }
-    if (!chart.group_by) {
-      chartMarks.push(Plot.tip(data, Plot.pointer({
-        x: transposed ? "y" : xKey,
-        y: transposed ? "label" : "y",
-        anchor: transposed ? "left" : "bottom",
-        ...(transposed ? { dx: -6 } : { dy: -6 }),
-        title: titleFn,
-      })));
-    }
-  } else if (chart.mark_type === "dot") {
-    chartMarks.push(Plot.dot(data, { x: xKey, y: "y", stroke: color, fill: color, r: 3, ...pointTipOptions }));
-  } else {
-    chartMarks.push(Plot.lineY(data, {
-      x: xKey, y: "y", stroke: color, strokeWidth: 1.5,
-      ...(chart.group_by ? { sort: xKey } : {}),
-      ...pointTipOptions,
-    }));
-  }
-
-  // Trend line overlay: rolling average for line/dot in non-aggregated, non-grouped mode
-  if (
-    chart.trend_line &&
-    (chart.mark_type === "line" || chart.mark_type === "dot") &&
-    chart.x_axis_mode !== "category" &&
-    !chart.group_by &&
-    data.length > 1
-  ) {
-    const windowSize = chart.trend_line_window ?? 7;
-    const smoothed = computeRollingAverage(data, windowSize);
-    chartMarks.push(Plot.lineY(smoothed, {
-      x: xKey,
-      y: "y",
-      stroke: "#111",
-      strokeWidth: 2,
-      strokeOpacity: 0.6,
-      strokeDasharray: "6 3",
-    }));
-  }
-
-  const isCategoryMode = chart.x_axis_mode === "category";
-  const catConfig: Record<string, unknown> = categorical
-    ? workoutXConfig(data, isCategoryMode, width)
-    : temporal
-      ? temporalAggXConfig(data, chart.x_axis_mode, width)
-      : { label: null, type: "utc" };
-
-  // Y-axis label: prepend aggregation function name when active
-  let yLabel = fieldLabel(yField.field);
-  if (aggregated && chart.agg_function) {
-    yLabel = chart.agg_function === "count" ? "Count" : `${AGG_LABEL[chart.agg_function]} ${yLabel}`;
-  }
-
-  // Estimate left margin for transposed charts based on longest label
-  let marginLeft: number | undefined;
-  if (transposed) {
-    const maxLen = Math.max(...data.map((d) => (d.label ?? "").length));
-    marginLeft = Math.min(200, maxLen * 7 + 20);
-  }
-
-  const plotConfig = transposed
-    ? {
-        width,
-        height,
-        marginLeft,
-        marginRight: 40,
-        x: { label: yLabel, grid: true } as Record<string, unknown>,
-        y: { ...catConfig, tickRotate: 0, label: null } as Record<string, unknown>,
-        color: chart.group_by ? { legend: true, domain: sortedGroups(data) } : undefined,
-        marks: chartMarks,
+      if (!singleFieldGrouped) {
+        chartMarks.push(Plot.tip(fd, Plot.pointer({
+          x: transposed ? "y" : xKey,
+          y: transposed ? "label" : "y",
+          anchor: transposed ? "left" : "bottom",
+          ...(transposed ? { dx: -6 } : { dy: -6 }),
+          title: titleFn,
+        })));
       }
-    : {
-        width,
-        height,
-        marginRight: 40,
-        marginBottom: (catConfig as Record<string, unknown>).tickRotate ? 60 : undefined,
-        x: catConfig,
-        y: { label: yLabel, grid: true },
-        color: chart.group_by ? { legend: true, domain: sortedGroups(data) } : undefined,
-        marks: chartMarks,
-      };
-
-  return Plot.plot(plotConfig);
-}
-
-/** Render a chart with two Y axes (left + right). */
-export function renderDualAxisChart(
-  workouts: Workout[],
-  chart: ChartDefinition,
-  width = 800,
-  height = 400,
-): SVGElement | HTMLElement {
-  const data = prepareChartData(workouts, chart);
-  if (chart.y_fields.length < 2 || data.length === 0) {
-    return renderSingleAxisChart(workouts, chart, width, height);
-  }
-
-  const leftField = chart.y_fields.find((f) => f.side === "left") ?? chart.y_fields[0];
-  const rightField = chart.y_fields.find((f) => f.side === "right") ?? chart.y_fields[1];
-
-  // Compute extent of both Y fields
-  const leftExtent = extent(data, (d) => d.y) as [number, number];
-  const rightValues = data.map((d) => d.y2).filter((v): v is number => v != null);
-  const rightExtent = extent(rightValues) as [number, number];
-
-  if (leftExtent[0] == null || rightExtent[0] == null) {
-    return renderSingleAxisChart(workouts, chart, width, height);
-  }
-
-  // Map right-axis values into left-axis range
-  const rightToLeft = scaleLinear()
-    .domain(rightExtent)
-    .range(leftExtent);
-
-  // Build mapped data for right axis (keep originalY for tooltips)
-  const mappedData = data
-    .filter((d) => d.y2 != null)
-    .map((d) => ({
-      date: d.date,
-      label: d.label,
-      y: rightToLeft(d.y2!),
-      originalY: d.y2!,
-      group: d.group,
-    }));
-
-  const marks: Plot.Markish[] = [];
-  const leftColor = chart.color ?? "#2563eb";
-  const rightColor = "#dc2626";
-  const aggregated = isAggregatedMode(chart.x_axis_mode);
-  const temporal = isTemporalAggregation(chart.x_axis_mode);
-  const categorical = chart.x_axis_mode === "category" || chart.x_axis_sequential;
-  const xKey = categorical ? "label" : "date";
-
-  const halfWidth = (temporal && TEMPORAL_BAR_HALF_WIDTH[chart.x_axis_mode]) || HALF_DAY_MS;
-  const makeBarData = <T extends { date: Date }>(pts: T[]) =>
-    pts.map((d) => ({
-      ...d,
-      x1: new Date(d.date.getTime() - halfWidth),
-      x2: new Date(d.date.getTime() + halfWidth),
-    }));
-
-  const leftTitleFn = (d: WorkoutPoint) => tooltipTitle(d, leftField.field, chart);
-  const rightTitleFn = (d: { originalY: number } & WorkoutPoint) => tooltipTitle(d, rightField.field, chart, d.originalY);
-  const leftPointTip = { tip: { anchor: "bottom" as const }, title: leftTitleFn };
-  const rightPointTip = { tip: { anchor: "bottom" as const }, title: rightTitleFn };
-
-  // Left Y marks
-  if (chart.mark_type === "bar") {
-    if (categorical) {
-      marks.push(Plot.barY(data, { x: "label", y: "y", fill: leftColor, fillOpacity: 0.8 }));
+    } else if (chart.mark_type === "dot") {
+      chartMarks.push(Plot.dot(fd, { x: xKey, y: "y", stroke: singleFieldGrouped ? singleColor : color, fill: singleFieldGrouped ? singleColor : color, r: 3, ...pointTip }));
     } else {
-      marks.push(Plot.rectY(makeBarData(data), { x1: "x1", x2: "x2", y: "y", fill: leftColor, fillOpacity: 0.8 }));
+      chartMarks.push(Plot.lineY(fd, {
+        x: xKey, y: "y", stroke: singleFieldGrouped ? singleColor : color, strokeWidth: 1.5,
+        ...(singleFieldGrouped ? { sort: xKey } : {}),
+        ...(multiField && fi !== primaryIdx ? { strokeDasharray: "4 2" } : {}),
+        ...pointTip,
+      }));
     }
-    marks.push(Plot.tip(data, Plot.pointer({ x: xKey, y: "y", anchor: "bottom", title: leftTitleFn })));
-  } else if (chart.mark_type === "dot") {
-    marks.push(Plot.dot(data, { x: xKey, y: "y", stroke: leftColor, fill: leftColor, r: 3, ...leftPointTip }));
-  } else {
-    marks.push(Plot.lineY(data, { x: xKey, y: "y", stroke: leftColor, strokeWidth: 1.5, ...leftPointTip }));
+  };
+
+  // Add marks for all fields
+  for (let fi = 0; fi < chart.y_fields.length; fi++) {
+    addFieldMarks(fi);
   }
 
-  // Right Y marks (mapped into left range)
-  if (chart.mark_type === "bar") {
-    if (categorical) {
-      marks.push(Plot.barY(mappedData, { x: "label", y: "y", fill: rightColor, fillOpacity: 0.5 }));
-    } else {
-      marks.push(Plot.rectY(makeBarData(mappedData), { x1: "x1", x2: "x2", y: "y", fill: rightColor, fillOpacity: 0.5 }));
-    }
-    marks.push(Plot.tip(mappedData, Plot.pointer({ x: xKey, y: "y", anchor: "bottom", title: rightTitleFn })));
-  } else if (chart.mark_type === "dot") {
-    marks.push(Plot.dot(mappedData, { x: xKey, y: "y", stroke: rightColor, fill: rightColor, r: 3, ...rightPointTip }));
-  } else {
-    marks.push(Plot.lineY(mappedData, { x: xKey, y: "y", stroke: rightColor, strokeWidth: 1.5, strokeDasharray: "4 2", ...rightPointTip }));
+  // Single-field grouped bar tip
+  if (chart.mark_type === "bar" && singleFieldGrouped) {
+    const fd = fieldData[0];
+    const titleFn = (d: FlatPoint) => tooltipTitle(d as unknown as WorkoutPoint, yField.field, chart, d.originalY);
+    chartMarks.push(Plot.tip(fd, Plot.pointer({
+      x: transposed ? "y" : xKey,
+      y: transposed ? "label" : "y",
+      anchor: transposed ? "left" : "bottom",
+      ...(transposed ? { dx: -6 } : { dy: -6 }),
+      title: titleFn,
+    })));
   }
 
-  // Right-side axis ticks
-  const leftToRight = scaleLinear().domain(leftExtent).range(rightExtent);
-  const leftDomain = [leftExtent[0], leftExtent[1]];
-  const tickCount = 6;
-  const leftStep = (leftDomain[1] - leftDomain[0]) / (tickCount - 1);
-  const maxXVal = categorical
-    ? data[data.length - 1]?.label
-    : data.reduce((max, d) => (d.date > max ? d.date : max), data[0].date);
-  const rightTicks = Array.from({ length: tickCount }, (_, i) => {
-    const leftVal = leftDomain[0] + i * leftStep;
-    return { x: maxXVal, y: leftVal, label: Math.round(leftToRight(leftVal)).toString() };
-  });
+  // --- Trend line overlays ---
+  const canTrend = (chart.mark_type === "line" || chart.mark_type === "dot") &&
+    chart.x_axis_mode !== "category" && !chart.group_by && data.length > 1;
 
-  marks.push(
-    Plot.text(rightTicks, {
-      x: "x",
-      y: "y",
-      text: "label",
-      textAnchor: "start",
-      dx: 8,
-      fontSize: 10,
-      fill: rightColor,
-    }),
-  );
+  if (canTrend) {
+    for (let fi = 0; fi < chart.y_fields.length; fi++) {
+      const yf = chart.y_fields[fi];
+      if (!yf.trend_line) continue;
+      const windowSize = yf.trend_line_window ?? 7;
+      const smoothed = computeRollingAverage(data, windowSize, fi);
+      // Map into primary extent
+      const mappedSmoothed = smoothed.map((d) => ({
+        ...d,
+        y: fieldScales[fi](d.y),
+      }));
+      const color = seriesColor(fi, yf.color);
+      chartMarks.push(Plot.lineY(mappedSmoothed, {
+        x: xKey, y: "y",
+        stroke: color, strokeWidth: 2, strokeOpacity: 0.6, strokeDasharray: "6 3",
+      }));
+    }
+  }
 
+  // --- Right-side axis ticks (for fields on the right side) ---
+  const hasRightFields = multiField && chart.y_fields.some((f) => f.side === "right");
+  if (hasRightFields) {
+    // Use the first right-side field for tick labels
+    const firstRightIdx = chart.y_fields.findIndex((f) => f.side === "right");
+    const rightExt = fieldExtents[firstRightIdx];
+    const rightColor = seriesColor(firstRightIdx, chart.y_fields[firstRightIdx].color);
+    const primaryToRight = scaleLinear().domain(primaryExtent).range(rightExt);
+    const tickCount = 6;
+    const step = (primaryExtent[1] - primaryExtent[0]) / (tickCount - 1);
+    const maxXVal = categorical
+      ? data[data.length - 1]?.label
+      : data.reduce((max, d) => (d.date > max ? d.date : max), data[0].date);
+    const rightTicks = Array.from({ length: tickCount }, (_, i) => {
+      const pVal = primaryExtent[0] + i * step;
+      return { x: maxXVal, y: pVal, label: Math.round(primaryToRight(pVal)).toString() };
+    });
+    chartMarks.push(Plot.text(rightTicks, {
+      x: "x", y: "y", text: "label",
+      textAnchor: "start", dx: 8, fontSize: 10, fill: rightColor,
+    }));
+  }
+
+  // --- X-axis config ---
   const isCategoryMode = chart.x_axis_mode === "category";
   const xConfig: Record<string, unknown> = categorical
     ? workoutXConfig(data, isCategoryMode, width)
@@ -1057,34 +1009,67 @@ export function renderDualAxisChart(
       ? temporalAggXConfig(data, chart.x_axis_mode, width)
       : { label: null, type: "utc" };
 
-  // Y-axis labels: prepend aggregation function name when active
-  let leftLabel = fieldLabel(leftField.field);
-  let rightLabel = fieldLabel(rightField.field);
+  // --- Y-axis label ---
+  let yLabel = fieldLabel(chart.y_fields[primaryIdx].field);
   if (aggregated && chart.agg_function) {
-    if (chart.agg_function === "count") {
-      leftLabel = "Count";
-      rightLabel = "Count";
+    yLabel = chart.agg_function === "count" ? "Count" : `${AGG_LABEL[chart.agg_function]} ${yLabel}`;
+  }
+
+  // --- Margin ---
+  let marginLeft: number | undefined;
+  if (transposed) {
+    const maxLen = Math.max(...data.map((d) => (d.label ?? "").length));
+    marginLeft = Math.min(200, maxLen * 7 + 20);
+  }
+  const marginRight = hasRightFields ? 70 : 40;
+
+  // --- Caption: list all field labels with colors when multi-field ---
+  let caption: string | undefined;
+  if (multiField) {
+    const parts = chart.y_fields.map((yf, fi) => {
+      let label = fieldLabel(yf.field);
+      if (aggregated && chart.agg_function) {
+        label = chart.agg_function === "count" ? "Count" : `${AGG_LABEL[chart.agg_function]} ${label}`;
+      }
+      const color = seriesColor(fi, yf.color);
+      return `<span style="color:${color}">●</span> ${label}${yf.side === "right" ? " (R)" : ""}`;
+    });
+    caption = parts.join("  ");
+  }
+
+  const plotConfig = transposed
+    ? {
+        width, height, marginLeft, marginRight,
+        x: { label: yLabel, grid: true } as Record<string, unknown>,
+        y: { ...xConfig, tickRotate: 0, label: null } as Record<string, unknown>,
+        color: singleFieldGrouped ? { legend: true, domain: sortedGroups(data) } : undefined,
+        marks: chartMarks,
+      }
+    : {
+        width, height, marginRight,
+        marginBottom: (xConfig as Record<string, unknown>).tickRotate ? 60 : undefined,
+        x: xConfig,
+        y: { label: yLabel, grid: true, ...(multiField ? { domain: primaryExtent } : {}) },
+        color: singleFieldGrouped ? { legend: true, domain: sortedGroups(data) } : undefined,
+        marks: chartMarks,
+      };
+
+  const svg = Plot.plot(plotConfig);
+
+  // Inject HTML caption if multi-field
+  if (caption) {
+    const figcaption = svg.querySelector("figcaption");
+    if (figcaption) {
+      figcaption.innerHTML = caption;
     } else {
-      const prefix = AGG_LABEL[chart.agg_function];
-      leftLabel = `${prefix} ${leftLabel}`;
-      rightLabel = `${prefix} ${rightLabel}`;
+      const cap = document.createElement("figcaption");
+      cap.innerHTML = caption;
+      cap.style.cssText = "font-size:12px;text-align:center;margin-top:4px;";
+      svg.appendChild(cap);
     }
   }
 
-  return Plot.plot({
-    width,
-    height,
-    marginRight: 70,
-    marginBottom: (xConfig as Record<string, unknown>).tickRotate ? 60 : undefined,
-    x: xConfig,
-    y: {
-      label: leftLabel,
-      grid: true,
-      domain: leftExtent,
-    },
-    marks,
-    caption: `Blue: ${leftLabel} · Red: ${rightLabel}`,
-  });
+  return svg;
 }
 
 // --- Compare chart ---
@@ -1598,10 +1583,7 @@ export function renderCustomChart(
   onCategoryClick?: (label: string) => void,
   onWorkoutClick?: (workoutId: string) => void,
 ): SVGElement | HTMLElement {
-  if (chart.y_fields.length >= 2) {
-    return renderDualAxisChart(workouts, chart, width, height);
-  }
-  const svg = renderSingleAxisChart(workouts, chart, width, height);
+  const svg = renderChart(workouts, chart, width, height);
 
   if (onCategoryClick && chart.x_axis_mode === "category" && chart.mark_type === "bar") {
     const data = prepareChartData(workouts, chart);
@@ -1669,7 +1651,7 @@ function attachLineClickTargets(
   for (const d of data) {
     const xVal = categorical ? d.label : d.date;
     const cx = xScale.apply(xVal);
-    const cy = yScale.apply(d.y);
+    const cy = yScale.apply(d.ys[0]);
     if (cx == null || cy == null || isNaN(cx) || isNaN(cy)) continue;
 
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");

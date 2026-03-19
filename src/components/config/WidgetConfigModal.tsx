@@ -31,7 +31,7 @@ export default function WidgetConfigModal() {
     <Dialog open onClose={cancelConfiguring} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="mx-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+        <DialogPanel className={`mx-auto max-h-[90vh] w-full overflow-y-auto rounded-xl bg-white p-6 shadow-xl ${widgetType === "chart" ? "max-w-5xl" : "max-w-2xl"}`}>
           <DialogTitle className="mb-4 text-lg font-semibold text-gray-900">{title}</DialogTitle>
 
           {widgetType === "metric_total" && (

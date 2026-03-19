@@ -91,7 +91,7 @@ export interface WorkoutFilters {
 
 // --- Chart definitions ---
 
-export type YAxisSide = "left" | "right";
+export type YAxisSide = "left" | "right" | "none";
 export type ChartMarkType = "line" | "dot" | "bar";
 export type ChartXAxisMode =
   | "date"
@@ -103,13 +103,16 @@ export type AggregationFunction = "avg" | "sum" | "count" | "min" | "max";
 export interface YAxisField {
   field: string;      // numeric field key from FIELD_DEFS
   side: YAxisSide;
+  color?: string | null;
+  trend_line?: boolean;
+  trend_line_window?: number | null;
 }
 
 export interface ChartDefinition {
   id: string;
   name: string;
   mark_type: ChartMarkType;
-  y_fields: YAxisField[];         // 1-2 fields
+  y_fields: YAxisField[];
   group_by: string | null;        // enum field key for color coding
   filters: FilterCondition[];     // reuses existing type
   x_axis_mode: ChartXAxisMode;
@@ -117,10 +120,7 @@ export interface ChartDefinition {
   x_axis_sequential: boolean;     // evenly spaced categorical axis
   agg_function: AggregationFunction | null;
   transposed: boolean;            // horizontal bars (swap x/y)
-  color: string | null;           // single-series color override
   min_value: number | null;       // HAVING-like filter: hide aggregated buckets below this
-  trend_line: boolean;            // rolling average overlay
-  trend_line_window: number | null; // rolling window size (default 7)
   created_at: number;
   updated_at: number;
 }
@@ -186,10 +186,7 @@ export interface ChartDefinitionRow {
   x_axis_sequential: number | null;
   agg_function: string | null;
   transposed: number | null;
-  color: string | null;
   min_value: number | null;
-  trend_line: number | null;
-  trend_line_window: number | null;
   created_at: number;
   updated_at: number;
 }

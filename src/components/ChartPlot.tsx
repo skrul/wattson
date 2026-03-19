@@ -11,6 +11,8 @@ interface ChartPlotProps {
   fillContainer?: boolean;
   /** Callback when a category bar is clicked (label is the raw category value) */
   onCategoryClick?: (label: string) => void;
+  /** Callback when a non-aggregated data point is clicked */
+  onWorkoutClick?: (workoutId: string) => void;
 }
 
 function useContainerSize(ref: React.RefObject<HTMLDivElement | null>, enabled: boolean) {
@@ -36,7 +38,7 @@ function useContainerSize(ref: React.RefObject<HTMLDivElement | null>, enabled: 
   return size;
 }
 
-export default function ChartPlot({ chart, workouts, width, height = 400, fillContainer, onCategoryClick }: ChartPlotProps) {
+export default function ChartPlot({ chart, workouts, width, height = 400, fillContainer, onCategoryClick, onWorkoutClick }: ChartPlotProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<HTMLDivElement>(null);
   const containerSize = useContainerSize(containerRef, !!fillContainer);
@@ -62,10 +64,10 @@ export default function ChartPlot({ chart, workouts, width, height = 400, fillCo
     const h = fillContainer ? containerSize.h : height;
     if (w <= 0 || h <= 0) return;
 
-    const svg = renderCustomChart(workouts, chart, w, h, onCategoryClick);
+    const svg = renderCustomChart(workouts, chart, w, h, onCategoryClick, onWorkoutClick);
     svg.style.overflow = "visible";
     el.replaceChildren(svg);
-  }, [chart, workouts, width, height, fillContainer, containerSize, ownWidth, onCategoryClick]);
+  }, [chart, workouts, width, height, fillContainer, containerSize, ownWidth, onCategoryClick, onWorkoutClick]);
 
   const hasFields = chart.y_fields.length > 0;
   const hasData = workouts.length > 0;

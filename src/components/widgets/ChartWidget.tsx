@@ -16,6 +16,7 @@ let condId = 0;
 export default function ChartWidget({ widget }: Props) {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const navigateToFilteredWorkouts = useNavigationStore((s) => s.navigateToFilteredWorkouts);
+  const navigateToWorkout = useNavigationStore((s) => s.navigateToWorkout);
   const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
   if (widget.config.type !== "chart") return null;
   const chartConfig = widget.config.chart;
@@ -53,13 +54,17 @@ export default function ChartWidget({ widget }: Props) {
     });
   }, [chartConfig.x_axis_field, navigateToFilteredWorkouts]);
 
+  const handleWorkoutClick = useCallback((workoutId: string) => {
+    navigateToWorkout(workoutId);
+  }, [navigateToWorkout]);
+
   return (
     <div className="flex h-full w-full flex-col">
       {chartConfig.name && (
         <div className="shrink-0 truncate text-sm font-medium text-gray-700">{chartConfig.name}</div>
       )}
       <div className="min-h-0 flex-1">
-        <ChartPlot chart={chart} workouts={workouts} fillContainer onCategoryClick={handleCategoryClick} />
+        <ChartPlot chart={chart} workouts={workouts} fillContainer onCategoryClick={handleCategoryClick} onWorkoutClick={handleWorkoutClick} />
       </div>
     </div>
   );

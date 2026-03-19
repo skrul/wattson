@@ -84,6 +84,67 @@ export function makeWidget(type: WidgetType, config: WidgetConfig, x: number, y:
   };
 }
 
+export function buildDefaultHomeWidgets(): DashboardWidget[] {
+  const widgets: DashboardWidget[] = [];
+
+  widgets.push(makeWidget("last_workout", {
+    type: "last_workout",
+    title: "Last Cycling Workout",
+    filters: [
+      { id: "preset-cycling", field: "discipline", operator: "equals", value: "cycling", values: ["cycling"] },
+    ],
+    showFooter: false,
+  }, 0, 0, 12, 10));
+
+  widgets.push(makeWidget("workout_list", {
+    type: "workout_list",
+    title: "Recent Rides",
+    limit: 10,
+    filters: [
+      { id: "home-last7", field: "date", operator: "last_n_days", value: "7", values: [] },
+      { id: "home-cycling", field: "discipline", operator: "equals", value: "", values: ["cycling"] },
+    ],
+  }, 12, 0, 10, 10));
+
+  widgets.push(makeWidget("section", { type: "section", title: "Trends" }, 0, 10));
+
+  widgets.push(makeWidget("chart", {
+    type: "chart",
+    chart: {
+      name: "Avg Heart Rate",
+      mark_type: "line",
+      y_fields: [{ field: "avg_heart_rate", side: "left" }],
+      group_by: null,
+      filters: [
+        { id: "home-hr-30d", field: "date", operator: "last_n_days", value: "30", values: [] },
+      ],
+      x_axis_mode: "date",
+      x_axis_field: null,
+      x_axis_sequential: true,
+      agg_function: null,
+    },
+  }, 0, 12, 12, 8));
+
+  widgets.push(makeWidget("chart", {
+    type: "chart",
+    chart: {
+      name: "Strive Score",
+      mark_type: "line",
+      y_fields: [{ field: "strive_score", side: "left" }],
+      group_by: null,
+      filters: [
+        { id: "home-ss-30d", field: "date", operator: "last_n_days", value: "30", values: [] },
+      ],
+      x_axis_mode: "date",
+      x_axis_field: null,
+      x_axis_sequential: true,
+      agg_function: null,
+    },
+  }, 12, 12, 12, 8));
+
+  return widgets;
+}
+
 export function buildDefaultInsightsWidgets(): DashboardWidget[] {
   const widgets: DashboardWidget[] = [];
   let y = 0;

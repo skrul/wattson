@@ -46,7 +46,7 @@ export default function WidgetWrapper({ widget }: Props) {
         mode === "edit" ? "opacity-100" : "opacity-0 group-hover:opacity-100"
       }`}>
         <div ref={toolbarSlotRef} className="flex items-center" />
-        {mode === "view" && !isSection && (
+        {mode === "view" && !isSection && widget.config.type !== "metric_total" && widget.config.type !== "personal_record" && widget.config.type !== "activity_grid" && (
           <button
             onClick={() => expandWidget(widget.id)}
             className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"

@@ -107,8 +107,8 @@ export default function ManageDashboardsModal({ open, onClose }: Props) {
                 {/* Reset to defaults (only for built-in dashboards) */}
                 {d.default_key && (
                   <button
-                    onClick={() => {
-                      if (window.confirm(`Reset "${d.name}" to defaults? This will replace all widgets.`)) {
+                    onClick={async () => {
+                      if (await window.confirm(`Reset "${d.name}" to defaults? This will replace all widgets.`)) {
                         resetDashboard(d.id);
                       }
                     }}

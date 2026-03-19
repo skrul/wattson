@@ -10,7 +10,7 @@ import {
   setSetting,
   saveDashboardWidgets,
 } from "../lib/database";
-import { buildDefaultInsightsWidgets } from "../lib/dashboardDefaults";
+import { buildDefaultInsightsWidgets, buildDefaultHomeWidgets } from "../lib/dashboardDefaults";
 import { useNavigationStore, isDashboardTab, makeDashboardTab, dashboardTabId } from "./navigationStore";
 
 export type DashboardStore = UseBoundStore<StoreApi<DashboardState>>;
@@ -48,20 +48,24 @@ async function persistOrder(dashboards: DashboardMeta[]) {
   await setSetting("dashboard_order", JSON.stringify(dashboards.map((d) => d.id)));
 }
 
+let loadPromise: Promise<void> | null = null;
+
 export const useDashboardRegistryStore = create<DashboardRegistryState>((set, get) => ({
   dashboards: [],
   loaded: false,
 
-  loadRegistry: async () => {
+  loadRegistry: () => {
+    if (loadPromise) return loadPromise;
+    loadPromise = (async () => {
     let allDashboards = await getAllDashboards();
 
     // Create defaults if empty
     if (allDashboards.length === 0) {
       const dash = await createDashboard("Home", "home");
       const insights = await createDashboard("Insights", "insights");
-      // Auto-populate insights with default widgets
-      const defaultWidgets = buildDefaultInsightsWidgets();
-      await saveDashboardWidgets(insights.id, defaultWidgets);
+      // Auto-populate with default widgets
+      await saveDashboardWidgets(dash.id, buildDefaultHomeWidgets());
+      await saveDashboardWidgets(insights.id, buildDefaultInsightsWidgets());
       allDashboards = [
         { id: dash.id, name: dash.name, default_key: "home", created_at: dash.created_at, updated_at: dash.updated_at },
         { id: insights.id, name: insights.name, default_key: "insights", created_at: insights.created_at, updated_at: insights.updated_at },
@@ -94,6 +98,8 @@ export const useDashboardRegistryStore = create<DashboardRegistryState>((set, ge
     }
 
     set({ dashboards, loaded: true });
+    })();
+    return loadPromise;
   },
 
   addDashboard: async (name) => {
@@ -135,14 +141,17 @@ export const useDashboardRegistryStore = create<DashboardRegistryState>((set, ge
     if (!dashboard?.default_key) return;
 
     if (dashboard.default_key === "home") {
-      await saveDashboardWidgets(id, []);
+      await saveDashboardWidgets(id, buildDefaultHomeWidgets());
     } else if (dashboard.default_key === "insights") {
       const defaultWidgets = buildDefaultInsightsWidgets();
       await saveDashboardWidgets(id, defaultWidgets);
     }
 
-    // Clear cached store so it reloads fresh
-    storeCache.delete(id);
+    // Reload the cached store so the UI updates immediately
+    const cachedStore = storeCache.get(id);
+    if (cachedStore) {
+      await cachedStore.getState().loadDashboard();
+    }
   },
 }));
 

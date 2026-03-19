@@ -617,7 +617,7 @@ function sortedGroups(data: WorkoutPoint[]): string[] {
 
 const MAX_X_TICKS = 20;
 
-function workoutXConfig(data: WorkoutPoint[], showAllTicks = false): Record<string, unknown> {
+function workoutXConfig(data: WorkoutPoint[], showAllTicks = false, chartWidth = 0): Record<string, unknown> {
   const domain = data.map((d) => d.label);
   const n = domain.length;
   const cfg: Record<string, unknown> = {
@@ -625,10 +625,18 @@ function workoutXConfig(data: WorkoutPoint[], showAllTicks = false): Record<stri
     domain,
     tickFormat: (d: string) => d.replace(/ #\d+$/, ""),
   };
+
+  // Estimate how many labels fit side-by-side (~7px per char + 12px gap)
+  const maxLabelLen = domain.reduce((mx, l) => Math.max(mx, (l ?? "").replace(/ #\d+$/, "").length), 0);
+  const labelPx = maxLabelLen * 7 + 12;
+  const usableWidth = chartWidth > 0 ? chartWidth - 80 : 0;
+  const fitCount = usableWidth > 0 ? Math.max(4, Math.floor(usableWidth / labelPx)) : MAX_X_TICKS;
+  const maxTicks = Math.min(MAX_X_TICKS, fitCount);
+
   if (showAllTicks) {
-    if (n > MAX_X_TICKS) cfg.tickRotate = -45;
-  } else if (n > MAX_X_TICKS) {
-    const step = Math.ceil(n / MAX_X_TICKS);
+    if (n > maxTicks) cfg.tickRotate = -45;
+  } else if (n > maxTicks) {
+    const step = Math.ceil(n / maxTicks);
     cfg.ticks = domain.filter((_, i) => i % step === 0);
     cfg.tickRotate = -45;
   }
@@ -745,7 +753,7 @@ export function renderSingleAxisChart(
   const xKey = categorical ? "label" : "date";
 
   const titleFn = (d: WorkoutPoint) => tooltipTitle(d, yField.field, chart);
-  const pointTipOptions = { tip: { anchor: "bottom" as const }, title: titleFn };
+  const pointTipOptions = { tip: { anchor: "bottom" as const, dy: -6 }, title: titleFn };
 
   // For grouped bars, build a title function that shows all groups at the same x-position
   let groupedBarTitleFn: ((d: WorkoutPoint) => string) | undefined;
@@ -813,6 +821,7 @@ export function renderSingleAxisChart(
         x: xKey,
         y: "y",
         anchor: "bottom",
+        dy: -6,
         title: titleFn,
       })));
     }
@@ -828,7 +837,7 @@ export function renderSingleAxisChart(
 
   const isCategoryMode = chart.x_axis_mode === "category";
   const xConfig: Record<string, unknown> = categorical
-    ? workoutXConfig(data, isCategoryMode)
+    ? workoutXConfig(data, isCategoryMode, width)
     : temporal
       ? temporalAggXConfig(data, chart.x_axis_mode, width)
       : { label: null, type: "utc" };
@@ -969,7 +978,7 @@ export function renderDualAxisChart(
 
   const isCategoryMode = chart.x_axis_mode === "category";
   const xConfig: Record<string, unknown> = categorical
-    ? workoutXConfig(data, isCategoryMode)
+    ? workoutXConfig(data, isCategoryMode, width)
     : temporal
       ? temporalAggXConfig(data, chart.x_axis_mode, width)
       : { label: null, type: "utc" };
@@ -1508,6 +1517,7 @@ export function renderCustomChart(
   width = 800,
   height = 400,
   onCategoryClick?: (label: string) => void,
+  onWorkoutClick?: (workoutId: string) => void,
 ): SVGElement | HTMLElement {
   if (chart.y_fields.length >= 2) {
     return renderDualAxisChart(workouts, chart, width, height);
@@ -1526,5 +1536,72 @@ export function renderCustomChart(
     });
   }
 
+  // For non-aggregated charts, attach click handlers to data points
+  if (onWorkoutClick && !isAggregatedMode(chart.x_axis_mode)) {
+    const data = prepareChartData(workouts, chart);
+    if (chart.mark_type === "dot") {
+      const circles = svg.querySelectorAll('[aria-label="dot"] circle');
+      circles.forEach((circle, i) => {
+        const d = data[i];
+        if (d?._workout) {
+          (circle as SVGCircleElement).style.cursor = "pointer";
+          circle.addEventListener("click", () => onWorkoutClick(d._workout!.id));
+        }
+      });
+    } else if (chart.mark_type === "bar") {
+      // Non-aggregated bars (rectY with x1/x2)
+      const rects = svg.querySelectorAll('[aria-label="rect"] rect');
+      rects.forEach((rect, i) => {
+        const d = data[i];
+        if (d?._workout) {
+          (rect as SVGRectElement).style.cursor = "pointer";
+          rect.addEventListener("click", () => onWorkoutClick(d._workout!.id));
+        }
+      });
+    } else {
+      // Line chart — add invisible hit-target circles on each data point
+      const categorical = chart.x_axis_mode === "category" || chart.x_axis_sequential;
+      attachLineClickTargets(svg, data, onWorkoutClick, categorical);
+    }
+  }
+
   return svg;
+}
+
+/** Add invisible but clickable circles over each data point on a line chart. */
+function attachLineClickTargets(
+  svg: SVGElement | HTMLElement,
+  data: WorkoutPoint[],
+  onClick: (workoutId: string) => void,
+  categorical: boolean,
+) {
+  // Observable Plot exposes computed scales via .scale() on the returned element
+  const plotEl = svg as SVGElement & { scale?: (name: string) => { apply?: (v: unknown) => number } };
+  if (!plotEl.scale) return;
+
+  const xScale = plotEl.scale("x");
+  const yScale = plotEl.scale("y");
+  if (!xScale?.apply || !yScale?.apply) return;
+
+  // Find the plot area <g> to append circles into
+  const plotArea = svg.querySelector('[aria-label="line"]') ?? svg.querySelector("g");
+  if (!plotArea) return;
+
+  for (const d of data) {
+    if (!d?._workout) continue;
+
+    const xVal = categorical ? d.label : d.date;
+    const cx = xScale.apply(xVal);
+    const cy = yScale.apply(d.y);
+    if (cx == null || cy == null || isNaN(cx) || isNaN(cy)) continue;
+
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", String(cx));
+    circle.setAttribute("cy", String(cy));
+    circle.setAttribute("r", "3");
+    circle.setAttribute("fill", "currentColor");
+    circle.style.cursor = "pointer";
+    circle.addEventListener("click", () => onClick(d._workout!.id));
+    plotArea.appendChild(circle);
+  }
 }

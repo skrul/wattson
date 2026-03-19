@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { getUnenrichedWorkouts, getEnrichmentCounts, updateWorkoutMetrics, updateRideDetails } from "../lib/database";
 import { cachedFetchPerformanceGraph, cachedFetchWorkoutDetail, cachedFetchRideDetails } from "../lib/enrichmentCache";
 import { useSessionStore } from "./sessionStore";
+import { useWorkoutStore } from "./workoutStore";
 
 type BackfillStatus = "running" | "paused" | "complete";
 
@@ -45,6 +46,8 @@ async function runBackfillLoop() {
     if (!next) {
       await useEnrichmentStore.getState().refreshCounts();
       useEnrichmentStore.setState({ backfillStatus: "complete", enrichmentComplete: true });
+      // Bump syncGeneration so dashboard widgets refetch with enriched data
+      useWorkoutStore.setState((s) => ({ syncGeneration: s.syncGeneration + 1 }));
       return;
     }
 

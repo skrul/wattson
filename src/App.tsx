@@ -44,14 +44,23 @@ function App() {
     useDashboardRegistryStore.getState().loadRegistry().catch((e) => console.error("Dashboard registry load failed:", e));
   }, []);
 
-  // After registry loads, set activeTab to first dashboard tab if current tab is invalid
+  // After registry loads, set activeTab to first dashboard tab
+  const initialTabSet = useRef(false);
   useEffect(() => {
     if (!registryLoaded || dashboards.length === 0) return;
     const { activeTab } = useNavigationStore.getState();
-    const fixedTabs = ["workouts", "studio", "profile"];
-    const validDashboardTab = isDashboardTab(activeTab) && dashboards.some((d) => makeDashboardTab(d.id) === activeTab);
-    if (!validDashboardTab && !fixedTabs.includes(activeTab)) {
-      setActiveTab(makeDashboardTab(dashboards[0].id));
+
+    if (!initialTabSet.current) {
+      // On first load, always navigate to the first dashboard
+      initialTabSet.current = true;
+      if (!isDashboardTab(activeTab)) {
+        setActiveTab(makeDashboardTab(dashboards[0].id));
+      }
+    } else {
+      // On subsequent updates, only fix invalid dashboard tabs
+      if (isDashboardTab(activeTab) && !dashboards.some((d) => makeDashboardTab(d.id) === activeTab)) {
+        setActiveTab(makeDashboardTab(dashboards[0].id));
+      }
     }
   }, [registryLoaded, dashboards, setActiveTab]);
 

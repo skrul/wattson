@@ -91,6 +91,8 @@ pub fn run() {
                 transposed INTEGER NOT NULL DEFAULT 0,
                 color TEXT,
                 min_value REAL,
+                trend_line INTEGER NOT NULL DEFAULT 0,
+                trend_line_window INTEGER,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
             );

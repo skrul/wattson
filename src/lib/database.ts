@@ -321,6 +321,8 @@ function rowToChart(row: ChartDefinitionRow): ChartDefinition {
     transposed: !!(row.transposed),
     color: row.color ?? null,
     min_value: row.min_value ?? null,
+    trend_line: !!(row.trend_line),
+    trend_line_window: row.trend_line_window ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -340,8 +342,8 @@ export async function saveChartDefinition(chart: ChartDefinition): Promise<void>
   const d = await getDb();
   await d.execute(
     `INSERT OR REPLACE INTO chart_definitions
-      (id, name, mark_type, y_fields_json, group_by, filters_json, x_axis_mode, x_axis_field, x_axis_sequential, agg_function, transposed, color, min_value, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+      (id, name, mark_type, y_fields_json, group_by, filters_json, x_axis_mode, x_axis_field, x_axis_sequential, agg_function, transposed, color, min_value, trend_line, trend_line_window, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
     [
       chart.id,
       chart.name,
@@ -356,6 +358,8 @@ export async function saveChartDefinition(chart: ChartDefinition): Promise<void>
       chart.transposed ? 1 : 0,
       chart.color,
       chart.min_value,
+      chart.trend_line ? 1 : 0,
+      chart.trend_line_window,
       chart.created_at,
       chart.updated_at,
     ],

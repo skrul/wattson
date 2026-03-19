@@ -743,6 +743,18 @@ function temporalAggXConfig(data: WorkoutPoint[], mode: ChartXAxisMode, chartWid
   return cfg;
 }
 
+/** Compute a rolling average over data points. */
+function computeRollingAverage(data: WorkoutPoint[], windowSize: number): WorkoutPoint[] {
+  const result: WorkoutPoint[] = [];
+  for (let i = 0; i < data.length; i++) {
+    const start = Math.max(0, i - windowSize + 1);
+    const slice = data.slice(start, i + 1);
+    const avg = slice.reduce((sum, d) => sum + d.y, 0) / slice.length;
+    result.push({ ...data[i], y: avg });
+  }
+  return result;
+}
+
 /** Render a chart with a single Y axis. */
 export function renderSingleAxisChart(
   workouts: Workout[],
@@ -856,6 +868,26 @@ export function renderSingleAxisChart(
       x: xKey, y: "y", stroke: color, strokeWidth: 1.5,
       ...(chart.group_by ? { sort: xKey } : {}),
       ...pointTipOptions,
+    }));
+  }
+
+  // Trend line overlay: rolling average for line/dot in non-aggregated, non-grouped mode
+  if (
+    chart.trend_line &&
+    (chart.mark_type === "line" || chart.mark_type === "dot") &&
+    chart.x_axis_mode !== "category" &&
+    !chart.group_by &&
+    data.length > 1
+  ) {
+    const windowSize = chart.trend_line_window ?? 7;
+    const smoothed = computeRollingAverage(data, windowSize);
+    chartMarks.push(Plot.lineY(smoothed, {
+      x: xKey,
+      y: "y",
+      stroke: "#111",
+      strokeWidth: 2,
+      strokeOpacity: 0.6,
+      strokeDasharray: "6 3",
     }));
   }
 

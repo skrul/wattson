@@ -125,6 +125,8 @@ export function buildDefaultHomeWidgets(): DashboardWidget[] {
       transposed: false,
       color: null,
       min_value: null,
+      trend_line: false,
+      trend_line_window: null,
     },
   }, 0, 12, 12, 8));
 
@@ -145,6 +147,8 @@ export function buildDefaultHomeWidgets(): DashboardWidget[] {
       transposed: false,
       color: null,
       min_value: null,
+      trend_line: false,
+      trend_line_window: null,
     },
   }, 12, 12, 12, 8));
 
@@ -220,6 +224,8 @@ export function buildDefaultInsightsWidgets(): DashboardWidget[] {
       transposed: true,
       color: null,
       min_value: 5,
+      trend_line: false,
+      trend_line_window: null,
     },
   }, 0, y, 12, 12));
 
@@ -238,6 +244,8 @@ export function buildDefaultInsightsWidgets(): DashboardWidget[] {
       transposed: true,
       color: null,
       min_value: 5,
+      trend_line: false,
+      trend_line_window: null,
     },
   }, 12, y, 12, 12));
   y += 12;

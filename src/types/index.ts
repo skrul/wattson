@@ -119,6 +119,8 @@ export interface ChartDefinition {
   transposed: boolean;            // horizontal bars (swap x/y)
   color: string | null;           // single-series color override
   min_value: number | null;       // HAVING-like filter: hide aggregated buckets below this
+  trend_line: boolean;            // rolling average overlay
+  trend_line_window: number | null; // rolling window size (default 7)
   created_at: number;
   updated_at: number;
 }
@@ -186,6 +188,8 @@ export interface ChartDefinitionRow {
   transposed: number | null;
   color: string | null;
   min_value: number | null;
+  trend_line: number | null;
+  trend_line_window: number | null;
   created_at: number;
   updated_at: number;
 }

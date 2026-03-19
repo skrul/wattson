@@ -345,6 +345,34 @@ export default function ChartBuilder({ chart, onChange }: ChartBuilderProps) {
               )}
             </div>
           )}
+          {(chart.mark_type === "line" || chart.mark_type === "dot") &&
+            chart.x_axis_mode !== "category" &&
+            !chart.group_by && (
+            <>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={chart.trend_line}
+                  onChange={(e) => update({ trend_line: e.target.checked })}
+                  className="text-blue-600"
+                />
+                <span className="whitespace-nowrap">Trend line</span>
+              </label>
+              {chart.trend_line && (
+                <div className="flex items-center gap-1">
+                  <label className="text-sm text-gray-600">Window</label>
+                  <input
+                    type="number"
+                    value={chart.trend_line_window ?? 7}
+                    min={2}
+                    max={50}
+                    onChange={(e) => update({ trend_line_window: e.target.value ? Number(e.target.value) : null })}
+                    className="w-16 rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+              )}
+            </>
+          )}
         </div>
       </fieldset>
 

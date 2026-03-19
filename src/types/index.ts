@@ -186,7 +186,7 @@ export interface ChartDefinitionRow {
 
 // --- Dashboard definitions ---
 
-export type WidgetType = "chart" | "metric_total" | "last_workout" | "section" | "activity_grid" | "personal_record" | "most_repeated";
+export type WidgetType = "chart" | "metric_total" | "last_workout" | "section" | "activity_grid" | "personal_record" | "most_repeated" | "workout_list";
 
 export interface WidgetLayout {
   x: number; y: number; w: number; h: number;
@@ -241,7 +241,14 @@ export interface MostRepeatedWidgetConfig {
   filters: FilterCondition[];
 }
 
-export type WidgetConfig = ChartWidgetConfig | MetricTotalWidgetConfig | LastWorkoutWidgetConfig | SectionWidgetConfig | ActivityGridWidgetConfig | PersonalRecordWidgetConfig | MostRepeatedWidgetConfig;
+export interface WorkoutListWidgetConfig {
+  type: "workout_list";
+  title: string;
+  limit: number;
+  filters: FilterCondition[];
+}
+
+export type WidgetConfig = ChartWidgetConfig | MetricTotalWidgetConfig | LastWorkoutWidgetConfig | SectionWidgetConfig | ActivityGridWidgetConfig | PersonalRecordWidgetConfig | MostRepeatedWidgetConfig | WorkoutListWidgetConfig;
 
 export interface DashboardWidget {
   id: string;

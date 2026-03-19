@@ -996,6 +996,31 @@ export async function getMostRepeatedFilteredWorkouts(
   );
 }
 
+/** Recent workouts with filter support, sorted by date DESC. */
+export async function getRecentFilteredWorkouts(
+  limit: number,
+  filters: FilterCondition[],
+): Promise<Workout[]> {
+  const params: unknown[] = [];
+  const idx = { val: 1 };
+  const clauses: string[] = [];
+
+  for (const cond of filters) {
+    const clause = buildConditionClause(cond, params, idx);
+    if (clause) clauses.push(clause);
+  }
+
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+  params.push(limit);
+  const limitParam = `$${idx.val++}`;
+
+  const d = await getDb();
+  return d.select<Workout[]>(
+    `SELECT * FROM workouts ${where} ORDER BY date DESC LIMIT ${limitParam}`,
+    params,
+  );
+}
+
 const METRIC_SQL: Record<string, string> = {
   total_workouts: "COUNT(*)",
   total_calories: "COALESCE(SUM(calories), 0)",

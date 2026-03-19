@@ -15,6 +15,7 @@ export const WIDGET_DEFAULTS: Record<WidgetType, WidgetDefaults> = {
   activity_grid: { defaultW: 24, defaultH: 5, minW: 4, minH: 4 },
   personal_record: { defaultW: 8, defaultH: 4, minW: 4, minH: 3 },
   most_repeated: { defaultW: 8, defaultH: 8, minW: 6, minH: 6 },
+  workout_list: { defaultW: 8, defaultH: 8, minW: 6, minH: 6 },
 };
 
 export interface MetricDefinition {

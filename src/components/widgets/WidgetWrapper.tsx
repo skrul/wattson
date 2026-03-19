@@ -9,6 +9,7 @@ import SectionWidget from "./SectionWidget";
 import ActivityGridWidget from "./ActivityGridWidget";
 import PersonalRecordWidget from "./PersonalRecordWidget";
 import MostRepeatedWidget from "./MostRepeatedWidget";
+import WorkoutListWidget from "./WorkoutListWidget";
 
 interface Props {
   widget: DashboardWidget;
@@ -93,6 +94,7 @@ export default function WidgetWrapper({ widget }: Props) {
           {widget.config.type === "activity_grid" && <ActivityGridWidget widget={widget} />}
           {widget.config.type === "personal_record" && <PersonalRecordWidget widget={widget} />}
           {widget.config.type === "most_repeated" && <MostRepeatedWidget widget={widget} />}
+          {widget.config.type === "workout_list" && <WorkoutListWidget widget={widget} />}
         </div>
       </WidgetToolbarContext.Provider>
     </div>

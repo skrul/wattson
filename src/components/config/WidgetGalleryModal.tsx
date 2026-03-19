@@ -11,6 +11,7 @@ import LastWorkoutWidget from "../widgets/LastWorkoutWidget";
 import ActivityGridWidget from "../widgets/ActivityGridWidget";
 import PersonalRecordWidget from "../widgets/PersonalRecordWidget";
 import MostRepeatedWidget from "../widgets/MostRepeatedWidget";
+import WorkoutListWidget from "../widgets/WorkoutListWidget";
 
 interface Props {
   open: boolean;
@@ -41,6 +42,8 @@ function WidgetPreview({ widget }: { widget: DashboardWidget }) {
       return <ActivityGridWidget widget={widget} preview />;
     case "most_repeated":
       return <MostRepeatedWidget widget={widget} />;
+    case "workout_list":
+      return <WorkoutListWidget widget={widget} />;
     case "last_workout":
       return <LastWorkoutWidget widget={widget} preview />;
     default:
@@ -55,6 +58,7 @@ const CARD_SIZES: Record<WidgetType, { width: string; height: string; cols: stri
   personal_record: { width: "280px", height: "140px", cols: "repeat(auto-fill, minmax(280px, 1fr))" },
   activity_grid:   { width: "100%",  height: "190px", cols: "1fr" },
   most_repeated:   { width: "280px", height: "200px", cols: "repeat(auto-fill, minmax(280px, 1fr))" },
+  workout_list:    { width: "280px", height: "200px", cols: "repeat(auto-fill, minmax(280px, 1fr))" },
   last_workout:    { width: "280px", height: "200px", cols: "repeat(auto-fill, minmax(280px, 1fr))" },
   section:         { width: "200px", height: "120px", cols: "repeat(auto-fill, minmax(200px, 1fr))" },
 };

@@ -22,6 +22,7 @@ export const WIDGET_TYPES: {
   { type: "activity_grid", label: "Activity Grid", description: "GitHub-style heatmap of daily activity" },
   { type: "personal_record", label: "Personal Record", description: "Top workout for a metric" },
   { type: "most_repeated", label: "Most Repeated", description: "Rides you've taken multiple times" },
+  { type: "workout_list", label: "Workout List", description: "Scrollable list of recent workouts" },
   { type: "section", label: "Section", description: "Full-width separator to organize widgets" },
 ];
 
@@ -157,12 +158,27 @@ const lastWorkoutPresets: WidgetPreset[] = [
   },
 ];
 
+// --- Workout List presets ---
+const workoutListPresets: WidgetPreset[] = [
+  {
+    id: "workout_list_recent10",
+    name: "Recent 10 Workouts",
+    config: {
+      type: "workout_list" as const,
+      title: "Recent Workouts",
+      limit: 10,
+      filters: [],
+    },
+  },
+];
+
 export const WIDGET_PRESETS: Record<WidgetType, WidgetPreset[]> = {
   metric_total: metricTotalPresets,
   chart: chartPresets,
   personal_record: personalRecordPresets,
   activity_grid: activityGridPresets,
   most_repeated: mostRepeatedPresets,
+  workout_list: workoutListPresets,
   last_workout: lastWorkoutPresets,
   section: [],
 };

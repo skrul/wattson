@@ -7,6 +7,7 @@ import SectionConfig from "./SectionConfig";
 import ActivityGridConfig from "./ActivityGridConfig";
 import PersonalRecordConfig from "./PersonalRecordConfig";
 import MostRepeatedConfig from "./MostRepeatedConfig";
+import WorkoutListConfig from "./WorkoutListConfig";
 
 export default function WidgetConfigModal() {
   const useStore = useDashboardContext();
@@ -23,7 +24,7 @@ export default function WidgetConfigModal() {
   const widgetType = isAdding ? addingWidgetType : widget?.widget_type;
   if (!widgetType) return null;
 
-  const WIDGET_LABELS: Record<string, string> = { metric_total: "Metric", chart: "Chart", last_workout: "Last Workout", section: "Section", activity_grid: "Activity Grid", personal_record: "Personal Record", most_repeated: "Most Repeated" };
+  const WIDGET_LABELS: Record<string, string> = { metric_total: "Metric", chart: "Chart", last_workout: "Last Workout", section: "Section", activity_grid: "Activity Grid", personal_record: "Personal Record", most_repeated: "Most Repeated", workout_list: "Workout List" };
   const title = isAdding ? `Add ${WIDGET_LABELS[widgetType] ?? widgetType} Widget` : "Configure Widget";
 
   return (
@@ -53,6 +54,9 @@ export default function WidgetConfigModal() {
           )}
           {widgetType === "most_repeated" && (
             <MostRepeatedConfig widget={widget ?? null} />
+          )}
+          {widgetType === "workout_list" && (
+            <WorkoutListConfig widget={widget ?? null} />
           )}
         </DialogPanel>
       </div>

@@ -1,15 +1,16 @@
 # Wattson
 
-A free, open-source desktop app for analyzing your Peloton workout data. Sync your rides, filter and sort them, build custom charts, and compare repeated rides — all locally on your machine with no server or cloud account required.
+A free, open-source desktop app for analyzing your Peloton workout data. Sync your rides, build custom dashboards, compare repeated rides, and export shareable charts — all locally on your machine with no server or cloud account required.
 
 ## Features
 
-- **Sync workouts** from your Peloton account
+- **Sync workouts** from your Peloton account with automatic background enrichment
+- **Custom dashboards** — drag-and-drop widgets including charts, metrics, activity grids, personal records, workout lists, and more
 - **Filter and sort** by date, duration, output, instructor, class type, and more
-- **Custom charts** — build time-series and grouped charts with the built-in chart builder
-- **Compare rides** — overlay multiple attempts of the same class to see progress
+- **Custom charts** — build time-series and grouped charts with the built-in chart builder; click data points to navigate to individual workouts
+- **Compare rides** — overlay multiple attempts of the same class to see progress over time
 - **Per-ride detail** — view output, cadence, resistance, and heart rate curves for any ride
-- **Insights** — activity heatmap, cumulative totals, personal records, favorite instructors, and most repeated classes
+- **Studio** — export stylized performance charts as PNG with customizable overlays, stats, and color themes
 - **Export** charts as PNG or SVG
 - **Auto-update** — the app checks for new versions on launch
 

@@ -117,22 +117,13 @@ export const useShareChartStore = create<ShareChartState>((set, get) => ({
       const raw = await getSetting(SETTINGS_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed.version === 2) {
-          const data = parsed as ChartStylesData;
-          const styles = data.styles.map((s) => ({
-            ...s,
-            settings: deepMerge(DEFAULT_SETTINGS, s.settings),
-          }));
-          const activeStyleId = styles.find((s) => s.id === data.activeStyleId) ? data.activeStyleId : styles[0].id;
-          set({ styles, activeStyleId, settings: getActiveSettings(styles, activeStyleId), loaded: true });
-        } else {
-          // v1: old single-settings format — migrate
-          const oldSettings = deepMerge(DEFAULT_SETTINGS, parsed as Partial<ShareChartSettings>);
-          const defaultStyle: ChartStyle = { id: DEFAULT_STYLE_ID, name: "Default", settings: oldSettings };
-          const state = { styles: [defaultStyle], activeStyleId: DEFAULT_STYLE_ID };
-          set({ ...state, settings: oldSettings, loaded: true });
-          persist(state);
-        }
+        const data = parsed as ChartStylesData;
+        const styles = data.styles.map((s) => ({
+          ...s,
+          settings: deepMerge(DEFAULT_SETTINGS, s.settings),
+        }));
+        const activeStyleId = styles.find((s) => s.id === data.activeStyleId) ? data.activeStyleId : styles[0].id;
+        set({ styles, activeStyleId, settings: getActiveSettings(styles, activeStyleId), loaded: true });
       } else {
         set({ loaded: true });
       }

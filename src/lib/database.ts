@@ -307,9 +307,6 @@ export async function updateRideDetails(workoutId: string, rawJson: string | nul
 // --- Chart definitions ---
 
 function rowToChart(row: ChartDefinitionRow): ChartDefinition {
-  // Migrate legacy "workout" mode → date + sequential
-  const rawMode = row.x_axis_mode ?? "date";
-  const isLegacyWorkout = rawMode === "workout";
   return {
     id: row.id,
     name: row.name,
@@ -317,9 +314,9 @@ function rowToChart(row: ChartDefinitionRow): ChartDefinition {
     y_fields: JSON.parse(row.y_fields_json),
     group_by: row.group_by,
     filters: JSON.parse(row.filters_json),
-    x_axis_mode: (isLegacyWorkout ? "date" : rawMode) as ChartXAxisMode,
+    x_axis_mode: (row.x_axis_mode ?? "date") as ChartXAxisMode,
     x_axis_field: row.x_axis_field ?? null,
-    x_axis_sequential: isLegacyWorkout || !!(row.x_axis_sequential),
+    x_axis_sequential: !!(row.x_axis_sequential),
     agg_function: (row.agg_function as AggregationFunction) ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,

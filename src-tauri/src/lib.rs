@@ -100,6 +100,7 @@ pub fn run() {
             CREATE TABLE dashboards (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL DEFAULT 'My Dashboard',
+                default_key TEXT,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
             );
@@ -116,14 +117,6 @@ pub fn run() {
             CREATE INDEX idx_workouts_date ON workouts(date);
             CREATE INDEX idx_workouts_duration ON workouts(duration_seconds);
             CREATE INDEX idx_workouts_ride_id ON workouts(ride_id);",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 2,
-            description: "add_dashboard_default_key",
-            sql: "ALTER TABLE dashboards ADD COLUMN default_key TEXT;
-            UPDATE dashboards SET default_key = 'home' WHERE name IN ('Home', 'My Dashboard', 'Dashboard');
-            UPDATE dashboards SET default_key = 'insights' WHERE name = 'Insights';",
             kind: MigrationKind::Up,
         },
     ];

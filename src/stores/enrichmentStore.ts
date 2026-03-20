@@ -45,9 +45,11 @@ async function runBackfillLoop() {
     const next = unenriched.find((w) => !skippedIds.has(w.id));
     if (!next) {
       await useEnrichmentStore.getState().refreshCounts();
-      useEnrichmentStore.setState({ backfillStatus: "complete", enrichmentComplete: true });
+      useEnrichmentStore.setState({ backfillStatus: "complete" });
       // Bump syncGeneration so dashboard widgets refetch with enriched data
-      useWorkoutStore.setState((s) => ({ syncGeneration: s.syncGeneration + 1 }));
+      if (useEnrichmentStore.getState().enrichmentComplete) {
+        useWorkoutStore.setState((s) => ({ syncGeneration: s.syncGeneration + 1 }));
+      }
       return;
     }
 
@@ -69,7 +71,7 @@ async function runBackfillLoop() {
 
       await updateWorkoutMetrics(workoutId, perfResult, detailResult?.rawJson ?? null, perfResult.rawJson);
       if (rideOk) {
-        await updateRideDetails(workoutId, rideResult?.rawJson ?? null);
+        await updateRideDetails(workoutId, rideResult?.rawJson ?? null, next.title);
       }
 
       // If detail or ride failed, skip this workout for the rest of the session

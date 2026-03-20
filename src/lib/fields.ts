@@ -17,6 +17,8 @@ export interface FieldDef {
   staticValues?: string[];
   /** Custom SQL clause builder for virtual fields that don't map to a column. */
   buildClause?: (cond: FilterCondition, params: unknown[], idx: { val: number }) => string | null;
+  /** Field key whose active values scope this field's enum options (e.g. "discipline" scopes class_type). */
+  scopedBy?: string;
 }
 
 const STRING_OPS: FilterOperator[] = [
@@ -54,8 +56,8 @@ export const FIELD_DEFS: FieldDef[] = [
   { key: "strive_score", label: "Strive Score", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
   { key: "workout_type", label: "Workout Type", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
   { key: "is_live", label: "Live/On-Demand", type: "enum", operators: ENUM_OPS, filterable: true, sortable: false },
-  { key: "class_type", label: "Class Type", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
-  { key: "class_subtype", label: "Class Subtype", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
+  { key: "class_type", label: "Class Type", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true, scopedBy: "discipline", requiresDetail: true },
+  { key: "class_subtype", label: "Class Subtype", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true, scopedBy: "class_type", requiresDetail: true },
   {
     key: "is_repeat",
     label: "Repeated Ride",

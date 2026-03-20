@@ -201,7 +201,7 @@ export default function StudioTab() {
           patch.raw_detail_json = detailResult.rawJson;
         }
 
-        await updateRideDetails(workout.id, rideResult?.rawJson ?? null);
+        await updateRideDetails(workout.id, rideResult?.rawJson ?? null, workout.title);
         if (rideResult) {
           patch.raw_ride_details_json = rideResult.rawJson;
         }

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import type { FilterCondition } from "../types";
 import { FIELD_MAP, OPERATOR_LABELS } from "../lib/fields";
 import { useWorkoutStore } from "../stores/workoutStore";
@@ -23,12 +23,23 @@ export default function FilterChip({
   defaultOpen?: boolean;
 }) {
   const { updateCondition, removeCondition } = useWorkoutStore();
+  const conditions = useWorkoutStore((s) => s.filters.conditions);
   const [open, setOpen] = useState(defaultOpen);
   const containerRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useClickOutside(containerRef, close);
 
   const field = FIELD_MAP[condition.field];
+
+  const scopeFilter = useMemo(() => {
+    if (!field?.scopedBy) return undefined;
+    const scopeValues = conditions
+      .filter((c) => c.field === field.scopedBy && c.operator === "equals")
+      .flatMap((c) => c.values);
+    if (scopeValues.length === 0) return undefined;
+    return { column: field.scopedBy, values: scopeValues };
+  }, [field?.scopedBy, conditions]);
+
   if (!field) return null;
 
   const active = isConditionActive(condition);
@@ -104,6 +115,7 @@ export default function FilterChip({
                 onChange={(values) =>
                   updateCondition(condition.id, { values })
                 }
+                scopeFilter={scopeFilter}
               />
             )}
 

@@ -31,6 +31,9 @@ function App() {
   const userProfile = useSessionStore((s) => s.userProfile);
   const isSyncing = useSessionStore((s) => s.isSyncing);
   const syncProgress = useSessionStore((s) => s.syncProgress);
+  const backfillStatus = useEnrichmentStore((s) => s.backfillStatus);
+  const enrichedCount = useEnrichmentStore((s) => s.enrichedCount);
+  const totalCount = useEnrichmentStore((s) => s.totalCount);
 
   const dashboards = useDashboardRegistryStore((s) => s.dashboards);
   const registryLoaded = useDashboardRegistryStore((s) => s.loaded);
@@ -157,7 +160,7 @@ function App() {
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-bold">Wattson</h1>
-          {isSyncing && (
+          {(isSyncing || backfillStatus === "running") && (
             <button
               onClick={() => setActiveTab("profile")}
               className="flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-200"
@@ -169,9 +172,11 @@ function App() {
                 <path d="M11.8 4l1.2-.8L13.5 4.8" />
                 <path d="M4.2 12l-1.2.8L2.5 11.2" />
               </svg>
-              {syncProgress
-                ? `Syncing ${syncProgress.fetched} / ${syncProgress.total}`
-                : "Syncing\u2026"}
+              {isSyncing
+                ? (syncProgress
+                  ? `Syncing ${syncProgress.fetched} / ${syncProgress.total}`
+                  : "Syncing\u2026")
+                : `Details ${enrichedCount} / ${totalCount}`}
             </button>
           )}
         </div>

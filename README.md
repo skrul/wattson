@@ -11,20 +11,24 @@ A free, open-source desktop app for analyzing your Peloton workout data. Sync yo
 - **Compare rides** — overlay multiple attempts of the same class to see progress over time
 - **Per-ride detail** — view output, cadence, resistance, and heart rate curves for any ride
 - **Studio** — export stylized performance charts as PNG with customizable overlays, stats, and color themes
-- **Export** charts as PNG or SVG
+- **Export** charts as PNG
 - **Auto-update** — the app checks for new versions on launch
 
 All data stays on your machine in a local SQLite database. Credentials are stored in your system keychain (macOS Keychain, Windows Credential Manager).
 
 ## Screenshots
 
-![Workout list with filters and ride detail](screenshots/filter.png)
+![Home dashboard with last workout, recent rides, and trend charts](screenshots/home.png)
 
-![Chart builder](screenshots/charts.png)
+![Workout list with ride detail and performance chart](screenshots/workouts.png)
 
-![Compare repeated rides](screenshots/compare.png)
+![Filtered workouts by instructor and date range](screenshots/filter.png)
 
-![Insights tab](screenshots/insights.png)
+![Compare repeated rides with overlaid output curves](screenshots/compare.png)
+
+![Insights dashboard with lifetime stats, activity grid, and personal records](screenshots/insights.png)
+
+![Studio chart editor with customizable overlays, power zones, and export](screenshots/studio.png)
 
 ## Install
 

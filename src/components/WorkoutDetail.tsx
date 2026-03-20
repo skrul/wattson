@@ -194,7 +194,7 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
           });
         }
 
-        await updateRideDetails(workout.id, rideResult?.rawJson ?? null);
+        await updateRideDetails(workout.id, rideResult?.rawJson ?? null, workout.title);
         if (rideResult) {
           updateWorkout(workout.id, { raw_ride_details_json: rideResult.rawJson });
         }

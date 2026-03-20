@@ -89,6 +89,24 @@ const POWER_ZONE_SUBTYPES: SubtypeEntry[] = [
 ];
 
 /**
+ * Extract class type from the API's structured class_types array in raw ride details JSON.
+ * The array lives at the top level ($.class_types), not under $.ride.
+ * Returns null if array is empty or parsing fails.
+ */
+export function extractApiClassType(rawRideDetailsJson: string): string | null {
+  try {
+    const data = JSON.parse(rawRideDetailsJson);
+    const classTypes: { name: string }[] | undefined = data?.class_types;
+    if (!Array.isArray(classTypes) || classTypes.length === 0) return null;
+    const names = classTypes.map((ct) => ct.name).filter(Boolean);
+    if (names.length === 0) return null;
+    return names.join(" / ");
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Derive a class subtype from the workout title and class type.
  * Currently only Power Zone has subtypes; all others return null.
  */

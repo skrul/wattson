@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { FIELD_DEFS, FIELD_MAP, OPERATOR_LABELS } from "../lib/fields";
@@ -21,11 +21,13 @@ function FilterChip({
   defaultOpen = false,
   onUpdate,
   onRemove,
+  allConditions,
 }: {
   condition: FilterCondition;
   defaultOpen?: boolean;
   onUpdate: (id: string, updates: Partial<FilterCondition>) => void;
   onRemove: (id: string) => void;
+  allConditions: FilterCondition[];
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const chipRef = useRef<HTMLButtonElement>(null);
@@ -67,6 +69,16 @@ function FilterChip({
   }, [open]);
 
   const field = FIELD_MAP[condition.field];
+
+  const scopeFilter = useMemo(() => {
+    if (!field?.scopedBy) return undefined;
+    const scopeValues = allConditions
+      .filter((c) => c.field === field.scopedBy && c.operator === "equals")
+      .flatMap((c) => c.values);
+    if (scopeValues.length === 0) return undefined;
+    return { column: field.scopedBy, values: scopeValues };
+  }, [field?.scopedBy, allConditions]);
+
   if (!field) return null;
 
   const active = isConditionActive(condition);
@@ -141,6 +153,7 @@ function FilterChip({
                 fieldKey={condition.field}
                 selectedValues={condition.values}
                 onChange={(values) => onUpdate(condition.id, { values })}
+                scopeFilter={scopeFilter}
               />
             )}
 
@@ -207,6 +220,7 @@ export function FilterBar({
           defaultOpen={c.id === newFilterId}
           onUpdate={onUpdate}
           onRemove={onRemove}
+          allConditions={filters}
         />
       ))}
 

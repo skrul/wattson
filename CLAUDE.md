@@ -17,6 +17,14 @@ When working inside a git worktree (`.claude/worktrees/`), follow these rules st
 5. **Never check out `main` in the worktree** — it's already checked out in the main worktree and git will refuse.
 6. **Never switch branches in the main worktree** — it should always stay on `main`.
 
+## Database Schema & Migrations
+
+The app has not yet been released, so destructive schema changes (drop + recreate) are acceptable for now. **Once the app is released**, any data or schema changes must:
+
+1. Be versioned — add a new `Migration` entry in `src-tauri/src/lib.rs` with an incremented version number.
+2. Include a migration path — use `ALTER TABLE`, data backfills, etc. so existing user data is preserved.
+3. Never drop or recreate tables that contain user data.
+
 ## UI Patterns & Gotchas
 
 ### Popover/dropdown dismissal inside modals

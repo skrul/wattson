@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import type { FilterCondition, FilterOperator } from "../types";
 import { FIELD_MAP, OPERATOR_LABELS } from "../lib/fields";
 import { getDistinctValues } from "../lib/database";
+import type { ScopeFilter } from "../lib/database";
 
 export function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -246,22 +247,25 @@ export function EnumMultiSelect({
   fieldKey,
   selectedValues,
   onChange,
+  scopeFilter,
 }: {
   fieldKey: string;
   selectedValues: string[];
   onChange: (values: string[]) => void;
+  scopeFilter?: ScopeFilter;
 }) {
   const [options, setOptions] = useState<string[]>([]);
   const field = FIELD_MAP[fieldKey];
   const displayValue = field?.displayValue ?? ((v: string) => v);
+  const scopeKey = scopeFilter ? JSON.stringify(scopeFilter.values) : "";
 
   useEffect(() => {
     if (field?.staticValues) {
       setOptions(field.staticValues);
     } else {
-      getDistinctValues(fieldKey).then(setOptions).catch(() => setOptions([]));
+      getDistinctValues(fieldKey, scopeFilter).then(setOptions).catch(() => setOptions([]));
     }
-  }, [fieldKey, field]);
+  }, [fieldKey, field, scopeKey]);
 
   const toggle = (val: string) => {
     if (selectedValues.includes(val)) {

@@ -1,6 +1,9 @@
 import Database from "@tauri-apps/plugin-sql";
 import type { Workout, WorkoutFilters, FilterCondition, UserProfile, WorkoutMetrics, ChartDefinition, ChartDefinitionRow, ChartXAxisMode, AggregationFunction, Dashboard, DashboardWidget } from "../types";
 import { FIELD_MAP } from "./fields";
+import { extractApiClassType, parseClassSubtype } from "./classType";
+
+export interface ScopeFilter { column: string; values: string[] }
 
 let db: Database | null = null;
 
@@ -194,16 +197,24 @@ const DISTINCT_VALUE_COLUMNS = new Set<string>(
   Object.values(FIELD_MAP).filter((f) => f.type === "enum" && !f.staticValues).map((f) => f.key),
 );
 
-/** Get sorted distinct non-null values for an enum column. */
-export async function getDistinctValues(column: string): Promise<string[]> {
+/** Get sorted distinct non-null values for an enum column, optionally scoped by another column. */
+export async function getDistinctValues(column: string, scopeFilter?: ScopeFilter): Promise<string[]> {
   if (!DISTINCT_VALUE_COLUMNS.has(column)) {
     throw new Error(`Column "${column}" is not allowed for distinct values`);
   }
   const field = FIELD_MAP[column];
   const extraFilter = field?.distinctFilter ? ` AND ${field.distinctFilter}` : "";
+  let scopeClause = "";
+  const params: unknown[] = [];
+  if (scopeFilter && scopeFilter.values.length > 0) {
+    const placeholders = scopeFilter.values.map((_, i) => `$${i + 1}`);
+    params.push(...scopeFilter.values);
+    scopeClause = ` AND ${scopeFilter.column} IN (${placeholders.join(", ")})`;
+  }
   const d = await getDb();
   const rows = await d.select<Record<string, string>[]>(
-    `SELECT DISTINCT ${column} FROM workouts WHERE ${column} IS NOT NULL AND ${column} != ''${extraFilter} ORDER BY ${column} ASC`,
+    `SELECT DISTINCT ${column} FROM workouts WHERE ${column} IS NOT NULL AND ${column} != ''${extraFilter}${scopeClause} ORDER BY ${column} ASC`,
+    params,
   );
   return rows.map((r) => r[column]);
 }
@@ -294,13 +305,17 @@ export async function updateWorkoutDetail(workoutId: string, rawDetailJson: stri
   );
 }
 
-/** Update a workout's cached ride details JSON. */
-export async function updateRideDetails(workoutId: string, rawJson: string | null): Promise<void> {
+/** Update a workout's cached ride details JSON, extracting class_type from the API response. */
+export async function updateRideDetails(workoutId: string, rawJson: string | null, title: string | null): Promise<void> {
   const d = await getDb();
   const now = Math.floor(Date.now() / 1000);
+  const apiClassType = rawJson ? extractApiClassType(rawJson) : null;
+  const classSubtype = title && apiClassType ? parseClassSubtype(title, apiClassType) : null;
   await d.execute(
-    `UPDATE workouts SET raw_ride_details_json=$1, ride_details_fetched_at=$2 WHERE id=$3`,
-    [rawJson, now, workoutId],
+    `UPDATE workouts SET raw_ride_details_json=$1, ride_details_fetched_at=$2,
+     class_type=COALESCE($3, class_type), class_subtype=COALESCE($4, class_subtype)
+     WHERE id=$5`,
+    [rawJson, now, apiClassType, classSubtype, workoutId],
   );
 }
 
@@ -408,10 +423,10 @@ export async function getShareableWorkouts(limit = 50): Promise<Workout[]> {
 }
 
 /** Get workouts that have not been fully enriched (missing any fetch timestamp). */
-export async function getUnenrichedWorkouts(): Promise<{ id: string; ride_id: string | null }[]> {
+export async function getUnenrichedWorkouts(): Promise<{ id: string; ride_id: string | null; title: string | null }[]> {
   const d = await getDb();
-  return d.select<{ id: string; ride_id: string | null }[]>(
-    `SELECT id, ride_id FROM workouts
+  return d.select<{ id: string; ride_id: string | null; title: string | null }[]>(
+    `SELECT id, ride_id, title FROM workouts
      WHERE detail_fetched_at IS NULL
         OR perf_graph_fetched_at IS NULL
         OR ride_details_fetched_at IS NULL

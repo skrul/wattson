@@ -9,6 +9,7 @@ import { cachedFetchWorkoutDetail, cachedFetchPerformanceGraph, cachedFetchRideD
 import { updateWorkoutMetrics, updateWorkoutDetail, updateRideDetails } from "../lib/database";
 import { useShareChartStore, resolveDisplayName } from "../stores/shareChartStore";
 import { useSessionStore } from "../stores/sessionStore";
+import { useWorkoutStore } from "../stores/workoutStore";
 import ShareMenu from "./ShareMenu";
 import ChartCard from "./ChartCard";
 
@@ -114,6 +115,7 @@ export default function StudioTab() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
   const session = useSessionStore((s) => s.session);
   const userProfile = useSessionStore((s) => s.userProfile);
 
@@ -124,13 +126,13 @@ export default function StudioTab() {
 
   const displayName = resolveDisplayName(settings, pelotonUsername);
 
-  // Load workouts on mount
+  // Load workouts on mount and after sync completes
   useEffect(() => {
     getShareableWorkouts().then((rows) => {
       setWorkouts(rows);
-      if (rows.length > 0) setSelectedId(rows[0].id);
+      if (rows.length > 0) setSelectedId((prev) => prev ?? rows[0].id);
     });
-  }, []);
+  }, [syncGeneration]);
 
   const workout = useMemo(
     () => workouts.find((w) => w.id === selectedId) ?? null,
@@ -358,6 +360,21 @@ export default function StudioTab() {
               <option value="always">Always</option>
             </select>
           </div>
+          {settings.zoneBands !== "off" && (
+            <div className="flex items-center gap-2 py-0.5">
+              <span className="text-sm text-gray-700">Opacity</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={settings.zoneBandOpacity}
+                onChange={(e) => update({ zoneBandOpacity: parseFloat(e.target.value) })}
+                className="h-1 flex-1 cursor-pointer"
+              />
+              <span className="w-7 text-right text-xs text-gray-500">{Math.round(settings.zoneBandOpacity * 100)}%</span>
+            </div>
+          )}
           <div className="flex items-center gap-2 py-0.5">
             <label className="flex flex-1 cursor-pointer items-center gap-2 text-sm text-gray-700">
               <input
@@ -370,6 +387,7 @@ export default function StudioTab() {
             </label>
             <ColorSwatch color={settings.cueColor} onChange={(v) => update({ cueColor: v })} />
           </div>
+          <Checkbox label="Dark mode" checked={settings.darkMode} onChange={(v) => update({ darkMode: v })} />
           <Checkbox label="Header (title/date)" checked={settings.showHeader} onChange={(v) => update({ showHeader: v })} />
           <Checkbox label="Y-axis & gridlines" checked={settings.showYAxis} onChange={(v) => update({ showYAxis: v })} />
         </div>

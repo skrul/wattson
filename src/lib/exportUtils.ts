@@ -85,6 +85,8 @@ export async function renderExportPng(
     overlayColors: settings?.overlayColors,
     cueColor: settings?.cueColor,
     showZoneBands: (settings?.zoneBands ?? "pz-only") === "always" || ((settings?.zoneBands ?? "pz-only") === "pz-only" && isPZ),
+    zoneBandOpacity: settings?.zoneBandOpacity,
+    darkMode: settings?.darkMode,
     showInstructorCues: settings?.showInstructorCues,
     showYAxis: settings?.showYAxis,
   }, cues);
@@ -117,32 +119,38 @@ export async function renderExportPng(
   const ctx = canvas.getContext("2d")!;
   ctx.scale(SCALE, SCALE);
 
+  const dark = settings?.darkMode === true;
+  const bgColor = dark ? "#111827" : "#ffffff";
+  const textPrimary = dark ? "#f3f4f6" : "#111827";
+  const textSecondary = dark ? "#9ca3af" : "#6b7280";
+  const dividerColor = dark ? "#374151" : "#e5e7eb";
+
   // Background
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, EXPORT_WIDTH, totalHeight);
 
   let y = PADDING;
 
   // Header — title + subtitle
   if (showHeader) {
-    ctx.fillStyle = "#111827";
+    ctx.fillStyle = textPrimary;
     ctx.font = "600 18px system-ui, -apple-system, sans-serif";
     ctx.fillText(workout.title, PADDING, y + 18);
 
     // Right side: display name + date/time
     ctx.textAlign = "right";
     if (displayName) {
-      ctx.fillStyle = "#6b7280";
+      ctx.fillStyle = textSecondary;
       ctx.font = "600 14px system-ui, -apple-system, sans-serif";
       ctx.fillText(displayName, EXPORT_WIDTH - PADDING, y + 18);
     }
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = textSecondary;
     ctx.font = "13px system-ui, -apple-system, sans-serif";
     ctx.fillText(formatExportDateTime(workout.date), EXPORT_WIDTH - PADDING, y + 40);
     ctx.textAlign = "start";
 
     // Subtitle: instructor + date
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = textSecondary;
     ctx.font = "13px system-ui, -apple-system, sans-serif";
     const subtitle = [
       workout.instructor,
@@ -161,7 +169,7 @@ export async function renderExportPng(
   // Footer stats
   if (stats.length > 0) {
     // Divider line
-    ctx.strokeStyle = "#e5e7eb";
+    ctx.strokeStyle = dividerColor;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(PADDING, y + 12);
@@ -174,13 +182,13 @@ export async function renderExportPng(
       const cx = PADDING + statWidth * i + statWidth / 2;
 
       // Value
-      ctx.fillStyle = "#111827";
+      ctx.fillStyle = textPrimary;
       ctx.font = "600 14px system-ui, -apple-system, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(value, cx, y + 32);
 
       // Label
-      ctx.fillStyle = "#6b7280";
+      ctx.fillStyle = textSecondary;
       ctx.font = "10px system-ui, -apple-system, sans-serif";
       ctx.fillText(label, cx, y + 46);
     }

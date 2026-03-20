@@ -135,6 +135,8 @@ interface ChartOptions {
   overlayColors?: { output?: string; heartRate?: string; cadence?: string; resistance?: string; speed?: string };
   cueColor?: string;
   showZoneBands?: boolean;
+  zoneBandOpacity?: number;
+  darkMode?: boolean;
   showInstructorCues?: boolean;
   showYAxis?: boolean;
 }
@@ -149,7 +151,9 @@ export function renderRideDetailChart(
   options: ChartOptions = {},
   cues?: InstructorCue[] | null,
 ): SVGElement | HTMLElement {
-  const { width = 800, height = 300 } = options;
+  const { width = 800, height = 300, darkMode = false } = options;
+  const textColor = darkMode ? "#e5e7eb" : undefined;
+  const subtleColor = darkMode ? "#9ca3af" : "#666";
 
   const maxOutput = Math.max(...timeSeries.output);
   const yMax = ftp != null
@@ -183,7 +187,7 @@ export function renderRideDetailChart(
         y1: "y1",
         y2: "y2",
         fill: "fill",
-        fillOpacity: 0.2,
+        fillOpacity: options.zoneBandOpacity ?? 0.2,
       }),
     );
 
@@ -202,7 +206,7 @@ export function renderRideDetailChart(
           textAnchor: "start",
           dx: 8,
           fontSize: 10,
-          fill: "#666",
+          fill: subtleColor,
         }),
       );
     }
@@ -313,6 +317,7 @@ export function renderRideDetailChart(
     width,
     height,
     marginRight: 36,
+    style: darkMode ? { background: "transparent", color: textColor } : undefined,
     x: {
       label: null,
       domain: [0, xMax],

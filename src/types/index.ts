@@ -142,6 +142,8 @@ export interface ShareChartSettings {
   };
   cueColor: string;
   zoneBands: "off" | "always" | "pz-only";
+  zoneBandOpacity: number;
+  darkMode: boolean;
   showInstructorCues: boolean;
   showHeader: boolean;
   showUsername: boolean;

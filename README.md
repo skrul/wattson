@@ -18,23 +18,23 @@ All data stays on your machine in a local SQLite database. Credentials are store
 
 ## Screenshots
 
-![Home](screenshots/home.png)
 *Home dashboard with last workout, recent rides, and trend charts*
+![Home](screenshots/home.png)
 
-![Workouts](screenshots/workouts.png)
 *Workout list with ride detail and performance chart*
+![Workouts](screenshots/workouts.png)
 
-![Filters](screenshots/filter.png)
 *Filtered workouts by instructor and date range*
+![Filters](screenshots/filter.png)
 
-![Compare](screenshots/compare.png)
 *Compare repeated rides with overlaid output curves*
+![Compare](screenshots/compare.png)
 
-![Insights](screenshots/insights.png)
 *Insights dashboard with lifetime stats, activity grid, and personal records*
+![Insights](screenshots/insights.png)
 
-![Studio](screenshots/studio.png)
 *Studio chart editor with customizable overlays, power zones, and export*
+![Studio](screenshots/studio.png)
 
 ## Install
 

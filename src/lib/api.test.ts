@@ -218,9 +218,9 @@ describe("fetchAllWorkouts", () => {
     expect(result.total_work).toBe(250000);
     expect(result.source).toBe("api");
     expect(result.raw_json).toBeTruthy();
-    expect(result.class_type).toBe("Climb");
+    expect(result.class_type).toBeNull(); // populated later by updateRideDetails
     expect(result.class_subtype).toBeNull();
-    expect(result.class_type_version).toBe(3);
+    expect(result.class_type_version).toBeNull();
   });
 
   it("uses knownTotal as progress denominator instead of body.total", async () => {

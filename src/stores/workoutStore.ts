@@ -24,6 +24,7 @@ interface WorkoutState {
   clearSort: () => void;
   setSearch: (search: string) => void;
   updateWorkout: (id: string, updates: Partial<Workout>) => void;
+  notifySync: () => void;
 }
 
 const DEFAULT_SORT: SortSpec = { field: "date", direction: "desc" };
@@ -36,7 +37,7 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
   isLoading: false,
   syncGeneration: 0,
 
-  setWorkouts: (workouts) => set((state) => ({ workouts, syncGeneration: state.syncGeneration + 1 })),
+  setWorkouts: (workouts) => set({ workouts }),
   selectWorkout: (id) => set({ selectedWorkoutId: id, detailTab: "summary" }),
   setDetailTab: (detailTab) => set({ detailTab }),
   setFilters: (filters) => set({ filters }),
@@ -94,4 +95,6 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
         w.id === id ? { ...w, ...updates } : w,
       ),
     })),
+
+  notifySync: () => set((state) => ({ syncGeneration: state.syncGeneration + 1 })),
 }));

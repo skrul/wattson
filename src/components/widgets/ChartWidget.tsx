@@ -12,11 +12,12 @@ import ChartPlot from "../ChartPlot";
 interface Props {
   widget: DashboardWidget;
   fullscreen?: boolean;
+  overrideFilters?: FilterCondition[];
 }
 
 let condId = 0;
 
-export default function ChartWidget({ widget }: Props) {
+export default function ChartWidget({ widget, overrideFilters }: Props) {
   const [workouts, setWorkouts] = useState<Workout[] | null>(null);
   const navigateToFilteredWorkouts = useNavigationStore((s) => s.navigateToFilteredWorkouts);
   const navigateToWorkout = useNavigationStore((s) => s.navigateToWorkout);
@@ -34,8 +35,8 @@ export default function ChartWidget({ widget }: Props) {
   }), [widget.id, chartConfig]);
 
   const activeFiltersKey = useMemo(
-    () => JSON.stringify((chartConfig.filters ?? []).filter(isConditionActive)),
-    [chartConfig.filters],
+    () => JSON.stringify((overrideFilters ?? chartConfig.filters ?? []).filter(isConditionActive)),
+    [chartConfig.filters, overrideFilters],
   );
 
   const fetchData = useCallback(async () => {

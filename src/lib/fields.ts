@@ -43,7 +43,7 @@ export const FIELD_DEFS: FieldDef[] = [
   { key: "date", label: "Date", type: "date", operators: DATE_OPS, filterable: true, sortable: true },
   { key: "title", label: "Title", type: "string", operators: STRING_OPS, filterable: true, sortable: true },
   { key: "instructor", label: "Instructor", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
-  { key: "discipline", label: "Discipline", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true },
+  { key: "discipline", label: "Discipline", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true, displayValue: (v) => v.charAt(0).toUpperCase() + v.slice(1) },
   { key: "duration_seconds", label: "Duration", type: "enum", operators: ENUM_OPS, filterable: true, sortable: true, displayValue: (v) => `${Math.round(Number(v) / 60)} min`, distinctFilter: "workout_type = 'class'" },
   { key: "total_work", label: "Total Output (kj)", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true },
   { key: "avg_output", label: "Avg Output (watts)", type: "number", operators: NUMBER_OPS, filterable: true, sortable: true, requiresDetail: true },

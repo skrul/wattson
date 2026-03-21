@@ -20,8 +20,7 @@ export default function ShareMenu({ onCopy, onSave, compact }: ShareMenuProps) {
       await onCopy();
       setCopyStatus("copied");
       setTimeout(() => setCopyStatus("idle"), 2000);
-    } catch (err) {
-      console.error("Copy failed:", err);
+    } catch {
       setCopyStatus("error");
       setTimeout(() => setCopyStatus("idle"), 2000);
     }
@@ -32,8 +31,8 @@ export default function ShareMenu({ onCopy, onSave, compact }: ShareMenuProps) {
     setOpen(false);
     try {
       await onSave();
-    } catch (err) {
-      console.error("Save failed:", err);
+    } catch {
+      // Save dialog was cancelled or failed
     }
   }
 

@@ -79,8 +79,8 @@ export async function syncWorkouts(
       try {
         const result = await cachedFetchPerformanceGraph(w.id, activeToken);
         await updateWorkoutMetrics(w.id, result, null, result.rawJson);
-      } catch (e) {
-        console.error(`Inline enrichment failed for workout ${w.id}:`, e);
+      } catch {
+        // Non-fatal: enrichment backfill will retry later
       }
     }
     await useEnrichmentStore.getState().refreshCounts();
@@ -93,8 +93,8 @@ export async function syncWorkouts(
     const profile = await fetchUserProfile(activeToken);
     await upsertUserProfile(profile);
     useSessionStore.getState().setUserProfile(profile);
-  } catch (e) {
-    console.error("Failed to fetch user profile:", e);
+  } catch {
+    // Non-fatal: profile will be refreshed on next sync
   }
 
   // Kick off backfill if there are unenriched workouts remaining

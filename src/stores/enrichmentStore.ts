@@ -82,7 +82,6 @@ async function runBackfillLoop() {
 
       await useEnrichmentStore.getState().refreshCounts();
     } catch (e) {
-      console.error(`Enrichment failed for workout ${workoutId}:`, e);
       // On auth error, pause the backfill so user can re-authenticate
       if (e instanceof Error && e.name === "AuthError") {
         useEnrichmentStore.setState({ backfillStatus: "paused" });

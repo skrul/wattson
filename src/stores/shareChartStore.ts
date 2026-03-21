@@ -105,9 +105,7 @@ function persist(state: { styles: ChartStyle[]; activeStyleId: string }) {
     activeStyleId: state.activeStyleId,
     styles: state.styles,
   };
-  setSetting(SETTINGS_KEY, JSON.stringify(data)).catch((e) =>
-    console.error("Failed to save share chart settings:", e),
-  );
+  setSetting(SETTINGS_KEY, JSON.stringify(data)).catch(() => {});
 }
 
 export const useShareChartStore = create<ShareChartState>((set, get) => ({
@@ -131,8 +129,7 @@ export const useShareChartStore = create<ShareChartState>((set, get) => ({
       } else {
         set({ loaded: true });
       }
-    } catch (e) {
-      console.error("Failed to load share chart settings:", e);
+    } catch {
       set({ loaded: true });
     }
   },

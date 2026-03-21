@@ -5,6 +5,7 @@ import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { STORAGE_KEYS } from "../lib/storageKeys";
 
 interface Props {
   open: boolean;
@@ -12,8 +13,6 @@ interface Props {
 }
 
 type Step = "signin" | "downloading" | "success";
-
-const AUTO_SYNC_KEY = "wattson:autoSyncOnLaunch";
 
 export default function SetupWizard({ open, onComplete }: Props) {
   const [step, setStep] = useState<Step>("signin");
@@ -48,7 +47,7 @@ export default function SetupWizard({ open, onComplete }: Props) {
     try {
       const result = await login(email, password);
       await sessionLogin({ ...result, email, password });
-      localStorage.setItem("wattson:lastEmail", email);
+      localStorage.setItem(STORAGE_KEYS.lastEmail, email);
       setStep("downloading");
       startSync(result.userId, result.accessToken);
     } catch (e) {
@@ -67,8 +66,8 @@ export default function SetupWizard({ open, onComplete }: Props) {
       try {
         const profile = await fetchUserProfile(accessToken);
         knownTotal = profile.total_workouts ?? undefined;
-      } catch (e) {
-        console.error("Failed to fetch profile before sync:", e);
+      } catch {
+        // Non-fatal: sync will proceed without progress total
       }
 
       const existingIds = await getExistingWorkoutIds();
@@ -92,8 +91,8 @@ export default function SetupWizard({ open, onComplete }: Props) {
         const profile = await fetchUserProfile(accessToken);
         await upsertUserProfile(profile);
         useSessionStore.getState().setUserProfile(profile);
-      } catch (e) {
-        console.error("Failed to fetch user profile:", e);
+      } catch {
+        // Non-fatal: profile will be fetched on next sync
       }
 
       // Kick off enrichment backfill for unenriched workouts
@@ -116,7 +115,7 @@ export default function SetupWizard({ open, onComplete }: Props) {
   };
 
   const handleComplete = () => {
-    localStorage.setItem(AUTO_SYNC_KEY, autoSync ? "true" : "false");
+    localStorage.setItem(STORAGE_KEYS.autoSyncOnLaunch, autoSync ? "true" : "false");
     onComplete();
   };
 

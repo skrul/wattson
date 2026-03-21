@@ -116,6 +116,12 @@ function mapWorkout(w: PelotonWorkout, raw: unknown): Workout {
     class_type: null,
     class_subtype: null,
     class_type_version: null,
+    max_heart_rate: null,
+    hr_zone1_pct: null,
+    hr_zone2_pct: null,
+    hr_zone3_pct: null,
+    hr_zone4_pct: null,
+    hr_zone5_pct: null,
   };
 }
 
@@ -279,6 +285,12 @@ export async function fetchPerformanceGraph(
     avg_resistance: findSummary(data.average_summaries, "avg_resistance"),
     avg_speed: findSummary(data.average_summaries, "avg_speed"),
     avg_heart_rate: heartRateMetric?.average_value ?? null,
+    max_heart_rate: null,
+    hr_zone1_pct: null,
+    hr_zone2_pct: null,
+    hr_zone3_pct: null,
+    hr_zone4_pct: null,
+    hr_zone5_pct: null,
     rawJson: JSON.stringify(data),
   };
 }

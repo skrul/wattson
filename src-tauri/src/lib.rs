@@ -65,6 +65,12 @@ pub fn run() {
                 class_type_version INTEGER,
                 class_subtype TEXT,
                 ride_id TEXT,
+                max_heart_rate REAL,
+                hr_zone1_pct REAL,
+                hr_zone2_pct REAL,
+                hr_zone3_pct REAL,
+                hr_zone4_pct REAL,
+                hr_zone5_pct REAL,
                 detail_fetched_at INTEGER,
                 perf_graph_fetched_at INTEGER,
                 ride_details_fetched_at INTEGER
@@ -89,6 +95,7 @@ pub fn run() {
                 x_axis_sequential INTEGER NOT NULL DEFAULT 0,
                 agg_function TEXT,
                 transposed INTEGER NOT NULL DEFAULT 0,
+                stacked INTEGER NOT NULL DEFAULT 0,
                 min_value REAL,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL

@@ -7,9 +7,7 @@ import { clearCache } from "../lib/enrichmentCache";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { useEnrichmentStore } from "../stores/enrichmentStore";
-
-const LAST_EMAIL_KEY = "wattson:lastEmail";
-const AUTO_SYNC_KEY = "wattson:autoSyncOnLaunch";
+import { STORAGE_KEYS } from "../lib/storageKeys";
 
 interface Props {
   onDataDeleted: () => void;
@@ -32,15 +30,15 @@ function parseProfileRaw(rawJson: string) {
 
 /** Profile / account tab: shows user info when logged in, login form when not. */
 export default function ApiSync({ onDataDeleted }: Props) {
-  const [email, setEmail] = useState(() => localStorage.getItem(LAST_EMAIL_KEY) ?? "");
+  const [email, setEmail] = useState(() => localStorage.getItem(STORAGE_KEYS.lastEmail) ?? "");
   const [password, setPassword] = useState("");
-  const savedEmail = localStorage.getItem(LAST_EMAIL_KEY);
+  const savedEmail = localStorage.getItem(STORAGE_KEYS.lastEmail);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [cacheStatus, setCacheStatus] = useState("");
-  const [autoSync, setAutoSync] = useState(() => localStorage.getItem(AUTO_SYNC_KEY) !== "false");
+  const [autoSync, setAutoSync] = useState(() => localStorage.getItem(STORAGE_KEYS.autoSyncOnLaunch) !== "false");
 
   const session = useSessionStore((s) => s.session);
   const userProfile = useSessionStore((s) => s.userProfile);
@@ -66,7 +64,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
     try {
       const result = await login(email, password);
       await sessionLogin({ ...result, email, password });
-      localStorage.setItem(LAST_EMAIL_KEY, email);
+      localStorage.setItem(STORAGE_KEYS.lastEmail, email);
       setPassword("");
       setStatus("Logged in successfully.");
     } catch (e) {
@@ -89,7 +87,6 @@ export default function ApiSync({ onDataDeleted }: Props) {
         setStatus(`Synced ${count} new workouts.`);
       }
     } catch (e) {
-      console.error("Sync error:", e);
       setError(e instanceof Error ? e.message : String(e));
       setStatus("");
     } finally {
@@ -108,7 +105,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
     resetEnrichment();
     await deleteAllData();
     setWorkouts([]);
-    localStorage.removeItem(LAST_EMAIL_KEY);
+    localStorage.removeItem(STORAGE_KEYS.lastEmail);
     setEmail("");
     onDataDeleted();
     await sessionLogout();
@@ -264,7 +261,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
                 checked={autoSync}
                 onChange={(e) => {
                   setAutoSync(e.target.checked);
-                  localStorage.setItem(AUTO_SYNC_KEY, e.target.checked ? "true" : "false");
+                  localStorage.setItem(STORAGE_KEYS.autoSyncOnLaunch, e.target.checked ? "true" : "false");
                 }}
                 className="rounded border-gray-300"
               />

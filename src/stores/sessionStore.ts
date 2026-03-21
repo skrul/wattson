@@ -56,8 +56,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       } else {
         set({ loaded: true });
       }
-    } catch (e) {
-      console.error("Failed to load credentials:", e);
+    } catch {
       set({ loaded: true });
     }
   },
@@ -73,7 +72,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   logout: async () => {
-    await invoke("delete_credentials").catch((e) => console.error("Failed to delete credentials:", e));
+    await invoke("delete_credentials").catch(() => {});
     set({ session: null, userProfile: null });
   },
 

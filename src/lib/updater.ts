@@ -21,8 +21,7 @@ export async function checkForUpdate(): Promise<UpdateStatus> {
       };
     }
     return { available: false };
-  } catch (e) {
-    console.error("Update check failed:", e);
+  } catch {
     return { available: false };
   }
 }

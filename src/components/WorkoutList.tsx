@@ -49,8 +49,7 @@ export default function WorkoutList() {
         }
         setLoading(false);
       }
-    }).catch((e) => {
-      console.error("Failed to load workouts:", e);
+    }).catch(() => {
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };

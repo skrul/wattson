@@ -15,7 +15,7 @@ interface Props {
 let condId = 0;
 
 export default function ChartWidget({ widget }: Props) {
-  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [workouts, setWorkouts] = useState<Workout[] | null>(null);
   const navigateToFilteredWorkouts = useNavigationStore((s) => s.navigateToFilteredWorkouts);
   const navigateToWorkout = useNavigationStore((s) => s.navigateToWorkout);
   const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
@@ -60,6 +60,17 @@ export default function ChartWidget({ widget }: Props) {
   const handleWorkoutClick = useCallback((workoutId: string) => {
     navigateToWorkout(workoutId);
   }, [navigateToWorkout]);
+
+  if (workouts === null) {
+    return (
+      <div className="flex h-full w-full flex-col">
+        {chartConfig.name && (
+          <div className="shrink-0 truncate text-sm font-medium text-gray-700">{chartConfig.name}</div>
+        )}
+        <div className="min-h-0 flex-1 animate-pulse rounded bg-gray-100" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full w-full flex-col">

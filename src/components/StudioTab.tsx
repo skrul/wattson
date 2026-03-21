@@ -210,9 +210,7 @@ export default function StudioTab() {
           );
         }
       })
-      .catch((err) => {
-        if (!cancelled) console.error("Studio enrichment failed:", err);
-      });
+      .catch(() => {});
 
     return () => { cancelled = true; };
   }, [workout?.id, session?.accessToken]);

@@ -13,8 +13,7 @@ import { useEnrichmentStore } from "./stores/enrichmentStore";
 import { useNavigationStore, isDashboardTab, makeDashboardTab } from "./stores/navigationStore";
 import { useShareChartStore } from "./stores/shareChartStore";
 import { useDashboardRegistryStore } from "./stores/dashboardRegistryStore";
-
-const AUTO_SYNC_KEY = "wattson:autoSyncOnLaunch";
+import { STORAGE_KEYS } from "./lib/storageKeys";
 
 function App() {
   const activeTab = useNavigationStore((s) => s.activeTab);
@@ -43,9 +42,9 @@ function App() {
     checkForUpdate().then((status) => {
       if (status.available) setUpdate(status);
     });
-    useEnrichmentStore.getState().loadState().catch((e) => console.error("Enrichment state load failed:", e));
-    useShareChartStore.getState().load().catch((e) => console.error("Share chart settings load failed:", e));
-    useDashboardRegistryStore.getState().loadRegistry().catch((e) => console.error("Dashboard registry load failed:", e));
+    useEnrichmentStore.getState().loadState().catch(() => {});
+    useShareChartStore.getState().load().catch(() => {});
+    useDashboardRegistryStore.getState().loadRegistry().catch(() => {});
   }, []);
 
   // After registry loads, set activeTab to first dashboard tab
@@ -77,13 +76,13 @@ function App() {
         if (profile) useSessionStore.getState().setUserProfile(profile);
         // Auto-sync after profile is loaded so early-stop optimization works
         if (!autoSyncRan.current && !showWizard) {
-          const pref = localStorage.getItem(AUTO_SYNC_KEY);
+          const pref = localStorage.getItem(STORAGE_KEYS.autoSyncOnLaunch);
           if (pref !== "false") {
             autoSyncRan.current = true;
-            syncWorkouts().catch((e) => { console.error("Auto-sync failed:", e); });
+            syncWorkouts().catch(() => {});
           }
         }
-      }).catch((e) => console.error("Failed to load cached profile:", e));
+      }).catch(() => {});
     } else if (dataState === "checking") {
       // Only check DB on first load — sign-out keeps existing dataState
       hasWorkouts().then((has) => {
@@ -111,8 +110,7 @@ function App() {
     setUpdating(true);
     try {
       await installUpdate();
-    } catch (e) {
-      console.error("Update failed:", e);
+    } catch {
       setUpdating(false);
     }
   };

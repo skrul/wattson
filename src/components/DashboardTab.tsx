@@ -42,9 +42,7 @@ export default function DashboardTab({ dashboardId }: Props) {
     const defaultWidgets = buildDefaultInsightsWidgets();
     const updatedDashboard = { ...dashboard, widgets: defaultWidgets };
     useStore.setState({ dashboard: updatedDashboard });
-    saveDashboardWidgets(dashboard.id, defaultWidgets).catch((err) =>
-      console.error("Failed to save insights dashboard:", err),
-    );
+    saveDashboardWidgets(dashboard.id, defaultWidgets).catch(() => {});
   }, [dashboard, defaultKey, useStore]);
 
   if (!dashboard) {

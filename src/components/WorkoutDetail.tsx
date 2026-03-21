@@ -162,10 +162,7 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
     }
 
     const detailPromise = needsMetrics
-      ? cachedFetchWorkoutDetail(workout.id, accessToken).catch((err) => {
-          console.warn("Failed to fetch workout detail (non-fatal):", err);
-          return null;
-        })
+      ? cachedFetchWorkoutDetail(workout.id, accessToken).catch(() => null)
       : Promise.resolve(null);
 
     const perfPromise = needsMetrics
@@ -173,10 +170,7 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
       : Promise.resolve(null);
 
     const ridePromise = rideId
-      ? cachedFetchRideDetails(rideId, accessToken).catch((err) => {
-          console.warn("Failed to fetch ride details (non-fatal):", err);
-          return null;
-        })
+      ? cachedFetchRideDetails(rideId, accessToken).catch(() => null)
       : Promise.resolve(null);
 
     Promise.all([detailPromise, perfPromise, ridePromise])
@@ -199,9 +193,8 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
           updateWorkout(workout.id, { raw_ride_details_json: rideResult.rawJson });
         }
       })
-      .catch((err) => {
+      .catch(() => {
         if (cancelled) return;
-        console.error("Failed to fetch workout metrics:", err);
         setMetricsError("Failed to load metrics");
       })
       .finally(() => {

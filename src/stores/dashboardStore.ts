@@ -25,9 +25,7 @@ export interface DashboardState {
 
 /** Persist current widgets to the database (fire-and-forget). */
 function persistWidgets(dashboard: Dashboard) {
-  saveDashboardWidgets(dashboard.id, dashboard.widgets).catch((err) =>
-    console.error("Failed to save dashboard:", err),
-  );
+  saveDashboardWidgets(dashboard.id, dashboard.widgets).catch(() => {});
 }
 
 /** Create a Zustand dashboard store for a named dashboard. */

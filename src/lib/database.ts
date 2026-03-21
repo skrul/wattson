@@ -25,8 +25,9 @@ export async function insertWorkouts(workouts: Workout[]): Promise<void> {
          avg_output, calories, distance, avg_heart_rate, avg_cadence,
          avg_resistance, avg_speed, strive_score, is_live, workout_type,
          total_work, source, raw_json, raw_detail_json, raw_performance_graph_json,
-         raw_ride_details_json, ride_id, class_type, class_subtype, class_type_version)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)`,
+         raw_ride_details_json, ride_id, class_type, class_subtype, class_type_version,
+         max_heart_rate, hr_zone1_pct, hr_zone2_pct, hr_zone3_pct, hr_zone4_pct, hr_zone5_pct)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)`,
       [
         w.id, w.peloton_id, w.date, w.duration_seconds, w.discipline,
         w.title, w.instructor, w.avg_output, w.calories, w.distance,
@@ -34,6 +35,8 @@ export async function insertWorkouts(workouts: Workout[]): Promise<void> {
         w.strive_score, w.is_live, w.workout_type, w.total_work,
         w.source, w.raw_json, w.raw_detail_json, w.raw_performance_graph_json,
         w.raw_ride_details_json, w.ride_id, w.class_type, w.class_subtype, w.class_type_version,
+        w.max_heart_rate ?? null, w.hr_zone1_pct ?? null, w.hr_zone2_pct ?? null,
+        w.hr_zone3_pct ?? null, w.hr_zone4_pct ?? null, w.hr_zone5_pct ?? null,
       ],
     );
   }
@@ -187,7 +190,8 @@ export async function queryWorkouts(filters: WorkoutFilters): Promise<Workout[]>
             avg_output, calories, distance, avg_heart_rate, avg_cadence,
             avg_resistance, avg_speed, strive_score, is_live, workout_type,
             total_work, source, raw_json, ride_id, class_type, class_subtype,
-            class_type_version
+            class_type_version, max_heart_rate,
+            hr_zone1_pct, hr_zone2_pct, hr_zone3_pct, hr_zone4_pct, hr_zone5_pct
      FROM workouts ${where} ORDER BY ${sortCol} ${sortDir}`,
     params,
   );
@@ -281,14 +285,18 @@ export async function updateWorkoutMetrics(
   await d.execute(
     `UPDATE workouts SET calories=$1, distance=$2, avg_output=$3, avg_cadence=$4,
      avg_resistance=$5, avg_speed=$6, avg_heart_rate=$7,
-     raw_detail_json = COALESCE($8, raw_detail_json),
-     raw_performance_graph_json = COALESCE($9, raw_performance_graph_json),
-     detail_fetched_at = CASE WHEN $8 IS NOT NULL THEN $10 ELSE detail_fetched_at END,
-     perf_graph_fetched_at = CASE WHEN $9 IS NOT NULL THEN $10 ELSE perf_graph_fetched_at END
-     WHERE id=$11`,
+     max_heart_rate=$8, hr_zone1_pct=$9, hr_zone2_pct=$10,
+     hr_zone3_pct=$11, hr_zone4_pct=$12, hr_zone5_pct=$13,
+     raw_detail_json = COALESCE($14, raw_detail_json),
+     raw_performance_graph_json = COALESCE($15, raw_performance_graph_json),
+     detail_fetched_at = CASE WHEN $14 IS NOT NULL THEN $16 ELSE detail_fetched_at END,
+     perf_graph_fetched_at = CASE WHEN $15 IS NOT NULL THEN $16 ELSE perf_graph_fetched_at END
+     WHERE id=$17`,
     [
       metrics.calories, metrics.distance, metrics.avg_output, metrics.avg_cadence,
       metrics.avg_resistance, metrics.avg_speed, metrics.avg_heart_rate,
+      metrics.max_heart_rate, metrics.hr_zone1_pct, metrics.hr_zone2_pct,
+      metrics.hr_zone3_pct, metrics.hr_zone4_pct, metrics.hr_zone5_pct,
       rawDetailJson, rawPerformanceGraphJson,
       now, workoutId,
     ],
@@ -334,6 +342,7 @@ function rowToChart(row: ChartDefinitionRow): ChartDefinition {
     x_axis_sequential: !!(row.x_axis_sequential),
     agg_function: (row.agg_function as AggregationFunction) ?? null,
     transposed: !!(row.transposed),
+    stacked: !!(row.stacked),
     min_value: row.min_value ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -354,8 +363,8 @@ export async function saveChartDefinition(chart: ChartDefinition): Promise<void>
   const d = await getDb();
   await d.execute(
     `INSERT OR REPLACE INTO chart_definitions
-      (id, name, mark_type, y_fields_json, group_by, filters_json, x_axis_mode, x_axis_field, x_axis_sequential, agg_function, transposed, min_value, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      (id, name, mark_type, y_fields_json, group_by, filters_json, x_axis_mode, x_axis_field, x_axis_sequential, agg_function, transposed, stacked, min_value, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
     [
       chart.id,
       chart.name,
@@ -368,6 +377,7 @@ export async function saveChartDefinition(chart: ChartDefinition): Promise<void>
       chart.x_axis_sequential ? 1 : 0,
       chart.agg_function,
       chart.transposed ? 1 : 0,
+      chart.stacked ? 1 : 0,
       chart.min_value,
       chart.created_at,
       chart.updated_at,

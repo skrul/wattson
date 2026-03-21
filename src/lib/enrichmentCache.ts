@@ -47,8 +47,36 @@ function parseMetrics(rawJson: string): WorkoutMetrics {
   const findSummary = (arr: { slug: string; value: number }[] | undefined, slug: string) =>
     arr?.find((s) => s.slug === slug)?.value ?? null;
 
-  const heartRateMetric = (data.metrics as { slug: string; average_value: number }[] | undefined)
+  const heartRateMetric = (data.metrics as { slug: string; average_value: number; max_value?: number }[] | undefined)
     ?.find((m) => m.slug === "heart_rate");
+
+  const maxHeartRate = heartRateMetric?.max_value ?? null;
+
+  // Extract HR zone percentages
+  let hr_zone1_pct: number | null = null;
+  let hr_zone2_pct: number | null = null;
+  let hr_zone3_pct: number | null = null;
+  let hr_zone4_pct: number | null = null;
+  let hr_zone5_pct: number | null = null;
+
+  const zoneDurations = data.effort_zones?.heart_rate_zone_durations as
+    { heart_rate_z1_duration?: number; heart_rate_z2_duration?: number; heart_rate_z3_duration?: number; heart_rate_z4_duration?: number; heart_rate_z5_duration?: number } | undefined;
+
+  if (zoneDurations) {
+    const z1 = zoneDurations.heart_rate_z1_duration ?? 0;
+    const z2 = zoneDurations.heart_rate_z2_duration ?? 0;
+    const z3 = zoneDurations.heart_rate_z3_duration ?? 0;
+    const z4 = zoneDurations.heart_rate_z4_duration ?? 0;
+    const z5 = zoneDurations.heart_rate_z5_duration ?? 0;
+    const total = z1 + z2 + z3 + z4 + z5;
+    if (total > 0) {
+      hr_zone1_pct = (z1 / total) * 100;
+      hr_zone2_pct = (z2 / total) * 100;
+      hr_zone3_pct = (z3 / total) * 100;
+      hr_zone4_pct = (z4 / total) * 100;
+      hr_zone5_pct = (z5 / total) * 100;
+    }
+  }
 
   return {
     calories: findSummary(data.summaries, "calories"),
@@ -58,6 +86,12 @@ function parseMetrics(rawJson: string): WorkoutMetrics {
     avg_resistance: findSummary(data.average_summaries, "avg_resistance"),
     avg_speed: findSummary(data.average_summaries, "avg_speed"),
     avg_heart_rate: heartRateMetric?.average_value ?? null,
+    max_heart_rate: maxHeartRate,
+    hr_zone1_pct,
+    hr_zone2_pct,
+    hr_zone3_pct,
+    hr_zone4_pct,
+    hr_zone5_pct,
   };
 }
 

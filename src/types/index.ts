@@ -27,6 +27,12 @@ export interface Workout {
   class_type: string | null;
   class_subtype: string | null;
   class_type_version: number | null;
+  max_heart_rate: number | null;
+  hr_zone1_pct: number | null;
+  hr_zone2_pct: number | null;
+  hr_zone3_pct: number | null;
+  hr_zone4_pct: number | null;
+  hr_zone5_pct: number | null;
 }
 
 /** Metrics fetched on-demand from the performance_graph endpoint. */
@@ -38,6 +44,12 @@ export interface WorkoutMetrics {
   avg_resistance: number | null;
   avg_speed: number | null;
   avg_heart_rate: number | null;
+  max_heart_rate: number | null;
+  hr_zone1_pct: number | null;
+  hr_zone2_pct: number | null;
+  hr_zone3_pct: number | null;
+  hr_zone4_pct: number | null;
+  hr_zone5_pct: number | null;
 }
 
 /** Per-second time series data parsed from raw_performance_graph_json. */
@@ -120,6 +132,7 @@ export interface ChartDefinition {
   x_axis_sequential: boolean;     // evenly spaced categorical axis
   agg_function: AggregationFunction | null;
   transposed: boolean;            // horizontal bars (swap x/y)
+  stacked?: boolean;               // stack multiple y_fields (bar chart)
   min_value: number | null;       // HAVING-like filter: hide aggregated buckets below this
   created_at: number;
   updated_at: number;
@@ -188,6 +201,7 @@ export interface ChartDefinitionRow {
   x_axis_sequential: number | null;
   agg_function: string | null;
   transposed: number | null;
+  stacked: number | null;
   min_value: number | null;
   created_at: number;
   updated_at: number;

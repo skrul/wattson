@@ -337,6 +337,17 @@ export default function ChartBuilder({ chart, onChange }: ChartBuilderProps) {
                 <span className="whitespace-nowrap">Horizontal bars</span>
               </label>
             )}
+            {chart.mark_type === "bar" && chart.y_fields.length >= 2 && !chart.group_by && (
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={chart.stacked ?? false}
+                  onChange={(e) => update({ stacked: e.target.checked })}
+                  className="text-blue-600"
+                />
+                <span className="whitespace-nowrap">Stack bars</span>
+              </label>
+            )}
             {chart.y_fields.length >= 2 && (
               <>
                 <div>

@@ -21,6 +21,7 @@ function makeEmptyChart(): ChartFields {
     x_axis_sequential: false,
     agg_function: null,
     transposed: false,
+    stacked: false,
     min_value: null,
   };
 }

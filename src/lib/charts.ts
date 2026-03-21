@@ -942,9 +942,62 @@ export function renderChart(
     }
   };
 
-  // Add marks for all fields
-  for (let fi = 0; fi < chart.y_fields.length; fi++) {
-    addFieldMarks(fi);
+  // --- Stacked bar mode ---
+  const useStacked = chart.stacked && chart.mark_type === "bar" && chart.y_fields.length >= 2 && !chart.group_by;
+
+  if (useStacked) {
+    // Transform wide WorkoutPoint[] into long format for Plot.stackY
+    interface LongPoint {
+      date: Date;
+      label?: string;
+      x1?: Date;
+      x2?: Date;
+      value: number;
+      series: string;
+    }
+    const longData: LongPoint[] = [];
+    for (const d of data) {
+      for (let fi = 0; fi < chart.y_fields.length; fi++) {
+        const v = d.ys[fi];
+        if (isNaN(v)) continue;
+        const yf = chart.y_fields[fi];
+        const point: LongPoint = {
+          date: d.date,
+          label: d.label,
+          value: v,
+          series: fieldLabel(yf.field),
+        };
+        if (!categorical) {
+          point.x1 = new Date(d.date.getTime() - halfWidth);
+          point.x2 = new Date(d.date.getTime() + halfWidth);
+        }
+        longData.push(point);
+      }
+    }
+
+    // Tooltip for stacked segments
+    const stackTitleFn = (d: LongPoint) => {
+      const xLabel = d.label ?? d.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+      const rounded = Number.isInteger(d.value) ? d.value : +d.value.toFixed(1);
+      return `${xLabel}\n${d.series}: ${rounded}`;
+    };
+
+    if (categorical) {
+      chartMarks.push(Plot.barY(longData, Plot.stackY({
+        x: "label", y: "value", fill: "series",
+        title: stackTitleFn, tip: true,
+      })));
+    } else {
+      chartMarks.push(Plot.rectY(longData, Plot.stackY({
+        x1: "x1", x2: "x2", y: "value", fill: "series",
+        title: stackTitleFn, tip: true,
+      })));
+    }
+  } else {
+    // Add marks for all fields (normal mode)
+    for (let fi = 0; fi < chart.y_fields.length; fi++) {
+      addFieldMarks(fi);
+    }
   }
 
   // Single-field grouped bar tip
@@ -1028,9 +1081,13 @@ export function renderChart(
   }
   const marginRight = hasRightFields ? 70 : 40;
 
+  // --- Color config for stacked mode ---
+  const stackedColorDomain = useStacked ? chart.y_fields.map((yf) => fieldLabel(yf.field)) : undefined;
+  const stackedColorRange = useStacked ? chart.y_fields.map((yf, fi) => seriesColor(fi, yf.color)) : undefined;
+
   // --- Caption: list all field labels with colors when multi-field ---
   let caption: string | undefined;
-  if (multiField) {
+  if (multiField && !useStacked) {
     const parts = chart.y_fields.map((yf, fi) => {
       let label = fieldLabel(yf.field);
       if (aggregated && chart.agg_function) {
@@ -1042,20 +1099,26 @@ export function renderChart(
     caption = parts.join("  ");
   }
 
+  const colorConfig = useStacked
+    ? { legend: true, domain: stackedColorDomain, range: stackedColorRange }
+    : singleFieldGrouped
+      ? { legend: true, domain: sortedGroups(data) }
+      : undefined;
+
   const plotConfig = transposed
     ? {
         width, height, marginLeft, marginRight,
         x: { label: yLabel, grid: true } as Record<string, unknown>,
         y: { ...xConfig, tickRotate: 0, label: null } as Record<string, unknown>,
-        color: singleFieldGrouped ? { legend: true, domain: sortedGroups(data) } : undefined,
+        color: colorConfig,
         marks: chartMarks,
       }
     : {
-        width, height, marginRight,
-        marginBottom: (xConfig as Record<string, unknown>).tickRotate ? 60 : undefined,
+        width, height: useStacked ? height - 30 : height, marginRight,
+        marginBottom: (xConfig as Record<string, unknown>).tickRotate || useStacked ? 60 : undefined,
         x: xConfig,
-        y: { label: yLabel, grid: true, ...(multiField ? { domain: primaryExtent } : {}) },
-        color: singleFieldGrouped ? { legend: true, domain: sortedGroups(data) } : undefined,
+        y: { label: useStacked ? "%" : yLabel, grid: true, ...(multiField && !useStacked ? { domain: primaryExtent } : {}) },
+        color: colorConfig,
         marks: chartMarks,
       };
 

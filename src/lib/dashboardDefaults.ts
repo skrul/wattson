@@ -123,6 +123,7 @@ export function buildDefaultHomeWidgets(): DashboardWidget[] {
       x_axis_sequential: true,
       agg_function: null,
       transposed: false,
+      stacked: false,
       min_value: null,
     },
   }, 0, 12, 12, 8));
@@ -130,18 +131,26 @@ export function buildDefaultHomeWidgets(): DashboardWidget[] {
   widgets.push(makeWidget("chart", {
     type: "chart",
     chart: {
-      name: "Strive Score",
-      mark_type: "line",
-      y_fields: [{ field: "strive_score", side: "left", trend_line: true }],
+      name: "Last Month HR Zone Distribution",
+      mark_type: "bar",
+      y_fields: [
+        { field: "hr_zone1_pct", side: "left", color: "#50c4aa" },
+        { field: "hr_zone2_pct", side: "none", color: "#b6c95c" },
+        { field: "hr_zone3_pct", side: "none", color: "#facb3e" },
+        { field: "hr_zone4_pct", side: "none", color: "#fc820f" },
+        { field: "hr_zone5_pct", side: "none", color: "#ff4759" },
+      ],
       group_by: null,
       filters: [
-        { id: "home-ss-30d", field: "date", operator: "last_n_days", value: "30", values: [] },
+        { id: "home-hrz-30d", field: "date", operator: "last_n_days", value: "30", values: [] },
+        { id: "home-hrz-cycling", field: "discipline", operator: "equals", value: "", values: ["cycling"] },
       ],
       x_axis_mode: "date",
       x_axis_field: null,
       x_axis_sequential: true,
       agg_function: null,
       transposed: false,
+      stacked: true,
       min_value: null,
     },
   }, 12, 12, 12, 8));
@@ -216,6 +225,7 @@ export function buildDefaultInsightsWidgets(): DashboardWidget[] {
       x_axis_sequential: false,
       agg_function: "count",
       transposed: true,
+      stacked: false,
       min_value: 5,
     },
   }, 0, y, 12, 12));
@@ -233,6 +243,7 @@ export function buildDefaultInsightsWidgets(): DashboardWidget[] {
       x_axis_sequential: false,
       agg_function: "count",
       transposed: true,
+      stacked: false,
       min_value: 5,
     },
   }, 12, y, 12, 12));

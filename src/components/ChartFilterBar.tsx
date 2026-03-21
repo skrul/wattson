@@ -32,15 +32,22 @@ function FilterChip({
   const [open, setOpen] = useState(defaultOpen);
   const chipRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; flip: boolean } | null>(null);
 
-  // Position the floating panel relative to the chip
+  // Position the floating panel relative to the chip, flipping above if near viewport bottom
   useEffect(() => {
     if (!open || !chipRef.current) return;
     function update() {
       if (!chipRef.current) return;
       const rect = chipRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + 4, left: rect.left });
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const panelHeight = panelRef.current?.offsetHeight ?? 300;
+      const flip = spaceBelow < panelHeight + 8;
+      setPos({
+        top: flip ? rect.top - 4 : rect.bottom + 4,
+        left: rect.left,
+        flip,
+      });
     }
     update();
     window.addEventListener("scroll", update, true);
@@ -105,7 +112,13 @@ function FilterChip({
       {open && pos && createPortal(
         <div
           ref={panelRef}
-          style={{ position: "fixed", top: pos.top, left: pos.left }}
+          style={{
+            position: "fixed",
+            left: pos.left,
+            ...(pos.flip
+              ? { bottom: window.innerHeight - pos.top }
+              : { top: pos.top }),
+          }}
           className="z-[100] w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
         >
           <div className="space-y-3">

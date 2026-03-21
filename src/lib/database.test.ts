@@ -44,6 +44,12 @@ function makeWorkout(id: string, overrides: Partial<Workout> = {}): Workout {
     class_type: "Ride",
     class_subtype: null,
     class_type_version: 3,
+    max_heart_rate: null,
+    hr_zone1_pct: null,
+    hr_zone2_pct: null,
+    hr_zone3_pct: null,
+    hr_zone4_pct: null,
+    hr_zone5_pct: null,
     ...overrides,
   };
 }
@@ -132,7 +138,7 @@ describe("queryWorkouts", () => {
     await queryWorkouts(makeFilters());
 
     const [sql, params] = mockSelect.mock.calls[0];
-    expect(sql).toContain("SELECT * FROM workouts");
+    expect(sql).toContain("FROM workouts");
     expect(sql).toContain("ORDER BY date DESC");
     expect(sql).not.toContain("WHERE");
     expect(params).toEqual([]);
@@ -373,7 +379,7 @@ describe("queryWorkouts", () => {
 
     const [sql, params] = mockSelect.mock.calls[0];
     expect(sql).toContain("WHERE calories > $1");
-    expect(sql).not.toContain("title");
+    expect(sql).not.toContain("title LIKE");
     expect(params).toEqual([300]);
   });
 

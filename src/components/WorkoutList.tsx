@@ -17,6 +17,7 @@ export default function WorkoutList() {
   const accessToken = useSessionStore((s) => s.session?.accessToken ?? null);
   const cardScrollRef = useRef<HTMLDivElement>(null);
   const prevSortRef = useRef(filters.sort);
+  const navSelectedRef = useRef(false);
 
   const cardVirtualizer = useVirtualizer({
     count: workouts.length,
@@ -43,10 +44,27 @@ export default function WorkoutList() {
     setLoading(true);
     queryWorkouts(currentFilters).then((rows) => {
       if (!cancelled) {
+        // Preserve enrichment data (fetched on-demand, not in queryWorkouts SELECT)
+        const oldWorkouts = useWorkoutStore.getState().workouts;
+        if (oldWorkouts.length > 0) {
+          const enriched = new Map<string, Workout>();
+          for (const w of oldWorkouts) {
+            if (w.raw_performance_graph_json != null || w.raw_detail_json != null || w.raw_ride_details_json != null) {
+              enriched.set(w.id, w);
+            }
+          }
+          if (enriched.size > 0) {
+            rows = rows.map((w) => {
+              const old = enriched.get(w.id);
+              return old ? { ...w, raw_performance_graph_json: old.raw_performance_graph_json, raw_detail_json: old.raw_detail_json, raw_ride_details_json: old.raw_ride_details_json } : w;
+            });
+          }
+        }
         setWorkouts(rows);
-        if (sortChanged && rows.length > 0) {
+        if (sortChanged && rows.length > 0 && !navSelectedRef.current) {
           selectWorkout(rows[0].id);
         }
+        navSelectedRef.current = false;
         setLoading(false);
       }
     }).catch(() => {
@@ -67,8 +85,8 @@ export default function WorkoutList() {
         sort: nav.sort,
         search: "",
       });
-      // Clear selection; auto-select will pick the first result after query loads
       store.selectWorkout(nav.workoutId || null);
+      navSelectedRef.current = !!nav.workoutId;
       if (!nav.workoutId) {
         store.setWorkouts([]);
       }

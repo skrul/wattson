@@ -105,6 +105,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
     resetEnrichment();
     await deleteAllData();
     setWorkouts([]);
+    useWorkoutStore.getState().notifySync();
     localStorage.removeItem(STORAGE_KEYS.lastEmail);
     setEmail("");
     onDataDeleted();

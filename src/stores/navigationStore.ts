@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { FilterCondition, SortSpec } from "../types";
+import type { FilterCondition, SortSpec, WorkoutFilters } from "../types";
+import { useWorkoutStore } from "./workoutStore";
 
 export type Tab = string;
 
@@ -26,6 +27,8 @@ interface PendingWorkoutNav {
 interface NavigationState {
   activeTab: Tab;
   previousTab: Tab | null;
+  previousWorkoutFilters: WorkoutFilters | null;
+  previousSelectedWorkoutId: string | null;
   pendingWorkoutNav: PendingWorkoutNav | null;
 
   setActiveTab: (tab: Tab) => void;
@@ -35,31 +38,62 @@ interface NavigationState {
   consumePendingWorkoutNav: () => PendingWorkoutNav | null;
 }
 
+function restorePreviousWorkoutState(state: NavigationState) {
+  if (state.previousWorkoutFilters) {
+    const ws = useWorkoutStore.getState();
+    ws.setFilters(state.previousWorkoutFilters);
+    ws.selectWorkout(state.previousSelectedWorkoutId);
+  }
+}
+
 export const useNavigationStore = create<NavigationState>((set, get) => ({
   activeTab: "workouts", // temporary default until registry sets first dashboard tab
   previousTab: null,
+  previousWorkoutFilters: null,
+  previousSelectedWorkoutId: null,
   pendingWorkoutNav: null,
 
-  setActiveTab: (tab) => set({ activeTab: tab, previousTab: null }),
+  setActiveTab: (tab) => {
+    const state = get();
+    restorePreviousWorkoutState(state);
+    set({ activeTab: tab, previousTab: null, previousWorkoutFilters: null, previousSelectedWorkoutId: null });
+  },
 
   goBack: () => {
-    const prev = get().previousTab;
-    if (prev) set({ activeTab: prev, previousTab: null });
+    const state = get();
+    if (!state.previousTab) return;
+    restorePreviousWorkoutState(state);
+    set({ activeTab: state.previousTab, previousTab: null, previousWorkoutFilters: null, previousSelectedWorkoutId: null });
   },
 
   navigateToWorkout: (id) =>
-    set((state) => ({
-      previousTab: state.activeTab,
-      activeTab: "workouts",
-      pendingWorkoutNav: { workoutId: id, conditions: [], sort: { field: "date", direction: "desc" } },
-    })),
+    set((state) => {
+      const ws = useWorkoutStore.getState();
+      return {
+        previousTab: state.activeTab,
+        activeTab: "workouts",
+        previousWorkoutFilters: ws.filters,
+        previousSelectedWorkoutId: ws.selectedWorkoutId,
+        pendingWorkoutNav: { workoutId: id, conditions: [], sort: { field: "date", direction: "desc" } },
+      };
+    }),
 
   navigateToFilteredWorkouts: (nav) =>
-    set((state) => ({ previousTab: state.activeTab, activeTab: "workouts", pendingWorkoutNav: nav })),
+    set((state) => {
+      const ws = useWorkoutStore.getState();
+      return {
+        previousTab: state.activeTab,
+        activeTab: "workouts",
+        previousWorkoutFilters: ws.filters,
+        previousSelectedWorkoutId: ws.selectedWorkoutId,
+        pendingWorkoutNav: nav,
+      };
+    }),
 
   consumePendingWorkoutNav: () => {
     const nav = get().pendingWorkoutNav;
     if (nav) set({ pendingWorkoutNav: null });
     return nav;
   },
+
 }));

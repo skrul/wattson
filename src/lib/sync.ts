@@ -72,6 +72,7 @@ export async function syncWorkouts(
     const filters = useWorkoutStore.getState().filters;
     const updated = await queryWorkouts(filters);
     useWorkoutStore.getState().setWorkouts(updated);
+    useWorkoutStore.getState().notifySync();
     useSessionStore.getState().setIsSyncing(false);
 
     // Inline enrichment: fetch performance_graph for each new workout

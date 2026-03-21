@@ -85,6 +85,7 @@ export default function SetupWizard({ open, onComplete }: Props) {
 
       const updated = await queryWorkouts(filters);
       setWorkouts(updated);
+      useWorkoutStore.getState().notifySync();
 
       // Fetch and cache user profile
       try {

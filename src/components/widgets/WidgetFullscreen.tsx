@@ -1,5 +1,7 @@
-import type { DashboardWidget, WidgetType } from "../../types";
+import { useState, useCallback } from "react";
+import type { DashboardWidget, WidgetType, FilterCondition } from "../../types";
 import { useDashboardContext } from "../../stores/DashboardContext";
+import FilterBar from "../ChartFilterBar";
 import ChartWidget from "./ChartWidget";
 import MetricTotalWidget from "./MetricTotalWidget";
 import LastWorkoutWidget from "./LastWorkoutWidget";
@@ -33,6 +35,26 @@ interface Props {
 export default function WidgetFullscreen({ widget }: Props) {
   const useStore = useDashboardContext();
   const expandWidget = useStore((s) => s.expandWidget);
+  const isChart = widget.config.type === "chart";
+
+  const [tempFilters, setTempFilters] = useState<FilterCondition[]>(() => {
+    if (widget.config.type === "chart") {
+      return (widget.config.chart.filters ?? []).map((f) => ({ ...f }));
+    }
+    return [];
+  });
+
+  const onAdd = useCallback((condition: FilterCondition) => {
+    setTempFilters((prev) => [...prev, condition]);
+  }, []);
+
+  const onUpdate = useCallback((id: string, updates: Partial<FilterCondition>) => {
+    setTempFilters((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+  }, []);
+
+  const onRemove = useCallback((id: string) => {
+    setTempFilters((prev) => prev.filter((c) => c.id !== id));
+  }, []);
 
   return (
     <div className="flex h-full flex-col">
@@ -45,8 +67,13 @@ export default function WidgetFullscreen({ widget }: Props) {
           Exit Fullscreen
         </button>
       </div>
+      {isChart && (
+        <div className="mb-3">
+          <FilterBar filters={tempFilters} onAdd={onAdd} onUpdate={onUpdate} onRemove={onRemove} />
+        </div>
+      )}
       <div className="flex-1 overflow-auto rounded-lg border border-gray-200 bg-white p-4">
-        {widget.config.type === "chart" && <ChartWidget widget={widget} fullscreen />}
+        {isChart && <ChartWidget widget={widget} fullscreen overrideFilters={tempFilters} />}
         {widget.config.type === "metric_total" && <MetricTotalWidget widget={widget} fullscreen />}
         {widget.config.type === "last_workout" && <LastWorkoutWidget widget={widget} fullscreen />}
         {widget.config.type === "personal_record" && <PersonalRecordWidget widget={widget} fullscreen />}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { Workout } from "../types";
 import { cachedFetchWorkoutDetail, cachedFetchPerformanceGraph, cachedFetchRideDetails } from "../lib/enrichmentCache";
-import { updateWorkoutMetrics, updateRideDetails, getWorkoutsByRideId } from "../lib/database";
+import { updateWorkoutMetrics, updateRideDetails, getWorkoutsByRideId, getWorkoutById } from "../lib/database";
 import { useWorkoutStore, type DetailTab } from "../stores/workoutStore";
 import RideDetailChart from "./RideDetailChart";
 import CompareTab from "./CompareTab";
@@ -136,7 +136,32 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
     return () => { cancelled = true; };
   }, [workout?.ride_id]);
 
-  // Fetch metrics on workout select (existing logic)
+  // Load enrichment data from DB if store workout is missing it
+  useEffect(() => {
+    if (!workout) return;
+    if (workout.raw_performance_graph_json != null && workout.raw_ride_details_json != null) return;
+
+    let cancelled = false;
+    getWorkoutById(workout.id).then((full) => {
+      if (cancelled || !full) return;
+      const updates: Partial<Workout> = {};
+      if (workout.raw_performance_graph_json == null && full.raw_performance_graph_json != null) {
+        updates.raw_performance_graph_json = full.raw_performance_graph_json;
+      }
+      if (workout.raw_detail_json == null && full.raw_detail_json != null) {
+        updates.raw_detail_json = full.raw_detail_json;
+      }
+      if (workout.raw_ride_details_json == null && full.raw_ride_details_json != null) {
+        updates.raw_ride_details_json = full.raw_ride_details_json;
+      }
+      if (Object.keys(updates).length > 0) {
+        updateWorkout(workout.id, updates);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [workout?.id]);
+
+  // Fetch metrics from API if DB also lacks them
   useEffect(() => {
     if (!workout || !accessToken) return;
 

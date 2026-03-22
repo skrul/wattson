@@ -391,6 +391,13 @@ export async function deleteChartDefinition(id: string): Promise<void> {
   await d.execute("DELETE FROM chart_definitions WHERE id = $1", [id]);
 }
 
+/** Fetch a single workout by ID with all columns (including raw JSON fields). */
+export async function getWorkoutById(id: string): Promise<Workout | null> {
+  const d = await getDb();
+  const rows = await d.select<Workout[]>("SELECT * FROM workouts WHERE id = $1", [id]);
+  return rows[0] ?? null;
+}
+
 /** Find all workouts that share the same Peloton ride ID (same class). */
 export async function getWorkoutsByRideId(rideId: string): Promise<Workout[]> {
   const d = await getDb();

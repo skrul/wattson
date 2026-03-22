@@ -36,3 +36,7 @@ Dropdowns inside scrollable modals (`overflow-y-auto`) have two recurring issues
 2. **Click-outside dismissal** — Headless UI `PopoverButton` can intercept events and prevent manual click-outside handlers from firing. Fix: use `pointerdown` in the **capture phase** (`addEventListener("pointerdown", handler, true)`) so the handler fires before Headless UI can stop propagation.
 
 See `ChartFilterBar.tsx` `FilterChip` for the reference implementation combining both fixes.
+
+## Architecture Docs
+
+- **[Sync & Enrichment](docs/SYNC.md)** — Data flow from Peloton API through sync, enrichment backfill, and on-demand loading. Covers the state machine, store↔DB data gap, and key invariants.

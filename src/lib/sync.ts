@@ -1,6 +1,6 @@
 import { login, fetchAllWorkouts, fetchUserProfile, AuthError } from "./api";
-import { cachedFetchPerformanceGraph } from "./enrichmentCache";
-import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile, updateWorkoutMetrics } from "./database";
+import { cachedFetchPerformanceGraph, cachedFetchWorkoutDetail, cachedFetchRideDetails } from "./enrichmentCache";
+import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile, updateWorkoutMetrics, updateRideDetails } from "./database";
 import { useSessionStore } from "../stores/sessionStore";
 import { useReauthStore } from "../stores/reauthStore";
 import { useWorkoutStore } from "../stores/workoutStore";
@@ -75,16 +75,41 @@ export async function syncWorkouts(
     useWorkoutStore.getState().notifySync();
     useSessionStore.getState().setIsSyncing(false);
 
-    // Inline enrichment: fetch performance_graph for each new workout
-    for (const w of newWorkouts) {
-      try {
-        const result = await cachedFetchPerformanceGraph(w.id, activeToken);
-        await updateWorkoutMetrics(w.id, result, null, result.rawJson);
-      } catch {
-        // Non-fatal: enrichment backfill will retry later
+    // Inline enrichment: fetch all detail endpoints for each new workout.
+    // Only runs on incremental syncs (isComplete); initial/full syncs rely on backfill.
+    if (isComplete) {
+      for (const w of newWorkouts) {
+        try {
+          const rideId =
+            w.ride_id && w.ride_id !== "00000000000000000000000000000000"
+              ? w.ride_id
+              : null;
+
+          const [perfResult, detailResult, rideResult] = await Promise.all([
+            cachedFetchPerformanceGraph(w.id, activeToken),
+            cachedFetchWorkoutDetail(w.id, activeToken).catch(() => null),
+            rideId
+              ? cachedFetchRideDetails(rideId, activeToken).catch(() => null)
+              : Promise.resolve(null),
+          ]);
+
+          await updateWorkoutMetrics(
+            w.id,
+            perfResult,
+            detailResult?.rawJson ?? null,
+            perfResult.rawJson,
+          );
+          await updateRideDetails(
+            w.id,
+            rideResult?.rawJson ?? null,
+            w.title,
+          );
+        } catch {
+          // Non-fatal: enrichment backfill will retry later
+        }
       }
+      await useEnrichmentStore.getState().refreshCounts();
     }
-    await useEnrichmentStore.getState().refreshCounts();
   } else {
     useSessionStore.getState().setIsSyncing(false);
   }

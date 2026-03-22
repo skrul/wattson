@@ -22,12 +22,15 @@ vi.mock("./database", () => ({
   queryWorkouts: (...args: unknown[]) => mockQueryWorkouts(...args),
   upsertUserProfile: (...args: unknown[]) => mockUpsertUserProfile(...args),
   updateWorkoutMetrics: (...args: unknown[]) => mockUpdateWorkoutMetrics(...args),
+  updateRideDetails: vi.fn().mockResolvedValue(undefined),
   getEnrichmentCounts: vi.fn().mockResolvedValue({ total: 0, enriched: 0 }),
   getUnenrichedWorkouts: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("./enrichmentCache", () => ({
   cachedFetchPerformanceGraph: vi.fn().mockResolvedValue({ rawJson: "{}" }),
+  cachedFetchWorkoutDetail: vi.fn().mockResolvedValue({ rawJson: "{}" }),
+  cachedFetchRideDetails: vi.fn().mockResolvedValue({ rawJson: "{}" }),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({

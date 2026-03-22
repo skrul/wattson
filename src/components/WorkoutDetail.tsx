@@ -240,7 +240,7 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
 
   const discipline = workout.discipline.charAt(0).toUpperCase() + workout.discipline.slice(1);
   const showLoading = loadingMetrics && workout.calories == null;
-  const hasShareContent = workout.discipline === "cycling" && workout.raw_performance_graph_json;
+  const hasShareContent = workout.discipline === "cycling" && timeSeries != null;
   const hasCompare = sameClassWorkouts.length >= 2;
 
   const tabs: { key: DetailTab; label: string }[] = [
@@ -305,9 +305,11 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
             Duration: {workout.duration_seconds != null ? formatDuration(workout.duration_seconds) : "—"}
           </p>
         </div>
-        {hasShareContent && (
+        {hasShareContent ? (
           <RideDetailChart workout={workout} ftp={ftp} />
-        )}
+        ) : workout.discipline === "cycling" && !showLoading && workout.raw_performance_graph_json != null ? (
+          <p className="text-sm text-gray-400">No performance data available for this ride.</p>
+        ) : null}
         </>
       )}
 

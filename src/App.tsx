@@ -29,10 +29,7 @@ function App() {
   const session = useSessionStore((s) => s.session);
   const userProfile = useSessionStore((s) => s.userProfile);
   const isSyncing = useSessionStore((s) => s.isSyncing);
-  const syncProgress = useSessionStore((s) => s.syncProgress);
   const backfillStatus = useEnrichmentStore((s) => s.backfillStatus);
-  const enrichedCount = useEnrichmentStore((s) => s.enrichedCount);
-  const totalCount = useEnrichmentStore((s) => s.totalCount);
 
   const dashboards = useDashboardRegistryStore((s) => s.dashboards);
   const registryLoaded = useDashboardRegistryStore((s) => s.loaded);
@@ -158,25 +155,23 @@ function App() {
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-bold">Wattson</h1>
-          {(isSyncing || backfillStatus === "running") && (
-            <button
-              onClick={() => setActiveTab("profile")}
-              className="flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-200"
-              title="Click to view sync details"
-            >
-              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="M2.5 8a5.5 5.5 0 0 1 9.3-4" />
-                <path d="M13.5 8a5.5 5.5 0 0 1-9.3 4" />
-                <path d="M11.8 4l1.2-.8L13.5 4.8" />
-                <path d="M4.2 12l-1.2.8L2.5 11.2" />
-              </svg>
-              {isSyncing
-                ? (syncProgress
-                  ? `Syncing ${syncProgress.fetched} / ${syncProgress.total}`
-                  : "Syncing\u2026")
-                : `Details ${enrichedCount} / ${totalCount}`}
-            </button>
-          )}
+          <button
+            onClick={() => {
+              if (!isSyncing && !backfillStatus?.startsWith("running")) {
+                syncWorkouts().catch(() => {});
+              }
+            }}
+            className={`flex items-center justify-center rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 ${isSyncing || backfillStatus === "running" ? "animate-spin" : ""}`}
+            title={isSyncing ? "Syncing…" : backfillStatus === "running" ? "Enriching…" : "Sync workouts"}
+            disabled={isSyncing || backfillStatus === "running"}
+          >
+            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M2.5 8a5.5 5.5 0 0 1 9.3-4" />
+              <path d="M13.5 8a5.5 5.5 0 0 1-9.3 4" />
+              <path d="M11.8 4l1.2-.8L13.5 4.8" />
+              <path d="M4.2 12l-1.2.8L2.5 11.2" />
+            </svg>
+          </button>
         </div>
         <nav className="flex gap-2">
           {allTabs.map((tab) => (

@@ -387,10 +387,21 @@ export default function CompareTab({ workouts: initialWorkouts, currentId, acces
                 className="h-4 w-4 rounded border-gray-300"
               />
               <span className="text-sm font-medium">{formatDate(w.date)}</span>
-              {isCurrent && (
+              {isCurrent ? (
                 <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">
                   Current
                 </span>
+              ) : (
+                <button
+                  className="text-xs text-blue-600 hover:underline"
+                  onClick={() => {
+                    const ws = useWorkoutStore.getState();
+                    ws.setFilters({ conditions: [], sort: ws.filters.sort, search: "" });
+                    ws.selectWorkout(w.id);
+                  }}
+                >
+                  View
+                </button>
               )}
               {fetchingIds.has(w.id) && (
                 <span className="text-xs text-gray-400">Loading details...</span>

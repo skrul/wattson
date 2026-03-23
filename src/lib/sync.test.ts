@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useSessionStore } from "../stores/sessionStore";
+import { useWorkoutStore } from "../stores/workoutStore";
 
 // --- Mocks ---
 
@@ -37,8 +38,10 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
-// Import after mocks
+// Import after mocks — these resolve to the vi.fn() instances from the factories above
 import { syncWorkouts } from "./sync";
+import { cachedFetchPerformanceGraph, cachedFetchWorkoutDetail, cachedFetchRideDetails } from "./enrichmentCache";
+import { updateRideDetails } from "./database";
 
 // --- Helpers ---
 
@@ -60,13 +63,13 @@ function setUserProfile(totalWorkouts: number) {
 }
 
 beforeEach(() => {
-  mockFetchAllWorkouts.mockReset();
-  mockFetchUserProfile.mockReset();
-  mockGetExistingWorkoutIds.mockReset();
-  mockInsertWorkouts.mockReset();
-  mockQueryWorkouts.mockReset();
-  mockUpsertUserProfile.mockReset();
-  mockUpdateWorkoutMetrics.mockReset();
+  vi.clearAllMocks();
+
+  // Restore default resolved values for mocks that need them
+  vi.mocked(cachedFetchPerformanceGraph).mockResolvedValue({ rawJson: "{}", cacheHit: false } as any);
+  vi.mocked(cachedFetchWorkoutDetail).mockResolvedValue({ rawJson: "{}", cacheHit: false } as any);
+  vi.mocked(cachedFetchRideDetails).mockResolvedValue({ rawJson: "{}", cacheHit: false } as any);
+  vi.mocked(updateRideDetails).mockResolvedValue(undefined);
 
   // Reset stores
   useSessionStore.setState({
@@ -75,6 +78,7 @@ beforeEach(() => {
     userProfile: null,
     isSyncing: false,
   });
+  useWorkoutStore.setState({ syncGeneration: 0 });
 
   // Default mock implementations
   mockFetchAllWorkouts.mockResolvedValue([]);
@@ -82,6 +86,7 @@ beforeEach(() => {
   mockUpsertUserProfile.mockResolvedValue(undefined);
   mockQueryWorkouts.mockResolvedValue([]);
   mockInsertWorkouts.mockResolvedValue(undefined);
+  mockUpdateWorkoutMetrics.mockResolvedValue(undefined);
 });
 
 describe("syncWorkouts", () => {
@@ -169,5 +174,102 @@ describe("syncWorkouts", () => {
     // No session set
     useSessionStore.setState({ session: null, loaded: true });
     await expect(syncWorkouts()).rejects.toThrow("Not logged in");
+  });
+
+  it("runs inline enrichment on incremental sync (isComplete=true)", async () => {
+    setSession();
+    setUserProfile(2);
+
+    mockGetExistingWorkoutIds.mockResolvedValue(new Set(["w1", "w2"]));
+    mockFetchAllWorkouts.mockResolvedValue([
+      { id: "w1" },
+      { id: "w2" },
+      { id: "w3", ride_id: "ride123", title: "Cycling" },
+    ]);
+
+    await syncWorkouts();
+
+    expect(cachedFetchPerformanceGraph).toHaveBeenCalledWith("w3", "tok");
+    expect(cachedFetchWorkoutDetail).toHaveBeenCalledWith("w3", "tok");
+    expect(cachedFetchRideDetails).toHaveBeenCalledWith("ride123", "tok");
+    expect(mockUpdateWorkoutMetrics).toHaveBeenCalledWith(
+      "w3",
+      expect.objectContaining({ rawJson: "{}" }),
+      "{}",
+      "{}",
+    );
+    expect(updateRideDetails).toHaveBeenCalledWith("w3", "{}", "Cycling");
+  });
+
+  it("skips inline enrichment on full sync (isComplete=false)", async () => {
+    setSession();
+    setUserProfile(100); // profile says 100 workouts
+
+    mockGetExistingWorkoutIds.mockResolvedValue(new Set(["w1"])); // only 1 in DB → incomplete
+    mockFetchAllWorkouts.mockResolvedValue([
+      { id: "w1" },
+      { id: "w2", ride_id: "ride456", title: "Cycling" },
+    ]);
+
+    await syncWorkouts();
+
+    expect(cachedFetchPerformanceGraph).not.toHaveBeenCalled();
+    expect(cachedFetchWorkoutDetail).not.toHaveBeenCalled();
+    expect(cachedFetchRideDetails).not.toHaveBeenCalled();
+  });
+
+  it("bumps syncGeneration twice on incremental sync with new workouts", async () => {
+    setSession();
+    setUserProfile(2);
+
+    mockGetExistingWorkoutIds.mockResolvedValue(new Set(["w1", "w2"]));
+    mockFetchAllWorkouts.mockResolvedValue([
+      { id: "w1" },
+      { id: "w2" },
+      { id: "w3", ride_id: "ride123", title: "Cycling" },
+    ]);
+
+    const before = useWorkoutStore.getState().syncGeneration;
+    await syncWorkouts();
+    const after = useWorkoutStore.getState().syncGeneration;
+
+    expect(after - before).toBe(2);
+  });
+
+  it("bumps syncGeneration once on full sync with new workouts", async () => {
+    setSession();
+    setUserProfile(100);
+
+    mockGetExistingWorkoutIds.mockResolvedValue(new Set(["w1"]));
+    mockFetchAllWorkouts.mockResolvedValue([
+      { id: "w1" },
+      { id: "w2", ride_id: "ride456", title: "Cycling" },
+    ]);
+
+    const before = useWorkoutStore.getState().syncGeneration;
+    await syncWorkouts();
+    const after = useWorkoutStore.getState().syncGeneration;
+
+    expect(after - before).toBe(1);
+  });
+
+  it("skips ride details fetch when ride_id is null UUID", async () => {
+    setSession();
+    setUserProfile(2);
+
+    mockGetExistingWorkoutIds.mockResolvedValue(new Set(["w1", "w2"]));
+    mockFetchAllWorkouts.mockResolvedValue([
+      { id: "w1" },
+      { id: "w2" },
+      { id: "w3", ride_id: "00000000000000000000000000000000", title: "Meditation" },
+    ]);
+
+    await syncWorkouts();
+
+    // Performance graph and detail are still fetched
+    expect(cachedFetchPerformanceGraph).toHaveBeenCalledWith("w3", "tok");
+    expect(cachedFetchWorkoutDetail).toHaveBeenCalledWith("w3", "tok");
+    // But ride details is NOT fetched for the null UUID
+    expect(cachedFetchRideDetails).not.toHaveBeenCalled();
   });
 });

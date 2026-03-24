@@ -108,7 +108,7 @@ export async function cachedFetchPerformanceGraph(
 
   const result = await fetchPerformanceGraph(workoutId, accessToken);
   await setCache(key, result.rawJson);
-  return { ...result, cacheHit: false };
+  return { ...parseMetrics(result.rawJson), rawJson: result.rawJson, cacheHit: false };
 }
 
 /** Fetch workout detail with cache. */

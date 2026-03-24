@@ -140,7 +140,7 @@ export default function WorkoutList() {
 
       <div className="flex flex-1 min-h-0">
         {/* Card list */}
-        <div ref={cardScrollRef} className="w-[380px] border-r overflow-auto">
+        <div ref={cardScrollRef} className="w-[380px] border-r overflow-auto bg-white">
           {isLoading ? (
             <p className="px-4 py-2 text-sm text-gray-400">Loading...</p>
           ) : workouts.length === 0 ? (
@@ -176,7 +176,7 @@ export default function WorkoutList() {
         </div>
 
         {/* Detail panel */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto bg-white p-6">
           <WorkoutDetail workout={selectedWorkout} accessToken={accessToken} />
         </div>
       </div>

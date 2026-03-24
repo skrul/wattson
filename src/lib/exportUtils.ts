@@ -177,7 +177,9 @@ export async function renderExportPng(
   ctx.scale(SCALE, SCALE);
 
   // Background
-  ctx.fillStyle = isDark ? "#000000" : "#ffffff";
+  const bgMode = settings?.backgroundImage ?? "none";
+  // darkMode only → dark gray; background image/dark → black; otherwise → white
+  ctx.fillStyle = bgMode !== "none" ? "#000000" : settings?.darkMode ? "#111827" : "#ffffff";
   ctx.fillRect(0, 0, EXPORT_WIDTH, totalHeight);
 
   if (backgroundImageSrc) {

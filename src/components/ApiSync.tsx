@@ -218,7 +218,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
             <div className="space-y-1">
               <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
                 <div
-                  className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                  className="h-full rounded-full bg-blue-600"
                   style={{ width: totalCount > 0 ? `${(enrichedCount / totalCount) * 100}%` : "0%" }}
                 />
               </div>

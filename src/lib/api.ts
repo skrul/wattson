@@ -8,8 +8,8 @@ export class AuthError extends Error {
   }
 }
 
-const AUTH_URL = "https://auth.onepeloton.com/oauth/token";
-const API_BASE = "https://api.onepeloton.com";
+const AUTH_URL = import.meta.env.VITE_AUTH_URL || "https://auth.onepeloton.com/oauth/token";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.onepeloton.com";
 const CLIENT_ID = "mgsmWCD0A8Qn6uz6mmqI6qeBNHH9IPwS";
 const PAGE_SIZE = 100;
 

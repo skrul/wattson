@@ -4,6 +4,8 @@ import { cachedFetchPerformanceGraph, cachedFetchWorkoutDetail, cachedFetchRideD
 import { useSessionStore } from "./sessionStore";
 import { useWorkoutStore } from "./workoutStore";
 
+const ENRICHMENT_DELAY_MS = parseInt(import.meta.env.VITE_ENRICHMENT_DELAY_MS || "2000", 10);
+
 type BackfillStatus = "running" | "paused" | "complete";
 
 interface EnrichmentState {
@@ -33,6 +35,10 @@ async function runBackfillLoop() {
 
   useEnrichmentStore.setState({ backfillStatus: "running" });
   abortBackfill = false;
+
+  // Reconcile with DB periodically instead of every iteration
+  let sinceLastReconcile = 0;
+  const RECONCILE_INTERVAL = 25;
 
   while (!abortBackfill) {
     const session = useSessionStore.getState().session;
@@ -78,9 +84,20 @@ async function runBackfillLoop() {
       // so the loop advances. It will be retried on next app launch.
       if (!detailOk || !rideOk) {
         skippedIds.add(workoutId);
+      } else {
+        // Optimistically update progress — avoids a DB query per workout
+        useEnrichmentStore.setState((s) => ({
+          enrichedCount: s.enrichedCount + 1,
+          enrichmentComplete: s.enrichedCount + 1 >= s.totalCount,
+        }));
       }
 
-      await useEnrichmentStore.getState().refreshCounts();
+      // Periodically reconcile with DB to correct any drift
+      sinceLastReconcile++;
+      if (sinceLastReconcile >= RECONCILE_INTERVAL) {
+        await useEnrichmentStore.getState().refreshCounts();
+        sinceLastReconcile = 0;
+      }
     } catch (e) {
       // On auth error, pause the backfill so user can re-authenticate
       if (e instanceof Error && e.name === "AuthError") {
@@ -95,7 +112,7 @@ async function runBackfillLoop() {
 
     // Only rate limit when we actually hit the API
     if (!allCacheHits) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, ENRICHMENT_DELAY_MS));
     }
   }
 

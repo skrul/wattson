@@ -43,8 +43,21 @@ export async function syncWorkouts(
     );
   };
 
+  // Fetch profile concurrently so the avatar updates while workouts download.
+  // Non-fatal: if it fails (e.g. expired token), we retry after auth recovery below.
+  const fetchAndCacheProfile = async (token: string) => {
+    try {
+      const profile = await fetchUserProfile(token);
+      await upsertUserProfile(profile);
+      useSessionStore.getState().setUserProfile(profile);
+    } catch {
+      // Non-fatal: will be retried with refreshed token or on next sync
+    }
+  };
+
   let workouts;
   let activeToken = session.accessToken;
+  const profilePromise = fetchAndCacheProfile(activeToken);
   try {
     workouts = await doFetch(session.userId, activeToken);
   } catch (e) {
@@ -64,10 +77,19 @@ export async function syncWorkouts(
     }
   }
 
+  // If token changed during auth recovery, re-fetch profile with the new token
+  if (activeToken !== session.accessToken) {
+    fetchAndCacheProfile(activeToken);
+  }
+  await profilePromise;
+
   const newWorkouts = workouts.filter((w) => !existingIds.has(w.id));
 
   if (newWorkouts.length > 0) {
     await insertWorkouts(newWorkouts);
+
+    // Update enrichment counts immediately so the UI reflects the new workout count
+    await useEnrichmentStore.getState().refreshCounts();
 
     const filters = useWorkoutStore.getState().filters;
     const updated = await queryWorkouts(filters);
@@ -116,19 +138,6 @@ export async function syncWorkouts(
     useSessionStore.getState().setIsSyncing(false);
   }
 
-  // Fetch and cache user profile
-  try {
-    const profile = await fetchUserProfile(activeToken);
-    await upsertUserProfile(profile);
-    useSessionStore.getState().setUserProfile(profile);
-  } catch {
-    // Non-fatal: profile will be refreshed on next sync
-  }
-
-  // Refresh enrichment counts so the store reflects newly inserted workouts.
-  // This also resets backfillStatus from "complete" to "paused" when unenriched
-  // workouts exist (e.g., the backfill loop ran on an empty DB before sync finished).
-  await useEnrichmentStore.getState().refreshCounts();
   // Kick off backfill if there are unenriched workouts remaining
   useEnrichmentStore.getState().ensureRunning();
 

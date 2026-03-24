@@ -15,7 +15,8 @@
       "allow": [
         { "url": "https://auth.onepeloton.com/**" },
         { "url": "https://api.onepeloton.com/**" },
-        { "url": "https://**" }
+        { "url": "https://**" },
+        { "url": "http://localhost:**" }
       ]
     },
     "dialog:default",

@@ -4,7 +4,7 @@ import type { DashboardWidget, Workout, FilterCondition } from "../../types";
 import { queryWorkouts, getDb } from "../../lib/database";
 import { isConditionActive } from "../FilterEditors";
 import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, isPowerZoneRide } from "../../lib/charts";
-import { renderExportPng } from "../../lib/exportUtils";
+import { renderExportPng, resolveBackgroundImageSrc } from "../../lib/exportUtils";
 import { useShareChartStore, resolveDisplayName } from "../../stores/shareChartStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -92,17 +92,22 @@ export default function LastWorkoutWidget({ widget, preview }: Props) {
 
   const isPZ = workout ? isPowerZoneRide(workout) : false;
 
+  const backgroundImageSrc = useMemo(
+    () => workout ? resolveBackgroundImageSrc(settings, workout.raw_ride_details_json) : null,
+    [settings, workout?.raw_ride_details_json],
+  );
+
   const filename = workout
     ? `${workout.title?.replace(/[^a-zA-Z0-9]/g, "-") ?? "workout"}-${workout.id.slice(0, 8)}`
     : "chart";
 
   const handleCopy = useCallback(async () => {
     if (!workout || !timeSeries) return;
-    const blobPromise = renderExportPng(workout, ftp, timeSeries, cues, settings, displayName);
+    const blobPromise = renderExportPng(workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc);
     await navigator.clipboard.write([
       new ClipboardItem({ "image/png": blobPromise }),
     ]);
-  }, [workout, ftp, timeSeries, cues, settings, displayName]);
+  }, [workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc]);
 
   const handleSave = useCallback(async () => {
     if (!workout || !timeSeries) return;
@@ -111,10 +116,10 @@ export default function LastWorkoutWidget({ widget, preview }: Props) {
       filters: [{ name: "PNG Image", extensions: ["png"] }],
     });
     if (!filePath) return;
-    const blob = await renderExportPng(workout, ftp, timeSeries, cues, settings, displayName);
+    const blob = await renderExportPng(workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc);
     const bytes = new Uint8Array(await blob.arrayBuffer());
     await writeFile(filePath, bytes);
-  }, [workout, ftp, timeSeries, cues, settings, displayName, filename]);
+  }, [workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc, filename]);
 
   if (loading) {
     return <div className="flex h-full items-center justify-center text-sm text-gray-400">Loading...</div>;
@@ -143,6 +148,7 @@ export default function LastWorkoutWidget({ widget, preview }: Props) {
           showHeader={preview ? false : configShowHeader}
           showFooter={preview ? false : configShowFooter}
           fitHeight
+          backgroundImageSrc={backgroundImageSrc}
         />
       </div>
       {toolbarSlotRef?.current && createPortal(

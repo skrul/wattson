@@ -139,6 +139,7 @@ interface ChartOptions {
   darkMode?: boolean;
   showInstructorCues?: boolean;
   showYAxis?: boolean;
+  darkBackground?: boolean;
 }
 
 /**
@@ -151,9 +152,7 @@ export function renderRideDetailChart(
   options: ChartOptions = {},
   cues?: InstructorCue[] | null,
 ): SVGElement | HTMLElement {
-  const { width = 800, height = 300, darkMode = false } = options;
-  const textColor = darkMode ? "#e5e7eb" : undefined;
-  const subtleColor = darkMode ? "#9ca3af" : "#666";
+  const { width = 800, height = 300 } = options;
 
   const maxOutput = Math.max(...timeSeries.output);
   const yMax = ftp != null
@@ -206,7 +205,7 @@ export function renderRideDetailChart(
           textAnchor: "start",
           dx: 8,
           fontSize: 10,
-          fill: subtleColor,
+          fill: (options.darkMode || options.darkBackground) ? "rgba(255,255,255,0.8)" : "#666",
         }),
       );
     }
@@ -313,11 +312,11 @@ export function renderRideDetailChart(
   const ticks = Array.from({ length: Math.floor(xMax / tickInterval) + 1 }, (_, i) => i * tickInterval);
   if (xMax % tickInterval !== 0) ticks.push(xMax);
 
-  return Plot.plot({
+  const plot = Plot.plot({
     width,
     height,
     marginRight: 36,
-    style: darkMode ? { background: "transparent", color: textColor } : undefined,
+    style: (options.darkMode || options.darkBackground) ? { background: "transparent", color: "#e5e7eb" } : undefined,
     x: {
       label: null,
       domain: [0, xMax],
@@ -335,6 +334,22 @@ export function renderRideDetailChart(
     },
     marks,
   });
+
+  if (options.darkBackground) {
+    // Restyle axis text and grid for light-on-dark
+    plot.querySelectorAll("text").forEach((el) => {
+      el.setAttribute("fill", "rgba(255,255,255,0.85)");
+    });
+    plot.querySelectorAll("[aria-label='y-axis tick'] line, [aria-label='x-axis tick'] line").forEach((el) => {
+      el.setAttribute("stroke", "rgba(255,255,255,0.3)");
+    });
+    // Grid lines
+    plot.querySelectorAll("g[aria-label='y-axis grid'] line").forEach((el) => {
+      el.setAttribute("stroke", "rgba(255,255,255,0.15)");
+    });
+  }
+
+  return plot;
 }
 
 // --- Custom chart rendering ---

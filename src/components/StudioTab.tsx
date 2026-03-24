@@ -4,7 +4,7 @@ import { writeFile } from "@tauri-apps/plugin-fs";
 import type { Workout } from "../types";
 import { getShareableWorkouts } from "../lib/database";
 import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, isPowerZoneRide } from "../lib/charts";
-import { renderExportPng } from "../lib/exportUtils";
+import { renderExportPng, resolveBackgroundImageSrc } from "../lib/exportUtils";
 import { cachedFetchWorkoutDetail, cachedFetchPerformanceGraph, cachedFetchRideDetails } from "../lib/enrichmentCache";
 import { updateWorkoutMetrics, updateWorkoutDetail, updateRideDetails } from "../lib/database";
 import { useShareChartStore, resolveDisplayName } from "../stores/shareChartStore";
@@ -154,6 +154,13 @@ export default function StudioTab() {
 
   const isPZ = workout ? isPowerZoneRide(workout) : false;
 
+  const backgroundImageSrc = useMemo(
+    () => workout ? resolveBackgroundImageSrc(settings, workout.raw_ride_details_json) : null,
+    [settings, workout?.raw_ride_details_json],
+  );
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // On-demand enrichment: fetch detail, performance graph, and ride details
   useEffect(() => {
     if (!workout || !session?.accessToken) return;
@@ -223,7 +230,7 @@ export default function StudioTab() {
 
   async function handleCopy() {
     if (!workout || !timeSeries) return;
-    const blobPromise = renderExportPng(workout, ftp, timeSeries, cues, settings, displayName);
+    const blobPromise = renderExportPng(workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc);
     await navigator.clipboard.write([
       new ClipboardItem({ "image/png": blobPromise }),
     ]);
@@ -236,9 +243,43 @@ export default function StudioTab() {
       filters: [{ name: "PNG Image", extensions: ["png"] }],
     });
     if (!filePath) return;
-    const blob = await renderExportPng(workout, ftp, timeSeries, cues, settings, displayName);
+    const blob = await renderExportPng(workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc);
     const bytes = new Uint8Array(await blob.arrayBuffer());
     await writeFile(filePath, bytes);
+  }
+
+  function handleUploadImage() {
+    const input = fileInputRef.current;
+    if (!input) return;
+    input.value = "";
+    input.click();
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 1200;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxW) {
+          h = Math.round(h * (maxW / w));
+          w = maxW;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        update({ customBackgroundImageDataUrl: dataUrl });
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
   }
 
   const st = settings.stats;
@@ -390,6 +431,62 @@ export default function StudioTab() {
           <Checkbox label="Y-axis & gridlines" checked={settings.showYAxis} onChange={(v) => update({ showYAxis: v })} />
         </div>
 
+        {/* Background */}
+        <div>
+          <h4 className="mb-1 text-xs font-medium uppercase text-gray-500">Background</h4>
+          <select
+            value={settings.backgroundImage}
+            onChange={(e) => update({ backgroundImage: e.target.value as "none" | "dark" | "ride" | "custom" })}
+            className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+          >
+            <option value="none">Light</option>
+            <option value="dark">Dark</option>
+            <option value="ride">Ride Image</option>
+            <option value="custom">Custom Upload</option>
+          </select>
+          {(settings.backgroundImage === "ride" || settings.backgroundImage === "custom") && (
+            <div className="mt-2">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <span className="shrink-0">Darkness</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={settings.backgroundImageOpacity}
+                  onChange={(e) => update({ backgroundImageOpacity: parseFloat(e.target.value) })}
+                  className="flex-1"
+                />
+                <span className="w-8 text-right text-xs text-gray-500">{Math.round(settings.backgroundImageOpacity * 100)}%</span>
+              </label>
+            </div>
+          )}
+          {settings.backgroundImage === "custom" && (
+            <div className="mt-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                onClick={handleUploadImage}
+                className="rounded border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
+              >
+                Upload Image
+              </button>
+              {settings.customBackgroundImageDataUrl && (
+                <img
+                  src={settings.customBackgroundImageDataUrl}
+                  alt="Custom background"
+                  className="mt-1.5 h-16 w-full rounded border border-gray-200 object-cover"
+                />
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Display Name */}
         <div>
           <h4 className="mb-1 text-xs font-medium uppercase text-gray-500">Display Name</h4>
@@ -432,6 +529,7 @@ export default function StudioTab() {
             settings={settings}
             displayName={displayName}
             isPZ={isPZ}
+            backgroundImageSrc={backgroundImageSrc}
           >
             <div className="mt-4 flex justify-end">
               <ShareMenu onCopy={handleCopy} onSave={handleSave} />

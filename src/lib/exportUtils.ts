@@ -1,3 +1,4 @@
+import { fetch } from "@tauri-apps/plugin-http";
 import { renderRideDetailChart, isPowerZoneRide, type InstructorCue } from "./charts";
 import type { Workout, PerformanceTimeSeries, ShareChartSettings } from "../types";
 
@@ -32,6 +33,60 @@ export function svgToImage(el: SVGElement | HTMLElement): Promise<HTMLImageEleme
     };
     img.src = url;
   });
+}
+
+/** Extract the ride image URL from raw ride details JSON. */
+export function parseRideImageUrl(rawRideDetailsJson: string | null | undefined): string | null {
+  if (!rawRideDetailsJson) return null;
+  try {
+    const data = JSON.parse(rawRideDetailsJson);
+    const url = data.ride?.image_url;
+    return typeof url === "string" && url ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Load an image URL (or data URL) into an HTMLImageElement.
+ *  For HTTP(S) URLs, fetches via Tauri's HTTP plugin to avoid CORS / tainted canvas. */
+export async function loadImage(src: string): Promise<HTMLImageElement> {
+  let objectUrl: string | null = null;
+  let imgSrc = src;
+
+  if (src.startsWith("http://") || src.startsWith("https://")) {
+    const resp = await fetch(src);
+    if (!resp.ok) throw new Error("Failed to fetch image");
+    const blob = await resp.blob();
+    objectUrl = URL.createObjectURL(blob);
+    imgSrc = objectUrl;
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      resolve(img);
+    };
+    img.onerror = () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      reject(new Error("Failed to load image"));
+    };
+    img.src = imgSrc;
+  });
+}
+
+/** Resolve the background image source based on settings and workout data. */
+export function resolveBackgroundImageSrc(
+  settings: ShareChartSettings,
+  rawRideDetailsJson: string | null | undefined,
+): string | null {
+  if (settings.backgroundImage === "ride") {
+    return parseRideImageUrl(rawRideDetailsJson);
+  }
+  if (settings.backgroundImage === "custom" && settings.customBackgroundImageDataUrl) {
+    return settings.customBackgroundImageDataUrl;
+  }
+  return null;
 }
 
 export const EXPORT_WIDTH = 1200;
@@ -74,9 +129,11 @@ export async function renderExportPng(
   cues?: InstructorCue[] | null,
   settings?: ShareChartSettings,
   displayName?: string | null,
+  backgroundImageSrc?: string | null,
 ): Promise<Blob> {
   // Render chart SVG at export width
   const isPZ = isPowerZoneRide(workout);
+  const isDark = settings?.darkMode || (settings?.backgroundImage ?? "none") !== "none";
   const chartEl = renderRideDetailChart(timeSeries, ftp || null, {
     width: CHART_WIDTH,
     height: CHART_HEIGHT,
@@ -86,9 +143,9 @@ export async function renderExportPng(
     cueColor: settings?.cueColor,
     showZoneBands: (settings?.zoneBands ?? "pz-only") === "always" || ((settings?.zoneBands ?? "pz-only") === "pz-only" && isPZ),
     zoneBandOpacity: settings?.zoneBandOpacity,
-    darkMode: settings?.darkMode,
     showInstructorCues: settings?.showInstructorCues,
     showYAxis: settings?.showYAxis,
+    darkBackground: isDark,
   }, cues);
   const chartImg = await svgToImage(chartEl);
 
@@ -119,38 +176,61 @@ export async function renderExportPng(
   const ctx = canvas.getContext("2d")!;
   ctx.scale(SCALE, SCALE);
 
-  const dark = settings?.darkMode === true;
-  const bgColor = dark ? "#111827" : "#ffffff";
-  const textPrimary = dark ? "#f3f4f6" : "#111827";
-  const textSecondary = dark ? "#9ca3af" : "#6b7280";
-  const dividerColor = dark ? "#374151" : "#e5e7eb";
-
   // Background
-  ctx.fillStyle = bgColor;
+  ctx.fillStyle = isDark ? "#000000" : "#ffffff";
   ctx.fillRect(0, 0, EXPORT_WIDTH, totalHeight);
+
+  if (backgroundImageSrc) {
+    try {
+      const bgImg = await loadImage(backgroundImageSrc);
+      // Cover-fit: scale to fill, center-crop
+      const imgAspect = bgImg.width / bgImg.height;
+      const canvasAspect = EXPORT_WIDTH / totalHeight;
+      let sx = 0, sy = 0, sw = bgImg.width, sh = bgImg.height;
+      if (imgAspect > canvasAspect) {
+        sw = bgImg.height * canvasAspect;
+        sx = (bgImg.width - sw) / 2;
+      } else {
+        sh = bgImg.width / canvasAspect;
+        sy = (bgImg.height - sh) / 2;
+      }
+      ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, EXPORT_WIDTH, totalHeight);
+      // Dark overlay
+      ctx.fillStyle = `rgba(0, 0, 0, ${settings?.backgroundImageOpacity ?? 0.6})`;
+      ctx.fillRect(0, 0, EXPORT_WIDTH, totalHeight);
+    } catch {
+      // Failed to load — solid background already drawn
+    }
+  }
+
+  const titleColor = isDark ? "#ffffff" : "#111827";
+  const subtitleColor = isDark ? "rgba(255,255,255,0.75)" : "#6b7280";
+  const dividerColor = isDark ? "rgba(255,255,255,0.3)" : "#e5e7eb";
+  const statValueColor = isDark ? "#ffffff" : "#111827";
+  const statLabelColor = isDark ? "rgba(255,255,255,0.7)" : "#6b7280";
 
   let y = PADDING;
 
   // Header — title + subtitle
   if (showHeader) {
-    ctx.fillStyle = textPrimary;
+    ctx.fillStyle = titleColor;
     ctx.font = "600 18px system-ui, -apple-system, sans-serif";
     ctx.fillText(workout.title, PADDING, y + 18);
 
     // Right side: display name + date/time
     ctx.textAlign = "right";
     if (displayName) {
-      ctx.fillStyle = textSecondary;
+      ctx.fillStyle = subtitleColor;
       ctx.font = "600 14px system-ui, -apple-system, sans-serif";
       ctx.fillText(displayName, EXPORT_WIDTH - PADDING, y + 18);
     }
-    ctx.fillStyle = textSecondary;
+    ctx.fillStyle = subtitleColor;
     ctx.font = "13px system-ui, -apple-system, sans-serif";
     ctx.fillText(formatExportDateTime(workout.date), EXPORT_WIDTH - PADDING, y + 40);
     ctx.textAlign = "start";
 
     // Subtitle: instructor + date
-    ctx.fillStyle = textSecondary;
+    ctx.fillStyle = subtitleColor;
     ctx.font = "13px system-ui, -apple-system, sans-serif";
     const subtitle = [
       workout.instructor,
@@ -182,13 +262,13 @@ export async function renderExportPng(
       const cx = PADDING + statWidth * i + statWidth / 2;
 
       // Value
-      ctx.fillStyle = textPrimary;
+      ctx.fillStyle = statValueColor;
       ctx.font = "600 14px system-ui, -apple-system, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(value, cx, y + 32);
 
       // Label
-      ctx.fillStyle = textSecondary;
+      ctx.fillStyle = statLabelColor;
       ctx.font = "10px system-ui, -apple-system, sans-serif";
       ctx.fillText(label, cx, y + 46);
     }

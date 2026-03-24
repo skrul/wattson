@@ -29,6 +29,9 @@ const DEFAULT_SETTINGS: ShareChartSettings = {
   showUsername: false,
   customUsername: "",
   showYAxis: true,
+  backgroundImage: "none",
+  customBackgroundImageDataUrl: "",
+  backgroundImageOpacity: 0.6,
   stats: {
     avgPower: true,
     totalOutput: true,
@@ -56,6 +59,9 @@ function deepMerge(defaults: ShareChartSettings, partial: Partial<ShareChartSett
     showUsername: partial.showUsername ?? defaults.showUsername,
     customUsername: partial.customUsername ?? defaults.customUsername,
     showYAxis: partial.showYAxis ?? defaults.showYAxis,
+    backgroundImage: partial.backgroundImage ?? defaults.backgroundImage,
+    customBackgroundImageDataUrl: partial.customBackgroundImageDataUrl ?? defaults.customBackgroundImageDataUrl,
+    backgroundImageOpacity: partial.backgroundImageOpacity ?? defaults.backgroundImageOpacity,
     stats: { ...defaults.stats, ...partial.stats },
   };
 }

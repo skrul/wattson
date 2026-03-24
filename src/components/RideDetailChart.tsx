@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import type { Workout } from "../types";
 import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, isPowerZoneRide } from "../lib/charts";
+import { resolveBackgroundImageSrc } from "../lib/exportUtils";
 import { useShareChartStore, resolveDisplayName } from "../stores/shareChartStore";
 import { useSessionStore } from "../stores/sessionStore";
 import ExportButton from "./ExportButton";
@@ -49,6 +50,11 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
 
   const isPZ = isPowerZoneRide(workout);
 
+  const backgroundImageSrc = useMemo(
+    () => resolveBackgroundImageSrc(settings, workout.raw_ride_details_json),
+    [settings, workout.raw_ride_details_json],
+  );
+
   if (!timeSeries) return null;
 
   const filename = `${workout.title?.replace(/[^a-zA-Z0-9]/g, "-") ?? "workout"}-${workout.id.slice(0, 8)}`;
@@ -78,6 +84,7 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
           cues={cues}
           displayName={displayName}
           settings={settings}
+          backgroundImageSrc={backgroundImageSrc}
         />
       </div>
 
@@ -89,6 +96,7 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
         settings={settings}
         displayName={displayName}
         isPZ={isPZ}
+        backgroundImageSrc={backgroundImageSrc}
       />
     </div>
   );

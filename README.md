@@ -2,6 +2,8 @@
 
 A free, open-source desktop app for analyzing your Peloton workout data. Sync your rides, build custom dashboards, compare repeated rides, and export shareable charts — all locally on your machine with no server or cloud account required.
 
+**Download:** [macOS (Apple Silicon)](https://github.com/skrul/wattson/releases/latest/download/Wattson_aarch64.dmg) | [macOS (Intel)](https://github.com/skrul/wattson/releases/latest/download/Wattson_x64.dmg) | [Windows](https://github.com/skrul/wattson/releases/latest/download/Wattson_x64-setup.exe) | [Linux (.deb)](https://github.com/skrul/wattson/releases/latest/download/Wattson_amd64.deb) | [Linux (.AppImage)](https://github.com/skrul/wattson/releases/latest/download/Wattson_amd64.AppImage)
+
 ## Features
 
 - **Sync workouts** from your Peloton account with automatic background enrichment

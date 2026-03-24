@@ -52,6 +52,10 @@ jobs:
       - name: Install tauri-wd
         run: cargo install tauri-webdriver-automation
 
+      - name: Disable macOS firewall
+        if: matrix.platform == 'macos-latest'
+        run: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate off
+
       - name: Run E2E tests (macOS)
         if: matrix.platform == 'macos-latest'
         working-directory: test-server

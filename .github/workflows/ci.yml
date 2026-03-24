@@ -36,6 +36,9 @@ jobs:
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
 
+      - name: Unit tests
+        run: pnpm test
+
       - name: Cargo check
         working-directory: src-tauri
         run: cargo check

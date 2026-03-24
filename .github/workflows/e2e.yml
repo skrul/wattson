@@ -8,7 +8,14 @@ on:
 
 jobs:
   e2e:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+          - platform: ubuntu-22.04
+
+    runs-on: ${{ matrix.platform }}
     timeout-minutes: 30
 
     steps:
@@ -30,6 +37,12 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xvfb
+
       - run: pnpm install --frozen-lockfile
 
       - name: Install test-server dependencies
@@ -39,9 +52,18 @@ jobs:
       - name: Install tauri-wd
         run: cargo install tauri-webdriver-automation
 
-      - name: Run E2E tests
+      - name: Run E2E tests (macOS)
+        if: matrix.platform == 'macos-latest'
         working-directory: test-server
         env:
           WATTSON_NO_KEYCHAIN: "1"
           VITE_ENRICHMENT_DELAY_MS: "0"
         run: npx wdio run wdio.conf.js
+
+      - name: Run E2E tests (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        working-directory: test-server
+        env:
+          WATTSON_NO_KEYCHAIN: "1"
+          VITE_ENRICHMENT_DELAY_MS: "0"
+        run: xvfb-run npx wdio run wdio.conf.js

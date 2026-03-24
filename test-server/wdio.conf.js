@@ -42,6 +42,7 @@ export const config = {
   port: 4444,
   specs: ["./test/specs/**/*.js"],
   maxInstances: 1,
+  connectionRetryCount: 10,
   capabilities: [
     {
       maxInstances: 1,

@@ -133,7 +133,7 @@ export async function renderExportPng(
 ): Promise<Blob> {
   // Render chart SVG at export width
   const isPZ = isPowerZoneRide(workout);
-  const isDark = settings?.darkMode || (settings?.backgroundImage ?? "none") !== "none";
+  const isDark = (settings?.backgroundImage ?? "none") !== "none";
   const chartEl = renderRideDetailChart(timeSeries, ftp || null, {
     width: CHART_WIDTH,
     height: CHART_HEIGHT,
@@ -178,8 +178,7 @@ export async function renderExportPng(
 
   // Background
   const bgMode = settings?.backgroundImage ?? "none";
-  // darkMode only → dark gray; background image/dark → black; otherwise → white
-  ctx.fillStyle = bgMode !== "none" ? "#000000" : settings?.darkMode ? "#111827" : "#ffffff";
+  ctx.fillStyle = bgMode !== "none" ? "#000000" : "#ffffff";
   ctx.fillRect(0, 0, EXPORT_WIDTH, totalHeight);
 
   if (backgroundImageSrc) {

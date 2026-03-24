@@ -136,7 +136,6 @@ interface ChartOptions {
   cueColor?: string;
   showZoneBands?: boolean;
   zoneBandOpacity?: number;
-  darkMode?: boolean;
   showInstructorCues?: boolean;
   showYAxis?: boolean;
   darkBackground?: boolean;
@@ -205,7 +204,7 @@ export function renderRideDetailChart(
           textAnchor: "start",
           dx: 8,
           fontSize: 10,
-          fill: (options.darkMode || options.darkBackground) ? "rgba(255,255,255,0.8)" : "#666",
+          fill: options.darkBackground ? "rgba(255,255,255,0.8)" : "#666",
         }),
       );
     }
@@ -316,7 +315,7 @@ export function renderRideDetailChart(
     width,
     height,
     marginRight: 36,
-    style: (options.darkMode || options.darkBackground) ? { background: "transparent", color: "#e5e7eb" } : undefined,
+    style: options.darkBackground ? { background: "transparent", color: "#e5e7eb" } : undefined,
     x: {
       label: null,
       domain: [0, xMax],

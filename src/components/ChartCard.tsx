@@ -91,7 +91,7 @@ export default function ChartCard({ workout, ftp, timeSeries, cues, settings, di
       zoneBandOpacity: settings.zoneBandOpacity,
       showInstructorCues: settings.showInstructorCues,
       showYAxis: settings.showYAxis,
-      darkBackground: settings.darkMode || settings.backgroundImage !== "none",
+      darkBackground: settings.backgroundImage !== "none",
     }, cues);
     el.replaceChildren(chart);
     return () => { el.replaceChildren(); };
@@ -100,7 +100,7 @@ export default function ChartCard({ workout, ftp, timeSeries, cues, settings, di
   const st = settings.stats;
   const headerVisible = showHeader ?? settings.showHeader;
   const footerVisible = showFooter ?? true;
-  const isDark = settings.darkMode || settings.backgroundImage !== "none";
+  const isDark = settings.backgroundImage !== "none";
   const hasImage = !!backgroundImageSrc;
   const opacity = settings.backgroundImageOpacity ?? 0.6;
 

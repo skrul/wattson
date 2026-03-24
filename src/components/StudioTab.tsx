@@ -426,7 +426,6 @@ export default function StudioTab() {
             </label>
             <ColorSwatch color={settings.cueColor} onChange={(v) => update({ cueColor: v })} />
           </div>
-          <Checkbox label="Dark mode" checked={settings.darkMode} onChange={(v) => update({ darkMode: v })} />
           <Checkbox label="Header (title/date)" checked={settings.showHeader} onChange={(v) => update({ showHeader: v })} />
           <Checkbox label="Y-axis & gridlines" checked={settings.showYAxis} onChange={(v) => update({ showYAxis: v })} />
         </div>

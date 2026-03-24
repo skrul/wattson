@@ -20,6 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 
 let workouts = [];
 let callLog = [];
+let rejectNextWorkoutFetch = false; // When true, the next /workouts request returns 401
 
 function resetState(count = 5) {
   workouts = [];
@@ -59,6 +60,13 @@ app.get("/api/me", (req, res) => {
 // Paginated workout list (sorted newest-first, like the real Peloton API)
 app.get("/api/user/:userId/workouts", (req, res) => {
   logCall("GET", `/api/user/${req.params.userId}/workouts`);
+
+  // Simulate token expiry: return 401 once, then reset the flag
+  if (rejectNextWorkoutFetch) {
+    rejectNextWorkoutFetch = false;
+    return res.status(401).json({ error: "Token expired" });
+  }
+
   const sorted = [...workouts].sort((a, b) => b.created_at - a.created_at);
   const limit = parseInt(req.query.limit || "100", 10);
   const page = parseInt(req.query.page || "0", 10);
@@ -121,6 +129,11 @@ app.post("/admin/add-workouts", (req, res) => {
     workouts.push(w);
   }
   res.json({ ok: true, workoutCount: workouts.length });
+});
+
+app.post("/admin/reject-next-workout-fetch", (_req, res) => {
+  rejectNextWorkoutFetch = true;
+  res.json({ ok: true });
 });
 
 app.get("/admin/call-log", (_req, res) => {

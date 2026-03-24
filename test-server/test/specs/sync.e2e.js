@@ -227,15 +227,66 @@ describe("Sync lifecycle", () => {
   });
 
   // ---------------------------------------------------------------
-  // Scenario 2: Incremental sync
+  // Scenario 2: Auth recovery (silent re-login on 401)
   // ---------------------------------------------------------------
-  describe("Scenario 2: Incremental sync", () => {
+  describe("Scenario 2: Auth recovery", () => {
+    it("should arm 401 rejection and add 2 workouts", async () => {
+      await adminCall("/admin/add-workouts", "POST", { count: 2 });
+      await adminCall("/admin/reject-next-workout-fetch");
+      await adminCall("/admin/clear-log");
+    });
+
+    it("should sync successfully despite initial 401", async () => {
+      const syncBtn = await waitFor('button[title="Sync workouts"]', 5_000);
+      await syncBtn.click();
+
+      // Wait for sync to complete
+      await browser.pause(500);
+      await browser.waitUntil(
+        async () => {
+          return browser.execute(() => {
+            const svgs = document.querySelectorAll("svg");
+            for (const svg of svgs) {
+              if (svg.classList.contains("animate-spin")) return false;
+            }
+            return true;
+          });
+        },
+        { timeout: 30_000, timeoutMsg: "Sync did not complete after auth recovery" },
+      );
+
+      await openAccountPopover();
+      await waitForText("252 workouts", 10_000);
+      await waitForText("All details downloaded", 30_000);
+    });
+
+    it("should have re-authenticated and retried", async () => {
+      const log = await adminCall("/admin/call-log", "GET");
+      const paths = log.map((e) => e.path);
+
+      // Should have: first /workouts (401) → /oauth/token (re-login) → /workouts (success)
+      const workoutCalls = paths.filter((p) => p.includes("/workouts") && !p.includes("workout/"));
+      const loginCalls = paths.filter((p) => p === "/oauth/token");
+
+      // At least 2 workout list calls (the rejected one + the retry)
+      expect(workoutCalls.length).toBeGreaterThanOrEqual(2);
+      // At least 1 re-login
+      expect(loginCalls.length).toBeGreaterThanOrEqual(1);
+
+      await closeAccountPopover();
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // Scenario 3: Incremental sync
+  // ---------------------------------------------------------------
+  describe("Scenario 3: Incremental sync", () => {
     it("should add 2 workouts and clear call log", async () => {
       await adminCall("/admin/add-workouts", "POST", { count: 2 });
       await adminCall("/admin/clear-log");
     });
 
-    it("should trigger sync and see 252 workouts", async () => {
+    it("should trigger sync and see 254 workouts", async () => {
       const syncBtn = await waitFor('button[title="Sync workouts"]', 5_000);
       await syncBtn.click();
 
@@ -255,7 +306,7 @@ describe("Sync lifecycle", () => {
       );
 
       await openAccountPopover();
-      await waitForText("252 workouts", 10_000);
+      await waitForText("254 workouts", 10_000);
       await waitForText("All details downloaded", 30_000);
     });
 
@@ -278,9 +329,9 @@ describe("Sync lifecycle", () => {
   });
 
   // ---------------------------------------------------------------
-  // Scenario 3: Reset and re-sync (race condition regression test)
+  // Scenario 4: Reset and re-sync (race condition regression test)
   // ---------------------------------------------------------------
-  describe("Scenario 3: Reset and re-sync", () => {
+  describe("Scenario 4: Reset and re-sync", () => {
     it("should reset via UI", async () => {
       await adminCall("/admin/reset", "POST", { count: 5 });
       await adminCall("/admin/clear-log");
@@ -318,6 +369,61 @@ describe("Sync lifecycle", () => {
     it("should show enriched data in workout detail after reset", async () => {
       await closeAccountPopover();
       await verifyEnrichmentInUI();
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // Scenario 5: Reset + re-sync uses enrichment cache (no API calls)
+  // ---------------------------------------------------------------
+  describe("Scenario 5: Re-sync uses enrichment cache", () => {
+    it("should reset via UI (keeping enrichment cache warm)", async () => {
+      // Reset fake server to same 5 workouts (cache has their enrichment data)
+      await adminCall("/admin/clear-log");
+
+      await openAccountPopover();
+
+      const resetBtn = await waitFor("button=Reset Workouts", 5_000);
+      await resetBtn.click();
+
+      // Confirm via JS click
+      await browser.pause(500);
+      await browser.execute(() => {
+        const buttons = document.querySelectorAll("button");
+        for (const btn of buttons) {
+          if (btn.classList.contains("bg-red-600") && btn.textContent.includes("Reset")) {
+            btn.click();
+            return;
+          }
+        }
+      });
+
+      await browser.pause(500);
+    });
+
+    it("should complete login again via setup wizard", async () => {
+      await loginViaWizard();
+    });
+
+    it("should show 5 workouts and complete enrichment", async () => {
+      await openAccountPopover();
+      await waitForText("5 workouts", 10_000);
+      await waitForText("All details downloaded", 30_000);
+    });
+
+    it("should not have made any enrichment API calls (all cache hits)", async () => {
+      const log = await adminCall("/admin/call-log", "GET");
+      const paths = log.map((e) => e.path);
+
+      // Should have login + profile + workout list, but NO enrichment calls
+      const perfGraphCalls = paths.filter((p) => p.includes("/performance_graph"));
+      const detailCalls = paths.filter((p) => p.match(/\/api\/workout\/[^/]+$/) != null);
+      const rideCalls = paths.filter((p) => p.includes("/ride/") && p.includes("/details"));
+
+      expect(perfGraphCalls.length).toBe(0);
+      expect(detailCalls.length).toBe(0);
+      expect(rideCalls.length).toBe(0);
+
+      await closeAccountPopover();
     });
   });
 });

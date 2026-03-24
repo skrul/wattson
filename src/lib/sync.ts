@@ -125,6 +125,10 @@ export async function syncWorkouts(
     // Non-fatal: profile will be refreshed on next sync
   }
 
+  // Refresh enrichment counts so the store reflects newly inserted workouts.
+  // This also resets backfillStatus from "complete" to "paused" when unenriched
+  // workouts exist (e.g., the backfill loop ran on an empty DB before sync finished).
+  await useEnrichmentStore.getState().refreshCounts();
   // Kick off backfill if there are unenriched workouts remaining
   useEnrichmentStore.getState().ensureRunning();
 

@@ -41,7 +41,8 @@ vi.mock("@tauri-apps/api/core", () => ({
 // Import after mocks — these resolve to the vi.fn() instances from the factories above
 import { syncWorkouts } from "./sync";
 import { cachedFetchPerformanceGraph, cachedFetchWorkoutDetail, cachedFetchRideDetails } from "./enrichmentCache";
-import { updateRideDetails } from "./database";
+import { updateRideDetails, getEnrichmentCounts } from "./database";
+import { useEnrichmentStore } from "../stores/enrichmentStore";
 
 // --- Helpers ---
 
@@ -79,6 +80,13 @@ beforeEach(() => {
     isSyncing: false,
   });
   useWorkoutStore.setState({ syncGeneration: 0 });
+  useEnrichmentStore.setState({
+    countsLoaded: false,
+    backfillStatus: "paused",
+    enrichedCount: 0,
+    totalCount: 0,
+    enrichmentComplete: false,
+  });
 
   // Default mock implementations
   mockFetchAllWorkouts.mockResolvedValue([]);
@@ -251,6 +259,31 @@ describe("syncWorkouts", () => {
     const after = useWorkoutStore.getState().syncGeneration;
 
     expect(after - before).toBe(1);
+  });
+
+  it("resets enrichment from complete to paused when new workouts are inserted (fresh DB race)", async () => {
+    setSession();
+    setUserProfile(100); // full sync (isComplete=false)
+
+    mockGetExistingWorkoutIds.mockResolvedValue(new Set());
+    mockFetchAllWorkouts.mockResolvedValue([
+      { id: "w1", ride_id: null, title: "Ride 1" },
+      { id: "w2", ride_id: null, title: "Ride 2" },
+    ]);
+
+    // Simulate the race: backfill loop already ran on empty DB and set "complete"
+    useEnrichmentStore.setState({ backfillStatus: "complete", totalCount: 0 });
+
+    // After insert, getEnrichmentCounts should reflect the new workouts
+    vi.mocked(getEnrichmentCounts).mockResolvedValue({ total: 2, enriched: 0 });
+
+    await syncWorkouts();
+
+    // refreshCounts should have reset from "complete" to "paused"
+    // and ensureRunning should have started the backfill
+    const state = useEnrichmentStore.getState();
+    expect(state.totalCount).toBe(2);
+    expect(state.backfillStatus).toBe("running");
   });
 
   it("skips ride details fetch when ride_id is null UUID", async () => {

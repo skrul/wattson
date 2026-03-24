@@ -160,6 +160,9 @@ export interface ShareChartSettings {
   showUsername: boolean;
   customUsername: string;
   showYAxis: boolean;
+  backgroundImage: "none" | "dark" | "ride" | "custom";
+  customBackgroundImageDataUrl: string;
+  backgroundImageOpacity: number;
   stats: {
     avgPower: boolean;
     totalOutput: boolean;

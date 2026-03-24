@@ -14,14 +14,15 @@ interface ExportButtonProps {
   cues?: InstructorCue[] | null;
   displayName?: string | null;
   settings?: ShareChartSettings;
+  backgroundImageSrc?: string | null;
 }
 
-export default function ExportButton({ filename, workout, ftp, timeSeries, cues, displayName, settings: settingsProp }: ExportButtonProps) {
+export default function ExportButton({ filename, workout, ftp, timeSeries, cues, displayName, settings: settingsProp, backgroundImageSrc }: ExportButtonProps) {
   const storeSettings = useShareChartStore((s) => s.settings);
   const settings = settingsProp ?? storeSettings;
 
   async function handleCopy() {
-    const blobPromise = renderExportPng(workout, ftp, timeSeries, cues, settings, displayName);
+    const blobPromise = renderExportPng(workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc);
     await navigator.clipboard.write([
       new ClipboardItem({ "image/png": blobPromise }),
     ]);
@@ -33,7 +34,7 @@ export default function ExportButton({ filename, workout, ftp, timeSeries, cues,
       filters: [{ name: "PNG Image", extensions: ["png"] }],
     });
     if (!filePath) return;
-    const blob = await renderExportPng(workout, ftp, timeSeries, cues, settings, displayName);
+    const blob = await renderExportPng(workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc);
     const bytes = new Uint8Array(await blob.arrayBuffer());
     await writeFile(filePath, bytes);
   }

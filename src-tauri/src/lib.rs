@@ -2,7 +2,7 @@ use tauri_plugin_sql::{Builder as SqlBuilder, Migration, MigrationKind};
 
 #[tauri::command]
 fn save_credentials(user_id: String, access_token: String, email: String, password: String) -> Result<(), String> {
-    let entry = keyring::Entry::new("com.wattson.app", "peloton").map_err(|e| e.to_string())?;
+    let entry = keyring::Entry::new("com.skrul.wattson", "peloton").map_err(|e| e.to_string())?;
     let json =
         serde_json::json!({ "user_id": user_id, "access_token": access_token, "email": email, "password": password }).to_string();
     entry.set_password(&json).map_err(|e| e.to_string())
@@ -10,7 +10,7 @@ fn save_credentials(user_id: String, access_token: String, email: String, passwo
 
 #[tauri::command]
 fn load_credentials() -> Result<Option<serde_json::Value>, String> {
-    let entry = keyring::Entry::new("com.wattson.app", "peloton").map_err(|e| e.to_string())?;
+    let entry = keyring::Entry::new("com.skrul.wattson", "peloton").map_err(|e| e.to_string())?;
     match entry.get_password() {
         Ok(json) => serde_json::from_str(&json)
             .map(Some)
@@ -22,7 +22,7 @@ fn load_credentials() -> Result<Option<serde_json::Value>, String> {
 
 #[tauri::command]
 fn delete_credentials() -> Result<(), String> {
-    let entry = keyring::Entry::new("com.wattson.app", "peloton").map_err(|e| e.to_string())?;
+    let entry = keyring::Entry::new("com.skrul.wattson", "peloton").map_err(|e| e.to_string())?;
     match entry.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(e.to_string()),

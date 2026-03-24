@@ -122,7 +122,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
 
   if (!session) {
     return (
-      <div className="mx-auto max-w-md rounded-lg border border-gray-200 p-6">
+      <div className="rounded-lg border border-gray-200 p-6">
         <h2 className="mb-4 text-lg font-semibold">Log in to Peloton</h2>
         <form
           onSubmit={(e) => {
@@ -172,7 +172,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
     : null;
 
   return (
-    <div className="mx-auto max-w-md space-y-6">
+    <div className="space-y-6">
       {/* Profile header */}
       <div className="flex items-center gap-4">
         {profile?.imageUrl ? (
@@ -189,10 +189,9 @@ export default function ApiSync({ onDataDeleted }: Props) {
         <div>
           <h2 className="text-lg font-semibold">{profile?.username ?? "Peloton User"}</h2>
           <p className="text-sm text-gray-500">
-            {[
-              memberSince ? `Member since ${memberSince}` : null,
-              profile?.cyclingFtp != null ? `FTP ${profile.cyclingFtp}W` : null,
-            ].filter(Boolean).join(" · ") || null}
+            {memberSince && <>Member since {memberSince}</>}
+            {memberSince && profile?.cyclingFtp != null && <br />}
+            {profile?.cyclingFtp != null && <>FTP {profile.cyclingFtp}W</>}
           </p>
         </div>
       </div>

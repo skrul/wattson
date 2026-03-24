@@ -117,11 +117,27 @@ function mapWorkout(w: PelotonWorkout, raw: unknown): Workout {
     class_subtype: null,
     class_type_version: null,
     max_heart_rate: null,
-    hr_zone1_pct: null,
-    hr_zone2_pct: null,
-    hr_zone3_pct: null,
-    hr_zone4_pct: null,
-    hr_zone5_pct: null,
+    ...extractHrZones(w.effort_zones?.heart_rate_zone_durations),
+  };
+}
+
+function extractHrZones(
+  durations: Record<string, number> | undefined | null,
+): Pick<Workout, "hr_zone1_pct" | "hr_zone2_pct" | "hr_zone3_pct" | "hr_zone4_pct" | "hr_zone5_pct"> {
+  if (!durations) return { hr_zone1_pct: null, hr_zone2_pct: null, hr_zone3_pct: null, hr_zone4_pct: null, hr_zone5_pct: null };
+  const z1 = durations.heart_rate_z1_duration ?? 0;
+  const z2 = durations.heart_rate_z2_duration ?? 0;
+  const z3 = durations.heart_rate_z3_duration ?? 0;
+  const z4 = durations.heart_rate_z4_duration ?? 0;
+  const z5 = durations.heart_rate_z5_duration ?? 0;
+  const total = z1 + z2 + z3 + z4 + z5;
+  if (total <= 0) return { hr_zone1_pct: null, hr_zone2_pct: null, hr_zone3_pct: null, hr_zone4_pct: null, hr_zone5_pct: null };
+  return {
+    hr_zone1_pct: (z1 / total) * 100,
+    hr_zone2_pct: (z2 / total) * 100,
+    hr_zone3_pct: (z3 / total) * 100,
+    hr_zone4_pct: (z4 / total) * 100,
+    hr_zone5_pct: (z5 / total) * 100,
   };
 }
 

@@ -109,6 +109,8 @@ export async function syncWorkouts(
         }
       }
       await useEnrichmentStore.getState().refreshCounts();
+      // Re-notify so dashboard widgets refetch with enriched data
+      useWorkoutStore.getState().notifySync();
     }
   } else {
     useSessionStore.getState().setIsSyncing(false);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import ApiSync from "./components/ApiSync";
 import WorkoutList from "./components/WorkoutList";
 import DashboardTab from "./components/DashboardTab";
@@ -29,7 +30,10 @@ function App() {
   const session = useSessionStore((s) => s.session);
   const userProfile = useSessionStore((s) => s.userProfile);
   const isSyncing = useSessionStore((s) => s.isSyncing);
+  const syncProgress = useSessionStore((s) => s.syncProgress);
   const backfillStatus = useEnrichmentStore((s) => s.backfillStatus);
+  const enrichedCount = useEnrichmentStore((s) => s.enrichedCount);
+  const totalCount = useEnrichmentStore((s) => s.totalCount);
 
   const dashboards = useDashboardRegistryStore((s) => s.dashboards);
   const registryLoaded = useDashboardRegistryStore((s) => s.loaded);
@@ -113,7 +117,7 @@ function App() {
   };
 
   // Build tab array: dashboard tabs first, then fixed tabs
-  const fixedTabs = ["workouts", "studio", "profile"] as const;
+  const fixedTabs = ["workouts", "studio"] as const;
   const allTabs: string[] = [
     ...dashboards.map((d) => makeDashboardTab(d.id)),
     ...fixedTabs,
@@ -123,14 +127,6 @@ function App() {
     if (isDashboardTab(tab)) {
       const d = dashboards.find((d) => makeDashboardTab(d.id) === tab);
       return d?.name ?? "Dashboard";
-    }
-    if (tab === "profile") {
-      if (userProfile) {
-        const raw = JSON.parse(userProfile.raw_json);
-        const username = raw.username as string | undefined;
-        if (username) return username;
-      }
-      return "Account";
     }
     return tab.charAt(0).toUpperCase() + tab.slice(1);
   }
@@ -153,41 +149,83 @@ function App() {
 
       {/* Header */}
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           <h1 className="text-xl font-bold">Wattson</h1>
-          <button
-            onClick={() => {
-              if (!isSyncing && !backfillStatus?.startsWith("running")) {
-                syncWorkouts().catch(() => {});
-              }
-            }}
-            className={`flex items-center justify-center rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 ${isSyncing || backfillStatus === "running" ? "animate-spin" : ""}`}
-            title={isSyncing ? "Syncing…" : backfillStatus === "running" ? "Enriching…" : "Sync workouts"}
-            disabled={isSyncing || backfillStatus === "running"}
-          >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <path d="M2.5 8a5.5 5.5 0 0 1 9.3-4" />
-              <path d="M13.5 8a5.5 5.5 0 0 1-9.3 4" />
-              <path d="M11.8 4l1.2-.8L13.5 4.8" />
-              <path d="M4.2 12l-1.2.8L2.5 11.2" />
-            </svg>
-          </button>
+          <nav className="flex gap-2">
+            {allTabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`rounded px-3 py-1.5 text-sm font-medium ${
+                  activeTab === tab
+                    ? "bg-gray-900 text-white"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                {tabLabel(tab)}
+              </button>
+            ))}
+          </nav>
         </div>
-        <nav className="flex gap-2">
-          {allTabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`rounded px-3 py-1.5 text-sm font-medium ${
-                activeTab === tab
-                  ? "bg-gray-900 text-white"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
+        <div className="flex items-center gap-2">
+          {(() => {
+            const isActive = isSyncing || backfillStatus === "running";
+            const progressText = isSyncing && syncProgress
+              ? `Syncing ${syncProgress.fetched} / ${syncProgress.total}`
+              : !isSyncing && backfillStatus === "running" && totalCount > 0
+                ? `Details ${enrichedCount} / ${totalCount}`
+                : null;
+            return (
+              <button
+                onClick={() => {
+                  if (!isActive) syncWorkouts().catch(() => {});
+                }}
+                className={`flex items-center gap-1.5 rounded-full bg-gray-100 text-gray-400 hover:text-gray-600 ${
+                  progressText ? "py-1 pl-1.5 pr-2.5" : "p-1.5"
+                }`}
+                title={isSyncing ? "Syncing…" : backfillStatus === "running" ? "Enriching…" : "Sync workouts"}
+                disabled={isActive}
+              >
+                <svg className={`h-4 w-4 ${isActive ? "animate-spin" : ""}`} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M2.5 8a5.5 5.5 0 0 1 9.3-4" />
+                  <path d="M13.5 8a5.5 5.5 0 0 1-9.3 4" />
+                  <path d="M11.8 4l1.2-.8L13.5 4.8" />
+                  <path d="M4.2 12l-1.2.8L2.5 11.2" />
+                </svg>
+                {progressText && (
+                  <span className="text-xs text-gray-500">{progressText}</span>
+                )}
+              </button>
+            );
+          })()}
+          <Popover className="relative flex items-center">
+            <PopoverButton
+              className="rounded-full data-[open]:ring-2 data-[open]:ring-gray-900 hover:ring-2 hover:ring-gray-300 focus:outline-none"
+              title="Account"
             >
-              {tabLabel(tab)}
-            </button>
-          ))}
-        </nav>
+              {(() => {
+                const imageUrl = userProfile
+                  ? (JSON.parse(userProfile.raw_json).image_url as string | undefined)
+                  : undefined;
+                return imageUrl ? (
+                  <img src={imageUrl} alt="Profile" className="h-7 w-7 rounded-full object-cover" />
+                ) : (
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-500">
+                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                );
+              })()}
+            </PopoverButton>
+            <PopoverPanel
+              anchor="bottom end"
+              className="z-50 mt-2 w-96 max-h-[calc(100vh-5rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
+            >
+              <ApiSync onDataDeleted={() => { setDataState("empty"); setShowWizard(true); }} />
+            </PopoverPanel>
+          </Popover>
+        </div>
       </header>
 
       {/* Content — all tabs stay mounted to preserve scroll position and avoid re-fetching.
@@ -212,9 +250,6 @@ function App() {
         </div>
         <div className={`absolute inset-0 overflow-y-auto p-6 ${activeTab === "studio" ? "visible z-10" : "invisible z-0"}`}>
           <StudioTab />
-        </div>
-        <div className={`absolute inset-0 overflow-y-auto p-6 ${activeTab === "profile" ? "visible z-10" : "invisible z-0"}`}>
-          <ApiSync onDataDeleted={() => { setDataState("empty"); setShowWizard(true); }} />
         </div>
       </div>
 

@@ -232,7 +232,7 @@ function App() {
            Dashboard tabs use visibility+absolute instead of display:none so that
            react-grid-layout always has a real container width and items don't
            animate on tab switch. */}
-      <div className="relative flex-1">
+      <div className="relative flex-1 bg-[#F8FAFC]">
         {dashboards.map((d) => {
           const tab = makeDashboardTab(d.id);
           const active = activeTab === tab;

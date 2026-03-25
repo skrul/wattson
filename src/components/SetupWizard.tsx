@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogPanel } from "@headlessui/react";
 import { login, fetchAllWorkouts, fetchUserProfile } from "../lib/api";
-import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile } from "../lib/database";
+import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile, getEnrichmentCounts } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { enrichmentActor } from "../machines/enrichmentMachine";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 
 interface Props {
@@ -81,7 +81,8 @@ export default function SetupWizard({ open, onComplete }: Props) {
       if (workouts.length > 0) {
         await insertWorkouts(workouts);
       }
-      await useEnrichmentStore.getState().refreshCounts();
+      const counts = await getEnrichmentCounts();
+      enrichmentActor.send({ type: "REFRESH_COUNTS", enriched: counts.enriched, total: counts.total });
 
       const updated = await queryWorkouts(filters);
       setWorkouts(updated);
@@ -97,7 +98,10 @@ export default function SetupWizard({ open, onComplete }: Props) {
       }
 
       // Kick off enrichment backfill for unenriched workouts
-      useEnrichmentStore.getState().ensureRunning();
+      const snap = enrichmentActor.getSnapshot();
+      if (snap.value === "paused") {
+        enrichmentActor.send({ type: "START" });
+      }
 
       setSyncedCount(workouts.length);
       setStep("success");

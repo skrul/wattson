@@ -10,7 +10,7 @@ import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
 import { syncWorkouts } from "./lib/sync";
 import { getUserProfile, hasWorkouts } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
-import { useEnrichmentStore } from "./stores/enrichmentStore";
+import { enrichmentActor, useEnrichmentSelector } from "./machines/enrichmentMachine";
 import { useNavigationStore, isDashboardTab, makeDashboardTab } from "./stores/navigationStore";
 import { useShareChartStore } from "./stores/shareChartStore";
 import { useDashboardRegistryStore } from "./stores/dashboardRegistryStore";
@@ -31,9 +31,9 @@ function App() {
   const userProfile = useSessionStore((s) => s.userProfile);
   const isSyncing = useSessionStore((s) => s.isSyncing);
   const syncProgress = useSessionStore((s) => s.syncProgress);
-  const backfillStatus = useEnrichmentStore((s) => s.backfillStatus);
-  const enrichedCount = useEnrichmentStore((s) => s.enrichedCount);
-  const totalCount = useEnrichmentStore((s) => s.totalCount);
+  const backfillStatus = useEnrichmentSelector((snap) => snap.value);
+  const enrichedCount = useEnrichmentSelector((snap) => snap.context.enrichedCount);
+  const totalCount = useEnrichmentSelector((snap) => snap.context.totalCount);
 
   const dashboards = useDashboardRegistryStore((s) => s.dashboards);
   const registryLoaded = useDashboardRegistryStore((s) => s.loaded);
@@ -43,7 +43,7 @@ function App() {
     checkForUpdate().then((status) => {
       if (status.available) setUpdate(status);
     });
-    useEnrichmentStore.getState().loadState().catch(() => {});
+    // enrichmentActor auto-loads counts on start (loadingCounts state)
     useShareChartStore.getState().load().catch(() => {});
     useDashboardRegistryStore.getState().loadRegistry().catch(() => {});
   }, []);
@@ -100,10 +100,10 @@ function App() {
   const autoResumeRan = useRef(false);
   useEffect(() => {
     if (!loaded || !session || autoResumeRan.current || showWizard) return;
-    const { backfillStatus } = useEnrichmentStore.getState();
-    if (backfillStatus === "paused") {
+    const snap = enrichmentActor.getSnapshot();
+    if (snap.value === "paused") {
       autoResumeRan.current = true;
-      useEnrichmentStore.getState().startBackfill();
+      enrichmentActor.send({ type: "START" });
     }
   }, [loaded, session, showWizard]);
 

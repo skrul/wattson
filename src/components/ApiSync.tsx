@@ -6,7 +6,7 @@ import { deleteAllData } from "../lib/database";
 import { clearCache } from "../lib/enrichmentCache";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { enrichmentActor, useEnrichmentSelector } from "../machines/enrichmentMachine";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 
 interface Props {
@@ -48,13 +48,10 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const progress = useSessionStore((s) => s.syncProgress);
   const setWorkouts = useWorkoutStore((s) => s.setWorkouts);
 
-  const countsLoaded = useEnrichmentStore((s) => s.countsLoaded);
-  const backfillStatus = useEnrichmentStore((s) => s.backfillStatus);
-  const enrichedCount = useEnrichmentStore((s) => s.enrichedCount);
-  const totalCount = useEnrichmentStore((s) => s.totalCount);
-  const startBackfill = useEnrichmentStore((s) => s.startBackfill);
-  const pauseBackfill = useEnrichmentStore((s) => s.pauseBackfill);
-  const resetEnrichment = useEnrichmentStore((s) => s.reset);
+  const countsLoaded = useEnrichmentSelector((snap) => snap.context.countsLoaded);
+  const backfillStatus = useEnrichmentSelector((snap) => snap.value);
+  const enrichedCount = useEnrichmentSelector((snap) => snap.context.enrichedCount);
+  const totalCount = useEnrichmentSelector((snap) => snap.context.totalCount);
 
 
   const handleLogin = async () => {
@@ -102,7 +99,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
 
   const handleReset = async () => {
     setConfirmResetOpen(false);
-    resetEnrichment();
+    enrichmentActor.send({ type: "RESET" });
     await deleteAllData();
     setWorkouts([]);
     useWorkoutStore.getState().notifySync();
@@ -249,7 +246,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
             </button>
             {backfillStatus !== "complete" && (
               <button
-                onClick={() => backfillStatus === "running" ? pauseBackfill() : startBackfill()}
+                onClick={() => backfillStatus === "running" ? enrichmentActor.send({ type: "PAUSE" }) : enrichmentActor.send({ type: "START" })}
                 className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
                 {backfillStatus === "running" ? "Pause" : "Resume"}

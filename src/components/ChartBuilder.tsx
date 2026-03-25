@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { FIELD_DEFS } from "../lib/fields";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { useEnrichmentSelector, selectEnrichmentComplete } from "../machines/enrichmentMachine";
 import { queryWorkouts, chartFiltersToWorkoutFilters } from "../lib/database";
 import type { Workout, ChartDefinition, ChartMarkType, ChartXAxisMode, AggregationFunction, YAxisField, YAxisSide, FilterCondition } from "../types";
 import { isAggregatedMode, seriesColor } from "../lib/charts";
@@ -19,7 +19,7 @@ interface ChartBuilderProps {
 }
 
 export default function ChartBuilder({ chart, onChange }: ChartBuilderProps) {
-  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
+  const enrichmentComplete = useEnrichmentSelector(selectEnrichmentComplete);
   const [previewWorkouts, setPreviewWorkouts] = useState<Workout[]>([]);
 
   const update = (updates: Partial<ChartFields>) => {

@@ -38,11 +38,31 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+// Mock enrichment actor — tracks events sent to it and simulates state transitions
+const mockEnrichmentSend = vi.fn();
+let mockEnrichmentValue: string = "paused";
+vi.mock("../machines/enrichmentMachine", () => ({
+  enrichmentActor: {
+    send: (...args: unknown[]) => {
+      mockEnrichmentSend(...args);
+      // Simulate key state transitions
+      const event = args[0] as { type: string; enriched?: number; total?: number };
+      if (event.type === "REFRESH_COUNTS" && mockEnrichmentValue === "complete") {
+        if (event.total! > 0 && event.enriched! < event.total!) {
+          mockEnrichmentValue = "paused";
+        }
+      } else if (event.type === "START" && mockEnrichmentValue === "paused") {
+        mockEnrichmentValue = "running";
+      }
+    },
+    getSnapshot: () => ({ value: mockEnrichmentValue }),
+  },
+}));
+
 // Import after mocks — these resolve to the vi.fn() instances from the factories above
 import { syncWorkouts } from "./sync";
 import { cachedFetchPerformanceGraph, cachedFetchWorkoutDetail, cachedFetchRideDetails } from "./enrichmentCache";
 import { updateRideDetails, getEnrichmentCounts } from "./database";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
 
 // --- Helpers ---
 
@@ -80,13 +100,9 @@ beforeEach(() => {
     isSyncing: false,
   });
   useWorkoutStore.setState({ syncGeneration: 0 });
-  useEnrichmentStore.setState({
-    countsLoaded: false,
-    backfillStatus: "paused",
-    enrichedCount: 0,
-    totalCount: 0,
-    enrichmentComplete: false,
-  });
+
+  // Reset mock actor state
+  mockEnrichmentValue = "paused";
 
   // Default mock implementations
   mockFetchAllWorkouts.mockResolvedValue([]);
@@ -272,18 +288,23 @@ describe("syncWorkouts", () => {
     ]);
 
     // Simulate the race: backfill loop already ran on empty DB and set "complete"
-    useEnrichmentStore.setState({ backfillStatus: "complete", totalCount: 0 });
+    mockEnrichmentValue = "complete";
 
     // After insert, getEnrichmentCounts should reflect the new workouts
     vi.mocked(getEnrichmentCounts).mockResolvedValue({ total: 2, enriched: 0 });
 
     await syncWorkouts();
 
-    // refreshCounts should have reset from "complete" to "paused"
-    // and ensureRunning should have started the backfill
-    const state = useEnrichmentStore.getState();
-    expect(state.totalCount).toBe(2);
-    expect(state.backfillStatus).toBe("running");
+    // REFRESH_COUNTS should have been sent, transitioning complete → paused
+    expect(mockEnrichmentSend).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "REFRESH_COUNTS", enriched: 0, total: 2 }),
+    );
+    // ensureRunning equivalent should have sent START (since mock transitions to paused)
+    expect(mockEnrichmentSend).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "START" }),
+    );
+    // Mock should now be in running state
+    expect(mockEnrichmentValue).toBe("running");
   });
 
   it("skips ride details fetch when ride_id is null UUID", async () => {

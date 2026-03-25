@@ -1,10 +1,10 @@
 import { login, fetchAllWorkouts, fetchUserProfile, AuthError } from "./api";
 import { cachedFetchPerformanceGraph, cachedFetchWorkoutDetail, cachedFetchRideDetails } from "./enrichmentCache";
-import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile, updateWorkoutMetrics, updateRideDetails } from "./database";
+import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile, updateWorkoutMetrics, updateRideDetails, getEnrichmentCounts } from "./database";
 import { useSessionStore } from "../stores/sessionStore";
 import { useReauthStore } from "../stores/reauthStore";
 import { useWorkoutStore } from "../stores/workoutStore";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { enrichmentActor } from "../machines/enrichmentMachine";
 
 /**
  * Sync workouts with retry logic for expired tokens.
@@ -89,7 +89,8 @@ export async function syncWorkouts(
     await insertWorkouts(newWorkouts);
 
     // Update enrichment counts immediately so the UI reflects the new workout count
-    await useEnrichmentStore.getState().refreshCounts();
+    const counts = await getEnrichmentCounts();
+    enrichmentActor.send({ type: "REFRESH_COUNTS", enriched: counts.enriched, total: counts.total });
 
     const filters = useWorkoutStore.getState().filters;
     const updated = await queryWorkouts(filters);
@@ -130,7 +131,8 @@ export async function syncWorkouts(
           // Non-fatal: enrichment backfill will retry later
         }
       }
-      await useEnrichmentStore.getState().refreshCounts();
+      const refreshedCounts = await getEnrichmentCounts();
+      enrichmentActor.send({ type: "REFRESH_COUNTS", enriched: refreshedCounts.enriched, total: refreshedCounts.total });
       // Re-notify so dashboard widgets refetch with enriched data
       useWorkoutStore.getState().notifySync();
     }
@@ -139,7 +141,10 @@ export async function syncWorkouts(
   }
 
   // Kick off backfill if there are unenriched workouts remaining
-  useEnrichmentStore.getState().ensureRunning();
+  const snap = enrichmentActor.getSnapshot();
+  if (snap.value === "paused") {
+    enrichmentActor.send({ type: "START" });
+  }
 
   return newWorkouts.length;
 }

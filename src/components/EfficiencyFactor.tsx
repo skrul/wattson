@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getDisciplineCounts, getEfficiencyFactorData } from "../lib/database";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { useEnrichmentSelector, selectEnrichmentComplete } from "../machines/enrichmentMachine";
 import { renderEFTrendChart } from "../lib/charts";
 import type { DisciplineCount, EFDataPoint } from "../lib/database";
 
@@ -10,7 +10,7 @@ export default function EfficiencyFactor({ refreshKey }: { refreshKey: number })
   const [data, setData] = useState<EFDataPoint[] | null>(null);
   const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
-  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
+  const enrichmentComplete = useEnrichmentSelector(selectEnrichmentComplete);
 
   // Load discipline list once
   useEffect(() => {

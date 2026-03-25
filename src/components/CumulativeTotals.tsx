@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCumulativeTotals, type CumulativeTotals as CumulativeTotalsData } from "../lib/database";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { useEnrichmentSelector, selectEnrichmentComplete } from "../machines/enrichmentMachine";
 
 interface StatCard {
   label: string;
@@ -10,7 +10,7 @@ interface StatCard {
 export default function CumulativeTotals({ refreshKey }: { refreshKey: number }) {
   const [stats, setStats] = useState<StatCard[]>([]);
   const [loading, setLoading] = useState(true);
-  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
+  const enrichmentComplete = useEnrichmentSelector(selectEnrichmentComplete);
 
   useEffect(() => {
     let cancelled = false;

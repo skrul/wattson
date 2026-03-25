@@ -4,7 +4,7 @@ import { queryWorkouts, chartFiltersToWorkoutFilters } from "../../lib/database"
 import { isConditionActive } from "../FilterEditors";
 import { useNavigationStore } from "../../stores/navigationStore";
 import { useWorkoutStore } from "../../stores/workoutStore";
-import { useEnrichmentStore } from "../../stores/enrichmentStore";
+import { useEnrichmentSelector, selectEnrichmentComplete } from "../../machines/enrichmentMachine";
 import { useDashboardContext } from "../../stores/DashboardContext";
 import { DETAIL_FIELD_KEYS } from "../../lib/fields";
 import ChartPlot from "../ChartPlot";
@@ -60,7 +60,7 @@ export default function ChartWidget({ widget, overrideFilters }: Props) {
     });
   }, [chartConfig.x_axis_field, navigateToFilteredWorkouts]);
 
-  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
+  const enrichmentComplete = useEnrichmentSelector(selectEnrichmentComplete);
 
   // Collect all field keys this chart depends on
   const usesDetailFields = useMemo(() => {

@@ -4,6 +4,7 @@ import { login, fetchAllWorkouts, fetchUserProfile } from "../lib/api";
 import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile, getEnrichmentCounts } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
+import { authActor } from "../machines/authMachine";
 import { enrichmentActor } from "../machines/enrichmentMachine";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 
@@ -24,7 +25,6 @@ export default function SetupWizard({ open, onComplete }: Props) {
   const [syncedCount, setSyncedCount] = useState(0);
   const [autoSync, setAutoSync] = useState(true);
 
-  const sessionLogin = useSessionStore((s) => s.login);
   const { filters, setWorkouts } = useWorkoutStore();
 
   // Reset wizard state when re-opened
@@ -46,7 +46,7 @@ export default function SetupWizard({ open, onComplete }: Props) {
     setLoading(true);
     try {
       const result = await login(email, password);
-      await sessionLogin({ ...result, email, password });
+      authActor.send({ type: "LOGIN_SUCCESS", session: { ...result, email, password } });
       localStorage.setItem(STORAGE_KEYS.lastEmail, email);
       setStep("downloading");
       startSync(result.userId, result.accessToken);
@@ -113,7 +113,7 @@ export default function SetupWizard({ open, onComplete }: Props) {
   };
 
   const handleRetry = () => {
-    const session = useSessionStore.getState().session;
+    const session = authActor.getSnapshot().context.session;
     if (session) {
       startSync(session.userId, session.accessToken);
     }

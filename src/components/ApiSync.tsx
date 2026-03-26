@@ -6,6 +6,7 @@ import { deleteAllData } from "../lib/database";
 import { clearCache } from "../lib/enrichmentCache";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
+import { authActor, useAuthSelector, selectSession } from "../machines/authMachine";
 import { enrichmentActor, useEnrichmentSelector } from "../machines/enrichmentMachine";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 
@@ -40,10 +41,8 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const [cacheStatus, setCacheStatus] = useState("");
   const [autoSync, setAutoSync] = useState(() => localStorage.getItem(STORAGE_KEYS.autoSyncOnLaunch) !== "false");
 
-  const session = useSessionStore((s) => s.session);
+  const session = useAuthSelector(selectSession);
   const userProfile = useSessionStore((s) => s.userProfile);
-  const sessionLogin = useSessionStore((s) => s.login);
-  const sessionLogout = useSessionStore((s) => s.logout);
   const isSyncing = useSessionStore((s) => s.isSyncing);
   const progress = useSessionStore((s) => s.syncProgress);
   const setWorkouts = useWorkoutStore((s) => s.setWorkouts);
@@ -60,7 +59,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
     setLoading(true);
     try {
       const result = await login(email, password);
-      await sessionLogin({ ...result, email, password });
+      authActor.send({ type: "LOGIN_SUCCESS", session: { ...result, email, password } });
       localStorage.setItem(STORAGE_KEYS.lastEmail, email);
       setPassword("");
       setStatus("Logged in successfully.");
@@ -91,8 +90,8 @@ export default function ApiSync({ onDataDeleted }: Props) {
     }
   };
 
-  const handleSignOut = async () => {
-    await sessionLogout();
+  const handleSignOut = () => {
+    authActor.send({ type: "LOGOUT" });
     setStatus("");
     setError("");
   };
@@ -106,7 +105,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
     localStorage.removeItem(STORAGE_KEYS.lastEmail);
     setEmail("");
     onDataDeleted();
-    await sessionLogout();
+    authActor.send({ type: "LOGOUT" });
     setStatus("");
     setError("");
   };

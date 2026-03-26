@@ -1,20 +1,19 @@
-import { login, fetchAllWorkouts, fetchUserProfile, AuthError } from "./api";
+import { fetchAllWorkouts, fetchUserProfile, AuthError } from "./api";
 import { cachedFetchPerformanceGraph, cachedFetchWorkoutDetail, cachedFetchRideDetails } from "./enrichmentCache";
 import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile, updateWorkoutMetrics, updateRideDetails, getEnrichmentCounts } from "./database";
 import { useSessionStore } from "../stores/sessionStore";
-import { useReauthStore } from "../stores/reauthStore";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { enrichmentActor } from "../machines/enrichmentMachine";
+import { authActor, refreshAuth } from "../machines/authMachine";
 
 /**
  * Sync workouts with retry logic for expired tokens.
- * On AuthError: tries silent re-login with stored credentials,
- * then falls back to a re-auth modal if that fails.
+ * On AuthError: delegates to the auth machine via refreshAuth().
  */
 export async function syncWorkouts(
   onProgress?: (fetched: number, total: number) => void,
 ): Promise<number> {
-  const session = useSessionStore.getState().session;
+  const session = authActor.getSnapshot().context.session;
   if (!session) throw new Error("Not logged in");
 
   useSessionStore.getState().setIsSyncing(true);
@@ -62,19 +61,8 @@ export async function syncWorkouts(
     workouts = await doFetch(session.userId, activeToken);
   } catch (e) {
     if (!(e instanceof AuthError)) throw e;
-
-    // Try silent refresh with stored credentials
-    try {
-      const refreshed = await login(session.email, session.password);
-      await useSessionStore.getState().updateCredentials(refreshed.accessToken, session.password);
-      activeToken = refreshed.accessToken;
-      workouts = await doFetch(refreshed.userId, activeToken);
-    } catch {
-      // Silent refresh failed — show re-auth modal
-      const result = await useReauthStore.getState().requestReauth(session.email);
-      activeToken = result.accessToken;
-      workouts = await doFetch(result.userId, activeToken);
-    }
+    activeToken = await refreshAuth();
+    workouts = await doFetch(session.userId, activeToken);
   }
 
   // If token changed during auth recovery, re-fetch profile with the new token

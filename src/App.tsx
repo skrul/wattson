@@ -10,6 +10,7 @@ import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
 import { syncWorkouts } from "./lib/sync";
 import { getUserProfile, hasWorkouts } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
+import { useAuthSelector, selectSession, selectIsLoaded } from "./machines/authMachine";
 import { enrichmentActor, useEnrichmentSelector } from "./machines/enrichmentMachine";
 import { useNavigationStore, isDashboardTab, makeDashboardTab } from "./stores/navigationStore";
 import { useShareChartStore } from "./stores/shareChartStore";
@@ -25,9 +26,8 @@ function App() {
   const [showWizard, setShowWizard] = useState(false);
   const autoSyncRan = useRef(false);
 
-  const loadFromKeychain = useSessionStore((s) => s.loadFromKeychain);
-  const loaded = useSessionStore((s) => s.loaded);
-  const session = useSessionStore((s) => s.session);
+  const loaded = useAuthSelector(selectIsLoaded);
+  const session = useAuthSelector(selectSession);
   const userProfile = useSessionStore((s) => s.userProfile);
   const isSyncing = useSessionStore((s) => s.isSyncing);
   const syncProgress = useSessionStore((s) => s.syncProgress);
@@ -39,10 +39,10 @@ function App() {
   const registryLoaded = useDashboardRegistryStore((s) => s.loaded);
 
   useEffect(() => {
-    loadFromKeychain();
     checkForUpdate().then((status) => {
       if (status.available) setUpdate(status);
     });
+    // authActor auto-starts with keychain loading
     // enrichmentActor auto-loads counts on start (loadingCounts state)
     useShareChartStore.getState().load().catch(() => {});
     useDashboardRegistryStore.getState().loadRegistry().catch(() => {});

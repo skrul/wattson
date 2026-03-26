@@ -59,6 +59,19 @@ vi.mock("../machines/enrichmentMachine", () => ({
   },
 }));
 
+// Mock auth actor
+let mockAuthContext = {
+  session: null as { userId: string; accessToken: string; email: string; password: string } | null,
+};
+const mockRefreshAuth = vi.fn();
+vi.mock("../machines/authMachine", () => ({
+  authActor: {
+    getSnapshot: () => ({ context: mockAuthContext }),
+    send: vi.fn(),
+  },
+  refreshAuth: (...args: unknown[]) => mockRefreshAuth(...args),
+}));
+
 // Import after mocks — these resolve to the vi.fn() instances from the factories above
 import { syncWorkouts } from "./sync";
 import { cachedFetchPerformanceGraph, cachedFetchWorkoutDetail, cachedFetchRideDetails } from "./enrichmentCache";
@@ -67,10 +80,7 @@ import { updateRideDetails, getEnrichmentCounts } from "./database";
 // --- Helpers ---
 
 function setSession() {
-  useSessionStore.setState({
-    session: { userId: "u1", accessToken: "tok", email: "a@b.com", password: "pw" },
-    loaded: true,
-  });
+  mockAuthContext.session = { userId: "u1", accessToken: "tok", email: "a@b.com", password: "pw" };
 }
 
 function setUserProfile(totalWorkouts: number) {
@@ -94,12 +104,13 @@ beforeEach(() => {
 
   // Reset stores
   useSessionStore.setState({
-    session: null,
-    loaded: false,
     userProfile: null,
     isSyncing: false,
   });
   useWorkoutStore.setState({ syncGeneration: 0 });
+
+  // Reset mock auth context
+  mockAuthContext = { session: null };
 
   // Reset mock actor state
   mockEnrichmentValue = "paused";
@@ -196,7 +207,7 @@ describe("syncWorkouts", () => {
 
   it("throws when not logged in", async () => {
     // No session set
-    useSessionStore.setState({ session: null, loaded: true });
+    mockAuthContext.session = null;
     await expect(syncWorkouts()).rejects.toThrow("Not logged in");
   });
 

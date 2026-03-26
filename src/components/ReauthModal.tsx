@@ -1,43 +1,38 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogPanel } from "@headlessui/react";
-import { login } from "../lib/api";
-import { useReauthStore } from "../stores/reauthStore";
-import { useSessionStore } from "../stores/sessionStore";
+import {
+  authActor,
+  useAuthSelector,
+  selectIsAwaitingReauth,
+  selectIsReauthing,
+  selectReauthError,
+  selectSession,
+} from "../machines/authMachine";
 
 export default function ReauthModal() {
-  const pending = useReauthStore((s) => s.pending);
-  const resolveReauth = useReauthStore((s) => s.resolveReauth);
-  const rejectReauth = useReauthStore((s) => s.rejectReauth);
-  const updateCredentials = useSessionStore((s) => s.updateCredentials);
+  const open = useAuthSelector(selectIsAwaitingReauth);
+  const loading = useAuthSelector(selectIsReauthing);
+  const error = useAuthSelector(selectReauthError);
+  const email = useAuthSelector((snap) => selectSession(snap)?.email ?? "");
 
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!pending) return;
-    setError("");
-    setLoading(true);
-    try {
-      const result = await login(pending.email, password);
-      await updateCredentials(result.accessToken, password);
-      resolveReauth(result);
-      setPassword("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Login failed");
-    } finally {
-      setLoading(false);
-    }
+  // Reset password when modal opens
+  useEffect(() => {
+    if (open) setPassword("");
+  }, [open]);
+
+  const handleSubmit = () => {
+    authActor.send({ type: "REAUTH_SUBMIT", password });
   };
 
   const handleDismiss = () => {
     setPassword("");
-    setError("");
-    rejectReauth(new Error("Re-authentication dismissed"));
+    authActor.send({ type: "REAUTH_DISMISS" });
   };
 
   return (
-    <Dialog open={pending !== null} onClose={handleDismiss} className="relative z-50">
+    <Dialog open={open} onClose={handleDismiss} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <DialogPanel className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
@@ -54,7 +49,7 @@ export default function ReauthModal() {
           >
             <input
               type="email"
-              value={pending?.email ?? ""}
+              value={email}
               disabled
               className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-500"
             />

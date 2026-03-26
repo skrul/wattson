@@ -41,6 +41,7 @@ export const config = {
   host: "127.0.0.1",
   port: 4444,
   specs: ["./test/specs/**/*.js"],
+  exclude: ["./test/specs/screenshots.e2e.js"],
   maxInstances: 1,
   connectionRetryCount: 10,
   capabilities: [

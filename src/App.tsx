@@ -7,11 +7,11 @@ import StudioTab from "./components/StudioTab";
 import SetupWizard from "./components/SetupWizard";
 import ReauthModal from "./components/ReauthModal";
 import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
-import { syncWorkouts } from "./lib/sync";
 import { getUserProfile, hasWorkouts } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
 import { useAuthSelector, selectSession, selectIsLoaded } from "./machines/authMachine";
 import { enrichmentActor, useEnrichmentSelector } from "./machines/enrichmentMachine";
+import { syncActor, useSyncSelector, selectIsSyncing, selectSyncProgress } from "./machines/syncMachine";
 import { useNavigationStore, isDashboardTab, makeDashboardTab } from "./stores/navigationStore";
 import { useShareChartStore } from "./stores/shareChartStore";
 import { useDashboardRegistryStore } from "./stores/dashboardRegistryStore";
@@ -29,8 +29,8 @@ function App() {
   const loaded = useAuthSelector(selectIsLoaded);
   const session = useAuthSelector(selectSession);
   const userProfile = useSessionStore((s) => s.userProfile);
-  const isSyncing = useSessionStore((s) => s.isSyncing);
-  const syncProgress = useSessionStore((s) => s.syncProgress);
+  const isSyncing = useSyncSelector(selectIsSyncing);
+  const syncProgress = useSyncSelector(selectSyncProgress);
   const backfillStatus = useEnrichmentSelector((snap) => snap.value);
   const enrichedCount = useEnrichmentSelector((snap) => snap.context.enrichedCount);
   const totalCount = useEnrichmentSelector((snap) => snap.context.totalCount);
@@ -80,7 +80,7 @@ function App() {
           const pref = localStorage.getItem(STORAGE_KEYS.autoSyncOnLaunch);
           if (pref !== "false") {
             autoSyncRan.current = true;
-            syncWorkouts().catch(() => {});
+            syncActor.send({ type: "SYNC" });
           }
         }
       }).catch(() => {});
@@ -178,7 +178,7 @@ function App() {
             return (
               <button
                 onClick={() => {
-                  if (!isActive) syncWorkouts().catch(() => {});
+                  if (!isActive) syncActor.send({ type: "SYNC" });
                 }}
                 className={`flex items-center gap-1.5 rounded-full bg-gray-100 text-gray-400 hover:text-gray-600 ${
                   progressText ? "py-1 pl-1.5 pr-2.5" : "p-1.5"

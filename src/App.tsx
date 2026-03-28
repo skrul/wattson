@@ -6,6 +6,7 @@ import DashboardTab from "./components/DashboardTab";
 import StudioTab from "./components/StudioTab";
 import SetupWizard from "./components/SetupWizard";
 import ReauthModal from "./components/ReauthModal";
+import DebugPanel from "./components/DebugPanel";
 import { checkForUpdate, installUpdate, UpdateStatus } from "./lib/updater";
 import { getUserProfile, hasWorkouts } from "./lib/database";
 import { useSessionStore } from "./stores/sessionStore";
@@ -255,6 +256,7 @@ function App() {
 
       <SetupWizard open={showWizard} onComplete={() => { setShowWizard(false); setDataState("has_data"); }} />
       <ReauthModal />
+      <DebugPanel />
     </div>
   );
 }

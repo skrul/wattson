@@ -109,6 +109,7 @@ export const authMachine = setup({
       description: "No active session. Waiting for user to log in.",
       on: {
         LOGIN_SUCCESS: {
+          description: "User successfully authenticated with Peloton.",
           target: "loggedIn",
           actions: ["setSessionFromLogin", "persistKeychain"],
         },
@@ -120,13 +121,19 @@ export const authMachine = setup({
       initial: "idle",
       exit: "rejectDeferred",
       on: {
-        LOGOUT: "loggingOut",
+        LOGOUT: {
+          description: "User initiated sign out.",
+          target: "loggingOut",
+        },
       },
       states: {
         idle: {
           description: "Session is valid. Normal operation.",
           on: {
-            AUTH_FAILURE: "refreshing",
+            AUTH_FAILURE: {
+              description: "API returned 401; token may be expired.",
+              target: "refreshing",
+            },
           },
         },
 
@@ -152,10 +159,12 @@ export const authMachine = setup({
           description: "Silent refresh failed. Showing modal for user to re-enter password.",
           on: {
             REAUTH_SUBMIT: {
+              description: "User submitted new password in reauth modal.",
               target: "reauthing",
               actions: "clearReauthError",
             },
             REAUTH_DISMISS: {
+              description: "User dismissed the reauth modal without re-authenticating.",
               target: "idle",
               actions: "rejectDeferred",
             },

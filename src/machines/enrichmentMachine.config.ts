@@ -87,10 +87,12 @@ export const enrichmentMachine = setup({
   },
   on: {
     RESET: {
+      description: "Clear all enrichment state and reload counts from DB.",
       target: ".loadingCounts",
       actions: "resetContext",
     },
     REFRESH_COUNTS: {
+      description: "Update enriched/total counts (e.g. after sync inserts new workouts).",
       actions: "updateCounts",
     },
   },
@@ -119,7 +121,10 @@ export const enrichmentMachine = setup({
     paused: {
       description: "Backfill is not running. Waiting for user to start or for a sync to complete.",
       on: {
-        START: "running",
+        START: {
+          description: "Begin enrichment backfill.",
+          target: "running",
+        },
       },
     },
     running: {
@@ -129,21 +134,31 @@ export const enrichmentMachine = setup({
         input: ({ context }) => ({ skippedIds: context.skippedIds }),
       },
       on: {
-        PAUSE: "paused",
+        PAUSE: {
+          description: "User paused enrichment backfill.",
+          target: "paused",
+        },
         WORKOUT_ENRICHED: {
+          description: "One workout successfully enriched.",
           actions: "incrementEnriched",
         },
         WORKOUT_SKIPPED: {
+          description: "Workout enrichment failed; skipped for this run.",
           actions: "addSkippedId",
         },
         REFRESH_COUNTS: {
+          description: "Periodic reconciliation of counts from DB.",
           actions: "updateCounts",
         },
         ALL_DONE: {
+          description: "No more unenriched workouts remain.",
           target: "complete",
           actions: "bumpSyncGeneration",
         },
-        AUTH_ERROR: "paused",
+        AUTH_ERROR: {
+          description: "API auth failed during enrichment; pause until resolved.",
+          target: "paused",
+        },
       },
     },
     complete: {
@@ -151,15 +166,20 @@ export const enrichmentMachine = setup({
       on: {
         REFRESH_COUNTS: [
           {
+            description: "New unenriched workouts detected after sync; revert to paused.",
             guard: "hasUnenriched",
             target: "paused",
             actions: "updateCounts",
           },
           {
+            description: "Counts updated but still fully enriched.",
             actions: "updateCounts",
           },
         ],
-        START: "running",
+        START: {
+          description: "Force restart enrichment.",
+          target: "running",
+        },
       },
     },
   },

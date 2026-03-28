@@ -40,3 +40,4 @@ See `ChartFilterBar.tsx` `FilterChip` for the reference implementation combining
 ## Architecture Docs
 
 - **[Sync & Enrichment](docs/SYNC.md)** — Data flow from Peloton API through sync, enrichment backfill, and on-demand loading. Covers the state machine, store↔DB data gap, and key invariants.
+- **[State Machine Style Guide](docs/STATE_MACHINES.md)** — Conventions for authoring XState v5 machines: file structure, config/companion split, descriptions, error handling, and visualization.

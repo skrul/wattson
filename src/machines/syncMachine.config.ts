@@ -52,6 +52,7 @@ export const syncMachine = setup({
     }),
     setComplete: assign({
       newCount: ({ event }: any) => event.newCount as number,
+      progress: null as SyncContext["progress"],
     }),
     setAuthError: assign({
       error: "Authentication failed",
@@ -70,6 +71,7 @@ export const syncMachine = setup({
   },
   on: {
     RESET: {
+      description: "Clear sync state and return to idle.",
       target: ".idle",
       actions: "resetContext",
     },
@@ -79,6 +81,7 @@ export const syncMachine = setup({
       description: "No sync in progress. Waiting for user or auto-sync to trigger.",
       on: {
         SYNC: {
+          description: "Start syncing workouts from Peloton.",
           target: "syncing",
           actions: "clearForSync",
         },
@@ -91,17 +94,21 @@ export const syncMachine = setup({
       },
       on: {
         PROGRESS: {
+          description: "Workout fetch progress update from worker.",
           actions: "setProgress",
         },
         COMPLETE: {
+          description: "All workouts fetched and processed successfully.",
           target: "done",
           actions: "setComplete",
         },
         AUTH_ERROR: {
+          description: "Authentication failed after retry attempt.",
           target: "error",
           actions: "setAuthError",
         },
         SYNC_ERROR: {
+          description: "Unrecoverable error during sync.",
           target: "error",
           actions: "setSyncError",
         },
@@ -111,10 +118,12 @@ export const syncMachine = setup({
       description: "Sync completed. Persists newCount for UI display until next sync or reset.",
       on: {
         SYNC: {
+          description: "Re-sync to check for new workouts.",
           target: "syncing",
           actions: "clearForSync",
         },
         RESET: {
+          description: "Clear sync results and return to idle.",
           target: "idle",
           actions: "resetContext",
         },
@@ -124,10 +133,12 @@ export const syncMachine = setup({
       description: "Sync failed. User can retry or reset.",
       on: {
         SYNC: {
+          description: "Retry sync after failure.",
           target: "syncing",
           actions: "clearForSync",
         },
         RESET: {
+          description: "Clear error and return to idle.",
           target: "idle",
           actions: "resetContext",
         },

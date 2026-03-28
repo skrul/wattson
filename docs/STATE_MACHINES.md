@@ -191,3 +191,25 @@ fromCallback<FooEvent>(({ sendBack }) => {
 | Auth | `authMachine.config.ts` | `authMachine.ts` | Login, session management, token refresh, reauth |
 | Enrichment | `enrichmentMachine.config.ts` | `enrichmentMachine.ts` | Background workout detail backfill |
 | Sync | `syncMachine.config.ts` | `syncMachine.ts` | Workout sync from Peloton API |
+
+## Diagrams
+
+Diagrams are exported from the [Stately editor](https://stately.ai/editor) and stored as PNGs. To regenerate:
+
+1. Copy the contents of the `.config.ts` file into the Stately editor
+2. Export as PNG
+3. Save to `docs/machines/` with the name shown below
+
+Run `./scripts/check-machine-diagrams.sh` to see which diagrams are stale.
+
+### Auth Machine
+
+![Auth state machine](machines/auth-machine.png)
+
+### Sync Machine
+
+![Sync state machine](machines/sync-machine.png)
+
+### Enrichment Machine
+
+![Enrichment state machine](machines/enrichment-machine.png)

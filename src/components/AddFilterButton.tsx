@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { FIELD_DEFS } from "../lib/fields";
 import { useWorkoutStore } from "../stores/workoutStore";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { useEnrichmentSelector, selectEnrichmentComplete } from "../machines/enrichmentMachine";
 import type { FilterCondition } from "../types";
 
 export default function AddFilterButton({
@@ -11,7 +11,7 @@ export default function AddFilterButton({
   onFilterCreated: (id: string) => void;
 }) {
   const { addCondition } = useWorkoutStore();
-  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
+  const enrichmentComplete = useEnrichmentSelector(selectEnrichmentComplete);
   const [search, setSearch] = useState("");
 
   const filterableFields = FIELD_DEFS.filter((f) => f.filterable);

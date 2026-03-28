@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { queryWorkouts } from "../lib/database";
 import { useWorkoutStore } from "../stores/workoutStore";
-import { useSessionStore } from "../stores/sessionStore";
+import { useAuthSelector, selectSession } from "../machines/authMachine";
 import { useNavigationStore, isDashboardTab, dashboardTabId } from "../stores/navigationStore";
 import { useDashboardRegistryStore } from "../stores/dashboardRegistryStore";
 import { isConditionActive } from "./FilterEditors";
@@ -14,7 +14,7 @@ import type { Workout } from "../types";
 /** Filterable list of all imported workouts with detail panel. */
 export default function WorkoutList() {
   const { workouts, selectedWorkoutId, filters, setWorkouts, selectWorkout, isLoading, setLoading } = useWorkoutStore();
-  const accessToken = useSessionStore((s) => s.session?.accessToken ?? null);
+  const accessToken = useAuthSelector((snap) => selectSession(snap)?.accessToken ?? null);
   const cardScrollRef = useRef<HTMLDivElement>(null);
   const prevSortRef = useRef(filters.sort);
   const navSelectedRef = useRef(false);

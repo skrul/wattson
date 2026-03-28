@@ -1,14 +1,14 @@
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { FIELD_DEFS, FIELD_MAP } from "../lib/fields";
 import { useWorkoutStore } from "../stores/workoutStore";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { useEnrichmentSelector, selectEnrichmentComplete } from "../machines/enrichmentMachine";
 
 export default function SortChip() {
   const { filters, setSort, clearSort } = useWorkoutStore();
   const sort = filters.sort;
   const field = FIELD_MAP[sort.field];
   const arrow = sort.direction === "asc" ? "↑" : "↓";
-  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
+  const enrichmentComplete = useEnrichmentSelector(selectEnrichmentComplete);
   const sortableFields = FIELD_DEFS.filter((f) => f.sortable);
 
   return (

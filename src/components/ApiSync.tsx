@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Dialog, DialogPanel } from "@headlessui/react";
 import { login } from "../lib/api";
-import { syncWorkouts } from "../lib/sync";
 import { deleteAllData } from "../lib/database";
 import { clearCache } from "../lib/enrichmentCache";
 import { useWorkoutStore } from "../stores/workoutStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { authActor, useAuthSelector, selectSession } from "../machines/authMachine";
+import { enrichmentActor, useEnrichmentSelector } from "../machines/enrichmentMachine";
+import { syncActor, useSyncSelector, selectIsSyncing, selectSyncProgress, selectSyncError, selectSyncNewCount, selectSyncDone } from "../machines/syncMachine";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 
 interface Props {
@@ -33,85 +34,64 @@ export default function ApiSync({ onDataDeleted }: Props) {
   const [email, setEmail] = useState(() => localStorage.getItem(STORAGE_KEYS.lastEmail) ?? "");
   const [password, setPassword] = useState("");
   const savedEmail = localStorage.getItem(STORAGE_KEYS.lastEmail);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
+  const [loginError, setLoginError] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [cacheStatus, setCacheStatus] = useState("");
   const [autoSync, setAutoSync] = useState(() => localStorage.getItem(STORAGE_KEYS.autoSyncOnLaunch) !== "false");
 
-  const session = useSessionStore((s) => s.session);
+  const session = useAuthSelector(selectSession);
   const userProfile = useSessionStore((s) => s.userProfile);
-  const sessionLogin = useSessionStore((s) => s.login);
-  const sessionLogout = useSessionStore((s) => s.logout);
-  const isSyncing = useSessionStore((s) => s.isSyncing);
-  const progress = useSessionStore((s) => s.syncProgress);
   const setWorkouts = useWorkoutStore((s) => s.setWorkouts);
 
-  const countsLoaded = useEnrichmentStore((s) => s.countsLoaded);
-  const backfillStatus = useEnrichmentStore((s) => s.backfillStatus);
-  const enrichedCount = useEnrichmentStore((s) => s.enrichedCount);
-  const totalCount = useEnrichmentStore((s) => s.totalCount);
-  const startBackfill = useEnrichmentStore((s) => s.startBackfill);
-  const pauseBackfill = useEnrichmentStore((s) => s.pauseBackfill);
-  const resetEnrichment = useEnrichmentStore((s) => s.reset);
+  const isSyncing = useSyncSelector(selectIsSyncing);
+  const progress = useSyncSelector(selectSyncProgress);
+  const syncError = useSyncSelector(selectSyncError);
+  const syncNewCount = useSyncSelector(selectSyncNewCount);
+  const syncDone = useSyncSelector(selectSyncDone);
+
+  const countsLoaded = useEnrichmentSelector((snap) => snap.context.countsLoaded);
+  const backfillStatus = useEnrichmentSelector((snap) => snap.value);
+  const enrichedCount = useEnrichmentSelector((snap) => snap.context.enrichedCount);
+  const totalCount = useEnrichmentSelector((snap) => snap.context.totalCount);
 
 
   const handleLogin = async () => {
-    setError("");
-    setStatus("");
+    setLoginError("");
     setLoading(true);
     try {
       const result = await login(email, password);
-      await sessionLogin({ ...result, email, password });
+      authActor.send({ type: "LOGIN_SUCCESS", session: { ...result, email, password } });
       localStorage.setItem(STORAGE_KEYS.lastEmail, email);
       setPassword("");
-      setStatus("Logged in successfully.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Login failed");
+      setLoginError(e instanceof Error ? e.message : "Login failed");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSync = async () => {
-    if (!session) return;
-    setError("");
-    setStatus("Fetching workouts...");
-    setLoading(true);
-    try {
-      const count = await syncWorkouts();
-      if (count === 0) {
-        setStatus("Already up to date.");
-      } else {
-        setStatus(`Synced ${count} new workouts.`);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setStatus("");
-    } finally {
-      setLoading(false);
-    }
+  const handleSync = () => {
+    syncActor.send({ type: "SYNC" });
   };
 
-  const handleSignOut = async () => {
-    await sessionLogout();
-    setStatus("");
-    setError("");
+  const handleSignOut = () => {
+    authActor.send({ type: "LOGOUT" });
+    setLoginError("");
   };
 
   const handleReset = async () => {
     setConfirmResetOpen(false);
-    resetEnrichment();
+    syncActor.send({ type: "RESET" });
+    enrichmentActor.send({ type: "RESET" });
     await deleteAllData();
     setWorkouts([]);
     useWorkoutStore.getState().notifySync();
     localStorage.removeItem(STORAGE_KEYS.lastEmail);
     setEmail("");
     onDataDeleted();
-    await sessionLogout();
-    setStatus("");
-    setError("");
+    authActor.send({ type: "LOGOUT" });
+    setLoginError("");
   };
 
   const handleClearCache = async () => {
@@ -156,8 +136,7 @@ export default function ApiSync({ onDataDeleted }: Props) {
             {loading ? "Logging in..." : "Log In"}
           </button>
         </form>
-        {status && <p className="mt-3 text-sm text-green-600">{status}</p>}
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        {loginError && <p className="mt-3 text-sm text-red-600">{loginError}</p>}
       </div>
     );
   }
@@ -234,22 +213,23 @@ export default function ApiSync({ onDataDeleted }: Props) {
               Fetching workouts... {progress.fetched} / {progress.total}
             </p>
           )}
-          {!status && isSyncing && !progress && <p className="text-xs text-gray-500">Checking for new workouts...</p>}
-          {status && <p className="text-xs text-green-600">{status}</p>}
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {isSyncing && !progress && <p className="text-xs text-gray-500">Checking for new workouts...</p>}
+          {syncDone && syncNewCount > 0 && <p className="text-xs text-green-600">Synced {syncNewCount} new workouts.</p>}
+          {syncDone && syncNewCount === 0 && <p className="text-xs text-green-600">Already up to date.</p>}
+          {syncError && <p className="text-xs text-red-600">{syncError}</p>}
 
           {/* Button row */}
           <div className="flex items-center gap-2">
             <button
               onClick={handleSync}
-              disabled={loading || isSyncing}
+              disabled={isSyncing}
               className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
             >
-              {loading || isSyncing ? "Syncing..." : "Sync Now"}
+              {isSyncing ? "Syncing..." : "Sync Now"}
             </button>
             {backfillStatus !== "complete" && (
               <button
-                onClick={() => backfillStatus === "running" ? pauseBackfill() : startBackfill()}
+                onClick={() => backfillStatus === "running" ? enrichmentActor.send({ type: "PAUSE" }) : enrichmentActor.send({ type: "START" })}
                 className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
                 {backfillStatus === "running" ? "Pause" : "Resume"}

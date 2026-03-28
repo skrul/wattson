@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogPanel } from "@headlessui/react";
-import { login, fetchAllWorkouts, fetchUserProfile } from "../lib/api";
-import { insertWorkouts, getExistingWorkoutIds, queryWorkouts, upsertUserProfile } from "../lib/database";
-import { useWorkoutStore } from "../stores/workoutStore";
-import { useSessionStore } from "../stores/sessionStore";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { login } from "../lib/api";
+import { authActor } from "../machines/authMachine";
+import { syncActor, useSyncSelector, selectSyncProgress, selectSyncDone, selectSyncError, selectSyncNewCount } from "../machines/syncMachine";
 import { STORAGE_KEYS } from "../lib/storageKeys";
 
 interface Props {
@@ -20,12 +18,13 @@ export default function SetupWizard({ open, onComplete }: Props) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState<{ fetched: number; total: number } | null>(null);
   const [syncedCount, setSyncedCount] = useState(0);
   const [autoSync, setAutoSync] = useState(true);
 
-  const sessionLogin = useSessionStore((s) => s.login);
-  const { filters, setWorkouts } = useWorkoutStore();
+  const progress = useSyncSelector(selectSyncProgress);
+  const syncDone = useSyncSelector(selectSyncDone);
+  const syncError = useSyncSelector(selectSyncError);
+  const syncNewCount = useSyncSelector(selectSyncNewCount);
 
   // Reset wizard state when re-opened
   useEffect(() => {
@@ -35,84 +34,45 @@ export default function SetupWizard({ open, onComplete }: Props) {
       setPassword("");
       setError("");
       setLoading(false);
-      setProgress(null);
       setSyncedCount(0);
       setAutoSync(true);
+      syncActor.send({ type: "RESET" });
     }
   }, [open]);
+
+  // Advance to success when sync completes
+  useEffect(() => {
+    if (step === "downloading" && syncDone) {
+      setSyncedCount(syncNewCount);
+      setStep("success");
+    }
+  }, [step, syncDone, syncNewCount]);
+
+  // Show error when sync fails
+  useEffect(() => {
+    if (step === "downloading" && syncError) {
+      setError(syncError);
+    }
+  }, [step, syncError]);
 
   const handleLogin = async () => {
     setError("");
     setLoading(true);
     try {
       const result = await login(email, password);
-      await sessionLogin({ ...result, email, password });
+      authActor.send({ type: "LOGIN_SUCCESS", session: { ...result, email, password } });
       localStorage.setItem(STORAGE_KEYS.lastEmail, email);
       setStep("downloading");
-      startSync(result.userId, result.accessToken);
+      syncActor.send({ type: "SYNC" });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Login failed");
       setLoading(false);
     }
   };
 
-  const startSync = async (userId: string, accessToken: string) => {
-    setError("");
-    setLoading(true);
-    setProgress(null);
-    try {
-      // Fetch profile first to get total_workouts for accurate progress
-      let knownTotal: number | undefined;
-      try {
-        const profile = await fetchUserProfile(accessToken);
-        knownTotal = profile.total_workouts ?? undefined;
-      } catch {
-        // Non-fatal: sync will proceed without progress total
-      }
-
-      const existingIds = await getExistingWorkoutIds();
-      const workouts = await fetchAllWorkouts(
-        userId,
-        accessToken,
-        (fetched, total) => setProgress({ fetched, total }),
-        existingIds,
-        knownTotal,
-      );
-      if (workouts.length > 0) {
-        await insertWorkouts(workouts);
-      }
-      await useEnrichmentStore.getState().refreshCounts();
-
-      const updated = await queryWorkouts(filters);
-      setWorkouts(updated);
-      useWorkoutStore.getState().notifySync();
-
-      // Fetch and cache user profile
-      try {
-        const profile = await fetchUserProfile(accessToken);
-        await upsertUserProfile(profile);
-        useSessionStore.getState().setUserProfile(profile);
-      } catch {
-        // Non-fatal: profile will be fetched on next sync
-      }
-
-      // Kick off enrichment backfill for unenriched workouts
-      useEnrichmentStore.getState().ensureRunning();
-
-      setSyncedCount(workouts.length);
-      setStep("success");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Sync failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleRetry = () => {
-    const session = useSessionStore.getState().session;
-    if (session) {
-      startSync(session.userId, session.accessToken);
-    }
+    setError("");
+    syncActor.send({ type: "SYNC" });
   };
 
   const handleComplete = () => {

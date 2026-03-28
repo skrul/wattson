@@ -8,7 +8,7 @@ import {
   type TopWorkoutFilters,
 } from "../lib/database";
 import { useNavigationStore } from "../stores/navigationStore";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { useEnrichmentSelector, selectEnrichmentComplete } from "../machines/enrichmentMachine";
 import WorkoutCard from "./WorkoutCard";
 import type { Workout, FilterCondition } from "../types";
 
@@ -77,7 +77,7 @@ export default function PersonalRecords({ refreshKey }: { refreshKey: number }) 
   const [cards, setCards] = useState<CardData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
+  const enrichmentComplete = useEnrichmentSelector(selectEnrichmentComplete);
 
   useEffect(() => {
     let cancelled = false;

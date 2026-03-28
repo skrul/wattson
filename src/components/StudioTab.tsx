@@ -8,6 +8,7 @@ import { renderExportPng, resolveBackgroundImageSrc } from "../lib/exportUtils";
 import { cachedFetchWorkoutDetail, cachedFetchPerformanceGraph, cachedFetchRideDetails } from "../lib/enrichmentCache";
 import { updateWorkoutMetrics, updateWorkoutDetail, updateRideDetails } from "../lib/database";
 import { useShareChartStore, resolveDisplayName } from "../stores/shareChartStore";
+import { useAuthSelector, selectSession } from "../machines/authMachine";
 import { useSessionStore } from "../stores/sessionStore";
 import { useWorkoutStore } from "../stores/workoutStore";
 import ShareMenu from "./ShareMenu";
@@ -116,7 +117,7 @@ export default function StudioTab() {
   const [renameValue, setRenameValue] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
   const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
-  const session = useSessionStore((s) => s.session);
+  const session = useAuthSelector(selectSession);
   const userProfile = useSessionStore((s) => s.userProfile);
 
   const pelotonUsername = useMemo(() => {

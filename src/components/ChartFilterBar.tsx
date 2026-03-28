@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { FIELD_DEFS, FIELD_MAP, OPERATOR_LABELS } from "../lib/fields";
-import { useEnrichmentStore } from "../stores/enrichmentStore";
+import { useEnrichmentSelector, selectEnrichmentComplete } from "../machines/enrichmentMachine";
 import type { FilterCondition } from "../types";
 import {
   isConditionActive,
@@ -196,7 +196,7 @@ export function FilterBar({
   onUpdate: (id: string, updates: Partial<FilterCondition>) => void;
   onRemove: (id: string) => void;
 }) {
-  const enrichmentComplete = useEnrichmentStore((s) => s.enrichmentComplete);
+  const enrichmentComplete = useEnrichmentSelector(selectEnrichmentComplete);
   const [search, setSearch] = useState("");
   const [newFilterId, setNewFilterId] = useState<string | null>(null);
 

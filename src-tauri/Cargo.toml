@@ -25,3 +25,8 @@ keyring = { version = "3", features = ["apple-native"] }
 tauri-plugin-dialog = "2.6.0"
 tauri-plugin-fs = "2.4.5"
 tauri-plugin-webdriver-automation = "0.1"
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+[[bin]]
+name = "schema-export"
+path = "src/bin/schema_export.rs"

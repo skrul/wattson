@@ -1,11 +1,11 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import type { Workout } from "../types";
 import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, isPowerZoneRide } from "../lib/charts";
 import { resolveBackgroundImageSrc } from "../lib/exportUtils";
 import { useShareChartStore, resolveDisplayName } from "../stores/shareChartStore";
 import { useSessionStore } from "../stores/sessionStore";
-import ExportButton from "./ExportButton";
 import ChartCard from "./ChartCard";
+import ShareModal from "./ShareModal";
 
 interface RideDetailChartProps {
   workout: Workout;
@@ -13,22 +13,9 @@ interface RideDetailChartProps {
 }
 
 export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) {
-  const styles = useShareChartStore((s) => s.styles);
-  const activeStyleId = useShareChartStore((s) => s.activeStyleId);
+  const settings = useShareChartStore((s) => s.settings);
   const userProfile = useSessionStore((s) => s.userProfile);
-
-  const [selectedStyleId, setSelectedStyleId] = useState(activeStyleId);
-
-  // Sync when activeStyleId changes externally (e.g. edited in Studio)
-  useEffect(() => {
-    setSelectedStyleId(activeStyleId);
-  }, [activeStyleId]);
-
-  const selectedStyle = useMemo(
-    () => styles.find((s) => s.id === selectedStyleId) ?? styles[0],
-    [styles, selectedStyleId],
-  );
-  const settings = selectedStyle.settings;
+  const [shareOpen, setShareOpen] = useState(false);
 
   const pelotonUsername = useMemo(() => {
     if (!userProfile?.raw_json) return null;
@@ -57,35 +44,21 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
 
   if (!timeSeries) return null;
 
-  const filename = `${workout.title?.replace(/[^a-zA-Z0-9]/g, "-") ?? "workout"}-${workout.id.slice(0, 8)}`;
-
   return (
     <div className="mt-6">
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-gray-700">Shareable Chart</h3>
-          {styles.length > 1 && (
-            <select
-              value={selectedStyleId}
-              onChange={(e) => setSelectedStyleId(e.target.value)}
-              className="rounded border border-gray-300 px-1.5 py-0.5 text-xs"
-            >
-              {styles.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          )}
-        </div>
-        <ExportButton
-          filename={filename}
-          workout={workout}
-          ftp={ftp}
-          timeSeries={timeSeries}
-          cues={cues}
-          displayName={displayName}
-          settings={settings}
-          backgroundImageSrc={backgroundImageSrc}
-        />
+        <h3 className="text-sm font-semibold text-gray-700">Shareable Chart</h3>
+        <button
+          onClick={() => setShareOpen(true)}
+          className="rounded bg-gray-100 p-1.5 text-gray-600 hover:bg-gray-200"
+          title="Share"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 8V13C4 13.5523 4.44772 14 5 14H11C11.5523 14 12 13.5523 12 13V8" />
+            <path d="M8 2V10" />
+            <path d="M5 5L8 2L11 5" />
+          </svg>
+        </button>
       </div>
 
       <ChartCard
@@ -98,6 +71,17 @@ export default function RideDetailChart({ workout, ftp }: RideDetailChartProps) 
         isPZ={isPZ}
         backgroundImageSrc={backgroundImageSrc}
       />
+
+      {shareOpen && (
+        <ShareModal
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          workout={workout}
+          ftp={ftp}
+          timeSeries={timeSeries}
+          cues={cues}
+        />
+      )}
     </div>
   );
 }

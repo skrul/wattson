@@ -95,6 +95,39 @@ export const PADDING = 32;
 export const CHART_WIDTH = EXPORT_WIDTH - PADDING * 2;
 export const CHART_HEIGHT = 400;
 
+export type AspectRatioPreset = "16:9" | "1:1" | "4:5";
+
+const ASPECT_RATIOS: Record<AspectRatioPreset, number> = {
+  "16:9": 16 / 9,
+  "1:1": 1,
+  "4:5": 4 / 5,
+};
+
+export interface ExportDimensions {
+  exportWidth: number;
+  totalHeight: number;
+  chartWidth: number;
+  chartHeight: number;
+  headerHeight: number;
+  footerHeight: number;
+  padding: number;
+}
+
+export function computeExportDimensions(
+  aspectRatio: AspectRatioPreset,
+  showHeader: boolean,
+  hasStats: boolean,
+): ExportDimensions {
+  const exportWidth = EXPORT_WIDTH;
+  const padding = PADDING;
+  const chartWidth = exportWidth - padding * 2;
+  const totalHeight = Math.round(exportWidth / ASPECT_RATIOS[aspectRatio]);
+  const headerHeight = showHeader ? 60 : 0;
+  const footerHeight = hasStats ? 60 : 0;
+  const chartHeight = totalHeight - padding * 2 - headerHeight - footerHeight;
+  return { exportWidth, totalHeight, chartWidth, chartHeight, headerHeight, footerHeight, padding };
+}
+
 export function formatExportDate(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleDateString("en-US", {
     weekday: "short",
@@ -130,26 +163,13 @@ export async function renderExportPng(
   settings?: ShareChartSettings,
   displayName?: string | null,
   backgroundImageSrc?: string | null,
+  aspectRatio?: AspectRatioPreset,
 ): Promise<Blob> {
   // Render chart SVG at export width
   const isPZ = isPowerZoneRide(workout);
   const isDark = (settings?.backgroundImage ?? "none") !== "none";
-  const chartEl = renderRideDetailChart(timeSeries, ftp || null, {
-    width: CHART_WIDTH,
-    height: CHART_HEIGHT,
-    durationSeconds: workout.duration_seconds ?? undefined,
-    overlays: settings?.overlays,
-    overlayColors: settings?.overlayColors,
-    cueColor: settings?.cueColor,
-    showZoneBands: (settings?.zoneBands ?? "pz-only") === "always" || ((settings?.zoneBands ?? "pz-only") === "pz-only" && isPZ),
-    zoneBandOpacity: settings?.zoneBandOpacity,
-    showInstructorCues: settings?.showInstructorCues,
-    showYAxis: settings?.showYAxis,
-    darkBackground: isDark,
-  }, cues);
-  const chartImg = await svgToImage(chartEl);
 
-  // Build stats list, filtered by settings
+  // Build stats list first so we know if footer is needed for dimension computation
   const stats: [string, string][] = [];
   const s = settings?.stats;
   if ((s?.avgPower ?? true) && workout.avg_output != null) stats.push(["Avg Power", `${workout.avg_output} w`]);
@@ -165,10 +185,37 @@ export async function renderExportPng(
 
   const showHeader = settings?.showHeader !== false;
 
-  // Layout measurements
-  const headerHeight = showHeader ? 60 : 0;
-  const footerHeight = stats.length > 0 ? 60 : 0;
-  const totalHeight = PADDING + headerHeight + CHART_HEIGHT + footerHeight + PADDING;
+  // Layout measurements — use aspect ratio if provided, otherwise legacy layout
+  let headerHeight: number, footerHeight: number, totalHeight: number, chartW: number, chartH: number;
+  if (aspectRatio) {
+    const dims = computeExportDimensions(aspectRatio, showHeader, stats.length > 0);
+    headerHeight = dims.headerHeight;
+    footerHeight = dims.footerHeight;
+    totalHeight = dims.totalHeight;
+    chartW = dims.chartWidth;
+    chartH = dims.chartHeight;
+  } else {
+    headerHeight = showHeader ? 60 : 0;
+    footerHeight = stats.length > 0 ? 60 : 0;
+    totalHeight = PADDING + headerHeight + CHART_HEIGHT + footerHeight + PADDING;
+    chartW = CHART_WIDTH;
+    chartH = CHART_HEIGHT;
+  }
+
+  const chartEl = renderRideDetailChart(timeSeries, ftp || null, {
+    width: chartW,
+    height: chartH,
+    durationSeconds: workout.duration_seconds ?? undefined,
+    overlays: settings?.overlays,
+    overlayColors: settings?.overlayColors,
+    cueColor: settings?.cueColor,
+    showZoneBands: (settings?.zoneBands ?? "pz-only") === "always" || ((settings?.zoneBands ?? "pz-only") === "pz-only" && isPZ),
+    zoneBandOpacity: settings?.zoneBandOpacity,
+    showInstructorCues: settings?.showInstructorCues,
+    showYAxis: settings?.showYAxis,
+    darkBackground: isDark,
+  }, cues);
+  const chartImg = await svgToImage(chartEl);
 
   const canvas = document.createElement("canvas");
   canvas.width = EXPORT_WIDTH * SCALE;
@@ -230,12 +277,22 @@ export async function renderExportPng(
     ctx.fillText(formatExportDateTime(workout.date), EXPORT_WIDTH - PADDING, y + 40);
     ctx.textAlign = "start";
 
-    // Subtitle: instructor + date
+    // Subtitle: instructor + class air date
     ctx.fillStyle = subtitleColor;
     ctx.font = "13px system-ui, -apple-system, sans-serif";
+    let classDate: string | null = null;
+    if (workout.raw_ride_details_json) {
+      try {
+        const rd = JSON.parse(workout.raw_ride_details_json);
+        const airTime = rd.ride?.original_air_time;
+        if (typeof airTime === "number" && airTime > 0) {
+          classDate = formatExportDate(airTime);
+        }
+      } catch { /* ignore */ }
+    }
     const subtitle = [
       workout.instructor,
-      formatExportDate(workout.date),
+      classDate ?? formatExportDate(workout.date),
     ].filter(Boolean).join(" \u00B7 ");
     ctx.fillText(subtitle, PADDING, y + 40);
 
@@ -243,9 +300,9 @@ export async function renderExportPng(
   }
 
   // Chart SVG image
-  ctx.drawImage(chartImg, PADDING, y, CHART_WIDTH, CHART_HEIGHT);
+  ctx.drawImage(chartImg, PADDING, y, chartW, chartH);
 
-  y += CHART_HEIGHT;
+  y += chartH;
 
   // Footer stats
   if (stats.length > 0) {
@@ -257,7 +314,7 @@ export async function renderExportPng(
     ctx.lineTo(EXPORT_WIDTH - PADDING, y + 12);
     ctx.stroke();
 
-    const statWidth = CHART_WIDTH / stats.length;
+    const statWidth = chartW / stats.length;
     for (let i = 0; i < stats.length; i++) {
       const [label, value] = stats[i];
       const cx = PADDING + statWidth * i + statWidth / 2;

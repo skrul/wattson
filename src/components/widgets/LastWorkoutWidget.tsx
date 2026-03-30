@@ -4,14 +4,12 @@ import type { DashboardWidget, Workout, FilterCondition } from "../../types";
 import { queryWorkouts, getDb } from "../../lib/database";
 import { isConditionActive } from "../FilterEditors";
 import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, isPowerZoneRide } from "../../lib/charts";
-import { renderExportPng, resolveBackgroundImageSrc } from "../../lib/exportUtils";
+import { resolveBackgroundImageSrc } from "../../lib/exportUtils";
 import { useShareChartStore, resolveDisplayName } from "../../stores/shareChartStore";
 import { useSessionStore } from "../../stores/sessionStore";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
 import { useWorkoutStore } from "../../stores/workoutStore";
 import ChartCard from "../ChartCard";
-import ShareMenu from "../ShareMenu";
+import ShareModal from "../ShareModal";
 import { useWidgetToolbarSlot } from "./WidgetToolbarContext";
 
 interface Props {
@@ -23,6 +21,7 @@ interface Props {
 export default function LastWorkoutWidget({ widget, preview }: Props) {
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(true);
+  const [shareOpen, setShareOpen] = useState(false);
   const toolbarSlotRef = useWidgetToolbarSlot();
   const syncGeneration = useWorkoutStore((s) => s.syncGeneration);
 
@@ -97,30 +96,6 @@ export default function LastWorkoutWidget({ widget, preview }: Props) {
     [settings, workout?.raw_ride_details_json],
   );
 
-  const filename = workout
-    ? `${workout.title?.replace(/[^a-zA-Z0-9]/g, "-") ?? "workout"}-${workout.id.slice(0, 8)}`
-    : "chart";
-
-  const handleCopy = useCallback(async () => {
-    if (!workout || !timeSeries) return;
-    const blobPromise = renderExportPng(workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc);
-    await navigator.clipboard.write([
-      new ClipboardItem({ "image/png": blobPromise }),
-    ]);
-  }, [workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc]);
-
-  const handleSave = useCallback(async () => {
-    if (!workout || !timeSeries) return;
-    const filePath = await save({
-      defaultPath: `${filename}.png`,
-      filters: [{ name: "PNG Image", extensions: ["png"] }],
-    });
-    if (!filePath) return;
-    const blob = await renderExportPng(workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc);
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    await writeFile(filePath, bytes);
-  }, [workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc, filename]);
-
   if (loading) {
     return <div className="flex h-full items-center justify-center text-sm text-gray-400">Loading...</div>;
   }
@@ -133,9 +108,23 @@ export default function LastWorkoutWidget({ widget, preview }: Props) {
     return <div className="flex h-full items-center justify-center text-sm text-gray-400">No performance data</div>;
   }
 
+  const shareButton = (
+    <button
+      onClick={() => setShareOpen(true)}
+      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+      title="Share"
+    >
+      <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 8V13C4 13.5523 4.44772 14 5 14H11C11.5523 14 12 13.5523 12 13V8" />
+        <path d="M8 2V10" />
+        <path d="M5 5L8 2L11 5" />
+      </svg>
+    </button>
+  );
+
   return (
     <div className="flex h-full flex-col">
-      {title && <div className="shrink-0 truncate text-sm font-medium text-gray-700">{title}</div>}
+      {title && <div className="mb-2 shrink-0 truncate text-sm font-medium text-gray-700">{title}</div>}
       <div className="min-h-0 flex-1">
         <ChartCard
           workout={workout}
@@ -151,9 +140,16 @@ export default function LastWorkoutWidget({ widget, preview }: Props) {
           backgroundImageSrc={backgroundImageSrc}
         />
       </div>
-      {toolbarSlotRef?.current && createPortal(
-        <ShareMenu onCopy={handleCopy} onSave={handleSave} compact />,
-        toolbarSlotRef.current,
+      {toolbarSlotRef?.current && createPortal(shareButton, toolbarSlotRef.current)}
+      {shareOpen && (
+        <ShareModal
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          workout={workout}
+          ftp={ftp}
+          timeSeries={timeSeries}
+          cues={cues}
+        />
       )}
     </div>
   );

@@ -1,18 +1,16 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
 import type { Workout } from "../types";
 import { getShareableWorkouts } from "../lib/database";
 import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, isPowerZoneRide } from "../lib/charts";
-import { renderExportPng, resolveBackgroundImageSrc } from "../lib/exportUtils";
+import { resolveBackgroundImageSrc } from "../lib/exportUtils";
 import { cachedFetchWorkoutDetail, cachedFetchPerformanceGraph, cachedFetchRideDetails } from "../lib/enrichmentCache";
 import { updateWorkoutMetrics, updateWorkoutDetail, updateRideDetails } from "../lib/database";
 import { useShareChartStore, resolveDisplayName } from "../stores/shareChartStore";
 import { useAuthSelector, selectSession } from "../machines/authMachine";
 import { useSessionStore } from "../stores/sessionStore";
 import { useWorkoutStore } from "../stores/workoutStore";
-import ShareMenu from "./ShareMenu";
 import ChartCard from "./ChartCard";
+import ShareModal from "./ShareModal";
 
 function formatPickerDate(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleDateString("en-US", {
@@ -160,6 +158,7 @@ export default function StudioTab() {
     [settings, workout?.raw_ride_details_json],
   );
 
+  const [shareOpen, setShareOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // On-demand enrichment: fetch detail, performance graph, and ride details
@@ -224,30 +223,6 @@ export default function StudioTab() {
 
     return () => { cancelled = true; };
   }, [workout?.id, session?.accessToken]);
-
-  const filename = workout
-    ? `${workout.title?.replace(/[^a-zA-Z0-9]/g, "-") ?? "workout"}-${workout.id.slice(0, 8)}`
-    : "chart";
-
-  async function handleCopy() {
-    if (!workout || !timeSeries) return;
-    const blobPromise = renderExportPng(workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc);
-    await navigator.clipboard.write([
-      new ClipboardItem({ "image/png": blobPromise }),
-    ]);
-  }
-
-  async function handleSave() {
-    if (!workout || !timeSeries) return;
-    const filePath = await save({
-      defaultPath: `${filename}.png`,
-      filters: [{ name: "PNG Image", extensions: ["png"] }],
-    });
-    if (!filePath) return;
-    const blob = await renderExportPng(workout, ftp, timeSeries, cues, settings, displayName, backgroundImageSrc);
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    await writeFile(filePath, bytes);
-  }
 
   function handleUploadImage() {
     const input = fileInputRef.current;
@@ -532,13 +507,33 @@ export default function StudioTab() {
             backgroundImageSrc={backgroundImageSrc}
           >
             <div className="mt-4 flex justify-end">
-              <ShareMenu onCopy={handleCopy} onSave={handleSave} />
+              <button
+                onClick={() => setShareOpen(true)}
+                className="rounded bg-gray-100 p-1.5 text-gray-600 hover:bg-gray-200"
+                title="Share"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 8V13C4 13.5523 4.44772 14 5 14H11C11.5523 14 12 13.5523 12 13V8" />
+                  <path d="M8 2V10" />
+                  <path d="M5 5L8 2L11 5" />
+                </svg>
+              </button>
             </div>
           </ChartCard>
         ) : (
           <div className="flex h-64 items-center justify-center rounded-lg border border-gray-200 text-gray-400">
             {workouts.length === 0 ? "No cycling workouts available" : "Select a workout"}
           </div>
+        )}
+        {shareOpen && workout && timeSeries && (
+          <ShareModal
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            workout={workout}
+            ftp={ftp}
+            timeSeries={timeSeries}
+            cues={cues}
+          />
         )}
       </div>
     </div>

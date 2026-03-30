@@ -6,6 +6,7 @@ import { useDashboardRegistryStore } from "../stores/dashboardRegistryStore";
 import { WIDGET_DEFAULTS } from "../lib/dashboardDefaults";
 import WidgetWrapper from "./widgets/WidgetWrapper";
 import AddWidgetMenu from "./config/AddWidgetMenu";
+import DashboardEmptyState from "./DashboardEmptyState";
 import ManageDashboardsModal from "./config/ManageDashboardsModal";
 
 interface Props {
@@ -82,7 +83,10 @@ export default function DashboardGrid({ dashboard }: Props) {
         </div>
       </div>
 
-      {/* Grid */}
+      {/* Empty state or grid */}
+      {dashboard.widgets.length === 0 ? (
+        <DashboardEmptyState />
+      ) : (
       <div style={{ position: "relative" }}>
         {mode === "edit" && (
           <div
@@ -119,6 +123,7 @@ export default function DashboardGrid({ dashboard }: Props) {
           ))}
         </GridLayout>
       </div>
+      )}
       <ManageDashboardsModal open={manageOpen} onClose={() => setManageOpen(false)} />
     </div>
   );

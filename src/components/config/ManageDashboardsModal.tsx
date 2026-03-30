@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
+import { confirm } from "@tauri-apps/plugin-dialog";
 import { useDashboardRegistryStore } from "../../stores/dashboardRegistryStore";
 
 interface Props {
@@ -92,6 +93,7 @@ export default function ManageDashboardsModal({ open, onClose }: Props) {
                         if (e.key === "Escape") { setEditingId(null); setEditingName(""); }
                       }}
                       autoFocus
+                      onFocus={(e) => e.currentTarget.select()}
                       className="w-full rounded border border-blue-400 px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   ) : (
@@ -108,7 +110,7 @@ export default function ManageDashboardsModal({ open, onClose }: Props) {
                 {d.default_key && (
                   <button
                     onClick={async () => {
-                      if (await window.confirm(`Reset "${d.name}" to defaults? This will replace all widgets.`)) {
+                      if (await confirm(`Reset "${d.name}" to defaults? This will replace all widgets.`)) {
                         resetDashboard(d.id);
                       }
                     }}
@@ -123,7 +125,7 @@ export default function ManageDashboardsModal({ open, onClose }: Props) {
 
                 {/* Delete */}
                 <button
-                  onClick={() => removeDashboard(d.id)}
+                  onClick={async () => { if (await confirm(`Delete "${d.name}"? This cannot be undone.`)) removeDashboard(d.id); }}
                   disabled={i === 0}
                   className="text-gray-400 hover:text-red-600 disabled:opacity-25"
                   title={i === 0 ? "Cannot delete the first dashboard" : "Delete dashboard"}

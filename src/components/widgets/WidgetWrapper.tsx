@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { confirm } from "@tauri-apps/plugin-dialog";
 import type { DashboardWidget } from "../../types";
 import { useDashboardContext } from "../../stores/DashboardContext";
 import { WidgetToolbarContext } from "./WidgetToolbarContext";
@@ -72,7 +73,7 @@ export default function WidgetWrapper({ widget }: Props) {
             </button>
             <button
               onMouseDown={(e) => e.stopPropagation()}
-              onClick={async () => { if (await window.confirm("Remove this widget?")) removeWidget(widget.id); }}
+              onClick={async () => { if (await confirm("Remove this widget?")) removeWidget(widget.id); }}
               className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
               title="Remove"
             >

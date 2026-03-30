@@ -3,7 +3,6 @@ import { getDashboardStore, useDashboardRegistryStore } from "../stores/dashboar
 import { DashboardContext } from "../stores/DashboardContext";
 import { saveDashboardWidgets } from "../lib/database";
 import { buildDefaultInsightsWidgets } from "../lib/dashboardDefaults";
-import DashboardEmptyState from "./DashboardEmptyState";
 import DashboardGrid from "./DashboardGrid";
 import WidgetFullscreen from "./widgets/WidgetFullscreen";
 import WidgetConfigModal from "./config/WidgetConfigModal";
@@ -16,7 +15,6 @@ export default function DashboardTab({ dashboardId }: Props) {
   const useStore = getDashboardStore(dashboardId);
   const dashboard = useStore((s) => s.dashboard);
   const expandedWidgetId = useStore((s) => s.expandedWidgetId);
-  const mode = useStore((s) => s.mode);
   const configuringWidgetId = useStore((s) => s.configuringWidgetId);
   const addingWidgetType = useStore((s) => s.addingWidgetType);
   const loadDashboard = useStore((s) => s.loadDashboard);
@@ -62,17 +60,9 @@ export default function DashboardTab({ dashboardId }: Props) {
     );
   }
 
-  if (dashboard.widgets.length === 0 && mode === "view") {
-    return (
-      <DashboardContext.Provider value={useStore}>
-        <DashboardEmptyState />
-      </DashboardContext.Provider>
-    );
-  }
-
   return (
     <DashboardContext.Provider value={useStore}>
-      {dashboard.widgets.length === 0 ? <DashboardEmptyState /> : <DashboardGrid dashboard={dashboard} />}
+      <DashboardGrid dashboard={dashboard} />
       {(configuringWidgetId || addingWidgetType) && <WidgetConfigModal />}
     </DashboardContext.Provider>
   );

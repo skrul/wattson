@@ -23,32 +23,36 @@ export interface DashboardState {
   cancelConfiguring: () => void;
 }
 
-/** Persist current widgets to the database (fire-and-forget). */
-function persistWidgets(dashboard: Dashboard) {
-  saveDashboardWidgets(dashboard.id, dashboard.widgets).catch(() => {});
+/** Compute the y position below all existing widgets. */
+function bottomY(widgets: DashboardWidget[]): number {
+  return widgets.reduce((max, w) => Math.max(max, w.layout.y + w.layout.h), 0);
 }
 
-/** Create a Zustand dashboard store for a named dashboard. */
-export function createDashboardStore(dashboardName: string): UseBoundStore<StoreApi<DashboardState>> {
-  return create<DashboardState>((set, get) => ({
-    dashboard: null,
-    mode: "view",
-    expandedWidgetId: null,
-    configuringWidgetId: null,
-    addingWidgetType: null,
+/**
+ * Create a serialized persist function that ensures writes don't race.
+ * Each call waits for the previous one to finish before starting.
+ */
+function createPersist() {
+  let pending: Promise<void> = Promise.resolve();
+  return (dashboard: Dashboard) => {
+    pending = pending
+      .then(() => saveDashboardWidgets(dashboard.id, dashboard.widgets))
+      .catch(() => {});
+  };
+}
 
-    loadDashboard: async () => {
-      const dashboard = dashboardName === "Home"
-        ? await getOrCreateDashboard()
-        : await getOrCreateDashboardByName(dashboardName);
-      set({ dashboard });
-    },
-
+/** Shared store factory — both named and by-ID stores use this. */
+function createStoreActions(
+  set: (partial: Partial<DashboardState>) => void,
+  get: () => DashboardState,
+  persistWidgets: (dashboard: Dashboard) => void,
+) {
+  return {
     enterEditMode: () => set({ mode: "edit" }),
 
     exitEditMode: () => set({ mode: "view", configuringWidgetId: null, addingWidgetType: null }),
 
-    addWidget: (type, config) => {
+    addWidget: (type: WidgetType, config: WidgetConfig) => {
       const { dashboard } = get();
       if (!dashboard) return;
       const defaults = WIDGET_DEFAULTS[type];
@@ -58,7 +62,7 @@ export function createDashboardStore(dashboardName: string): UseBoundStore<Store
         config,
         layout: {
           x: 0,
-          y: Infinity, // place at bottom
+          y: bottomY(dashboard.widgets),
           w: defaults.defaultW,
           h: defaults.defaultH,
           minW: defaults.minW,
@@ -74,7 +78,7 @@ export function createDashboardStore(dashboardName: string): UseBoundStore<Store
       persistWidgets(updated);
     },
 
-    removeWidget: (id) => {
+    removeWidget: (id: string) => {
       const { dashboard } = get();
       if (!dashboard) return;
       const updated = { ...dashboard, widgets: dashboard.widgets.filter((w) => w.id !== id) };
@@ -82,7 +86,7 @@ export function createDashboardStore(dashboardName: string): UseBoundStore<Store
       persistWidgets(updated);
     },
 
-    updateWidgetConfig: (id, config) => {
+    updateWidgetConfig: (id: string, config: WidgetConfig) => {
       const { dashboard } = get();
       if (!dashboard) return;
       const updated = {
@@ -93,7 +97,7 @@ export function createDashboardStore(dashboardName: string): UseBoundStore<Store
       persistWidgets(updated);
     },
 
-    updateLayouts: (layouts) => {
+    updateLayouts: (layouts: Array<{ i: string } & WidgetLayout>) => {
       const { dashboard } = get();
       if (!dashboard) return;
       const layoutMap = new Map(layouts.map((l) => [l.i, l]));
@@ -109,18 +113,40 @@ export function createDashboardStore(dashboardName: string): UseBoundStore<Store
       persistWidgets(updated);
     },
 
-    expandWidget: (id) => set({ expandedWidgetId: id }),
+    expandWidget: (id: string | null) => set({ expandedWidgetId: id }),
 
-    startConfiguring: (id) => set({ configuringWidgetId: id }),
+    startConfiguring: (id: string | null) => set({ configuringWidgetId: id }),
 
-    startAddingWidget: (type) => set({ addingWidgetType: type }),
+    startAddingWidget: (type: WidgetType | null) => set({ addingWidgetType: type }),
 
     cancelConfiguring: () => set({ configuringWidgetId: null, addingWidgetType: null }),
+  };
+}
+
+/** Create a Zustand dashboard store for a named dashboard. */
+export function createDashboardStore(dashboardName: string): UseBoundStore<StoreApi<DashboardState>> {
+  const persistWidgets = createPersist();
+  return create<DashboardState>((set, get) => ({
+    dashboard: null,
+    mode: "view",
+    expandedWidgetId: null,
+    configuringWidgetId: null,
+    addingWidgetType: null,
+
+    loadDashboard: async () => {
+      const dashboard = dashboardName === "Home"
+        ? await getOrCreateDashboard()
+        : await getOrCreateDashboardByName(dashboardName);
+      set({ dashboard });
+    },
+
+    ...createStoreActions(set, get, persistWidgets),
   }));
 }
 
 /** Create a Zustand dashboard store that loads by ID. */
 export function createDashboardStoreById(id: string): UseBoundStore<StoreApi<DashboardState>> {
+  const persistWidgets = createPersist();
   return create<DashboardState>((set, get) => ({
     dashboard: null,
     mode: "view",
@@ -133,73 +159,6 @@ export function createDashboardStoreById(id: string): UseBoundStore<StoreApi<Das
       set({ dashboard });
     },
 
-    enterEditMode: () => set({ mode: "edit" }),
-
-    exitEditMode: () => set({ mode: "view", configuringWidgetId: null, addingWidgetType: null }),
-
-    addWidget: (type, config) => {
-      const { dashboard } = get();
-      if (!dashboard) return;
-      const defaults = WIDGET_DEFAULTS[type];
-      const widget: DashboardWidget = {
-        id: crypto.randomUUID(),
-        widget_type: type,
-        config,
-        layout: {
-          x: 0,
-          y: Infinity,
-          w: defaults.defaultW,
-          h: defaults.defaultH,
-          minW: defaults.minW,
-          minH: defaults.minH,
-        },
-      };
-      const updated = { ...dashboard, widgets: [...dashboard.widgets, widget] };
-      set({ dashboard: updated, addingWidgetType: null, configuringWidgetId: null });
-      persistWidgets(updated);
-    },
-
-    removeWidget: (id) => {
-      const { dashboard } = get();
-      if (!dashboard) return;
-      const updated = { ...dashboard, widgets: dashboard.widgets.filter((w) => w.id !== id) };
-      set({ dashboard: updated });
-      persistWidgets(updated);
-    },
-
-    updateWidgetConfig: (id, config) => {
-      const { dashboard } = get();
-      if (!dashboard) return;
-      const updated = {
-        ...dashboard,
-        widgets: dashboard.widgets.map((w) => (w.id === id ? { ...w, config } : w)),
-      };
-      set({ dashboard: updated, configuringWidgetId: null });
-      persistWidgets(updated);
-    },
-
-    updateLayouts: (layouts) => {
-      const { dashboard } = get();
-      if (!dashboard) return;
-      const layoutMap = new Map(layouts.map((l) => [l.i, l]));
-      const updated = {
-        ...dashboard,
-        widgets: dashboard.widgets.map((w) => {
-          const l = layoutMap.get(w.id);
-          if (!l) return w;
-          return { ...w, layout: { ...w.layout, x: l.x, y: l.y, w: l.w, h: l.h } };
-        }),
-      };
-      set({ dashboard: updated });
-      persistWidgets(updated);
-    },
-
-    expandWidget: (id) => set({ expandedWidgetId: id }),
-
-    startConfiguring: (id) => set({ configuringWidgetId: id }),
-
-    startAddingWidget: (type) => set({ addingWidgetType: type }),
-
-    cancelConfiguring: () => set({ configuringWidgetId: null, addingWidgetType: null }),
+    ...createStoreActions(set, get, persistWidgets),
   }));
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { confirm } from "@tauri-apps/plugin-dialog";
 import type { Workout } from "../types";
 import { getShareableWorkouts } from "../lib/database";
 import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, isPowerZoneRide } from "../lib/charts";
@@ -322,10 +323,10 @@ export default function StudioTab() {
               title="Rename"
             >Rename</button>
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (activeStyleId === "default") return;
                 const style = styles.find((s) => s.id === activeStyleId);
-                if (style && window.confirm(`Delete "${style.name}"?`)) deleteStyle(activeStyleId);
+                if (style && await confirm(`Delete "${style.name}"?`)) deleteStyle(activeStyleId);
               }}
               disabled={activeStyleId === "default"}
               className="rounded border border-gray-300 px-2 py-0.5 text-xs text-red-500 hover:bg-red-50 disabled:opacity-40"

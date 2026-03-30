@@ -89,7 +89,7 @@ export function buildDefaultHomeWidgets(): DashboardWidget[] {
 
   widgets.push(makeWidget("last_workout", {
     type: "last_workout",
-    title: "Last Cycling Workout",
+    title: "Share your last cycling workout",
     filters: [
       { id: "preset-cycling", field: "discipline", operator: "equals", value: "cycling", values: ["cycling"] },
     ],

@@ -124,12 +124,16 @@ function App() {
     ...fixedTabs,
   ];
 
+  const TAB_LABELS: Record<string, string> = {
+    studio: "Share Studio",
+  };
+
   function tabLabel(tab: string): string {
     if (isDashboardTab(tab)) {
       const d = dashboards.find((d) => makeDashboardTab(d.id) === tab);
       return d?.name ?? "Dashboard";
     }
-    return tab.charAt(0).toUpperCase() + tab.slice(1);
+    return TAB_LABELS[tab] ?? tab.charAt(0).toUpperCase() + tab.slice(1);
   }
 
   return (

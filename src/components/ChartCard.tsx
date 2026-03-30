@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, type ReactNode } from "react";
+import { useRef, useEffect, useState, useMemo, type ReactNode } from "react";
 import type { Workout, ShareChartSettings, PerformanceTimeSeries } from "../types";
 import type { InstructorCue } from "../lib/charts";
 import { renderRideDetailChart } from "../lib/charts";
@@ -57,6 +57,15 @@ interface ChartCardProps {
 }
 
 export default function ChartCard({ workout, ftp, timeSeries, cues, settings, displayName, isPZ, showHeader, showFooter, fitHeight, backgroundImageSrc, children }: ChartCardProps) {
+  const classDate = useMemo(() => {
+    if (!workout.raw_ride_details_json) return null;
+    try {
+      const rd = JSON.parse(workout.raw_ride_details_json);
+      const airTime = rd.ride?.original_air_time;
+      return typeof airTime === "number" && airTime > 0 ? airTime : null;
+    } catch { return null; }
+  }, [workout.raw_ride_details_json]);
+
   const chartRef = useRef<HTMLDivElement>(null);
 
   // Track container size via ResizeObserver for correct sizing
@@ -128,7 +137,7 @@ export default function ChartCard({ workout, ftp, timeSeries, cues, settings, di
             <p className={`text-sm font-semibold ${isDark ? "text-white" : ""}`}>{workout.title}</p>
             <p className={`text-xs ${isDark ? "text-white/75" : "text-gray-500"}`}>
               {workout.instructor && <>{workout.instructor} · </>}
-              {formatDate(workout.date)}
+              {formatDate(classDate ?? workout.date)}
             </p>
           </div>
           <div className="text-right">

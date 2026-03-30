@@ -152,6 +152,7 @@ export function parseTargetMetrics(rawPerformanceGraphJson: string, pedalingStar
       });
     }
 
+    parsed.sort((a, b) => a.startSecond - b.startSecond);
     return parsed.length > 0 ? parsed : null;
   } catch {
     return null;
@@ -302,7 +303,7 @@ export function renderRideDetailChart(
       const pz = POWER_ZONES[c.zone - 1];
       if (!pz) return null;
       const yVal = ((pz.minPct + pz.maxPct) / 2) * ftp;
-      return { x1: c.startSecond, x2: c.endSecond, y: yVal, zone: c.zone, duration: c.endSecond - c.startSecond };
+      return { x1: c.startSecond, x2: c.endSecond, y: yVal, zone: c.zone };
     }).filter((s): s is NonNullable<typeof s> => s != null);
 
     // Horizontal line segments
@@ -318,13 +319,13 @@ export function renderRideDetailChart(
       }),
     );
 
-    // Vertical connectors between adjacent cues
+    // Vertical connectors between consecutive cues at end of each segment
     const verticals: { x: number; y1: number; y2: number }[] = [];
     for (let i = 0; i < cueSegments.length - 1; i++) {
       const curr = cueSegments[i];
       const next = cueSegments[i + 1];
       if (curr.y !== next.y) {
-        verticals.push({ x: next.x1, y1: curr.y, y2: next.y });
+        verticals.push({ x: curr.x2, y1: curr.y, y2: next.y });
       }
     }
 

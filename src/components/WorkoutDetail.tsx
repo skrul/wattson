@@ -5,6 +5,7 @@ import { updateWorkoutMetrics, updateRideDetails, getWorkoutsByRideId, getWorkou
 import { useWorkoutStore, type DetailTab } from "../stores/workoutStore";
 import RideDetailChart from "./RideDetailChart";
 import CompareTab from "./CompareTab";
+import AnalyzeTab from "./AnalyzeTab";
 import { parsePerformanceGraph, renderMetricChart, type CompareMetric } from "../lib/charts";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
@@ -246,6 +247,7 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
   const tabs: { key: DetailTab; label: string }[] = [
     { key: "summary", label: "Summary" },
     { key: "stats", label: "Stats" },
+    ...(hasShareContent ? [{ key: "analyze" as DetailTab, label: "Analyze" }] : []),
     ...(hasCompare ? [{ key: "compare" as DetailTab, label: `Compare (${sameClassWorkouts.length})` }] : []),
   ];
 
@@ -348,6 +350,10 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
           <div ref={metricChartsRef} className="mt-6 flex flex-col gap-4" />
         )}
         </>
+      )}
+
+      {currentTab === "analyze" && hasShareContent && (
+        <AnalyzeTab workout={workout} ftp={ftp} timeSeries={timeSeries!} />
       )}
 
       {currentTab === "compare" && hasCompare && (

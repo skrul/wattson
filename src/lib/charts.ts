@@ -26,6 +26,37 @@ export interface InstructorCue {
   zone: number;
 }
 
+export interface HrZoneConfig {
+  zones: number[];   // BPM boundaries, e.g. [0, 113.1, 130.5, 147.9, 165.3]
+  maxHr: number;     // e.g. 174
+}
+
+export const HR_ZONE_COLORS = [
+  "#50c4aa", // Z1 teal
+  "#b6c95c", // Z2 olive
+  "#facb3e", // Z3 yellow
+  "#fc820f", // Z4 orange
+  "#ff4759", // Z5 red
+];
+
+/**
+ * Parse HR zone boundaries from the raw user profile JSON.
+ * Returns null if the required fields are missing.
+ */
+export function parseHrZones(rawProfileJson: string | null | undefined): HrZoneConfig | null {
+  if (!rawProfileJson) return null;
+  try {
+    const data = JSON.parse(rawProfileJson);
+    const zones: number[] | undefined = data.default_heart_rate_zones;
+    if (!Array.isArray(zones) || zones.length === 0) return null;
+    const maxHr: number = data.customized_max_heart_rate ?? data.default_max_heart_rate;
+    if (typeof maxHr !== "number" || maxHr <= 0) return null;
+    return { zones, maxHr };
+  } catch {
+    return null;
+  }
+}
+
 export const POWER_ZONES: PowerZone[] = [
   { zone: "Z1", minPct: 0, maxPct: 0.55, color: "#6baed6" },
   { zone: "Z2", minPct: 0.55, maxPct: 0.75, color: "#31b5c4" },
@@ -127,6 +158,43 @@ export function parseTargetMetrics(rawPerformanceGraphJson: string, pedalingStar
   }
 }
 
+export interface SongCue {
+  startSecond: number;
+  title: string;
+  artist: string;
+  imageUrl: string | null;
+}
+
+/**
+ * Parse the in-class playlist from raw ride details JSON.
+ * Returns song cues adjusted for pedaling start offset, or null if no playlist.
+ */
+export function parsePlaylist(rawRideDetailsJson: string | null, pedalingStartOffset = 0): SongCue[] | null {
+  if (!rawRideDetailsJson) return null;
+  try {
+    const data = JSON.parse(rawRideDetailsJson);
+    const songs = data.playlist?.songs;
+    if (!Array.isArray(songs) || songs.length === 0) return null;
+
+    const parsed: SongCue[] = [];
+    for (const s of songs) {
+      const title = s.title;
+      const artist = s.artists?.[0]?.artist_name ?? "";
+      const offset = s.start_time_offset ?? s.cue_time_offset;
+      if (title == null || offset == null) continue;
+      parsed.push({
+        startSecond: offset - pedalingStartOffset,
+        title,
+        artist,
+        imageUrl: s.album?.image_url ?? null,
+      });
+    }
+    return parsed.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 interface ChartOptions {
   width?: number;
   height?: number;
@@ -139,6 +207,10 @@ interface ChartOptions {
   showInstructorCues?: boolean;
   showYAxis?: boolean;
   darkBackground?: boolean;
+  interactive?: boolean;
+  songs?: SongCue[];
+  hrZones?: HrZoneConfig;
+  hrZonesForTooltip?: HrZoneConfig;
 }
 
 /**
@@ -158,6 +230,16 @@ export function renderRideDetailChart(
     ? Math.max(maxOutput * 1.1, ftp * 1.5)
     : maxOutput * 1.1;
 
+  // Compute the last visible Y-axis tick to cap zone bands
+  // (yMax includes headroom above the last tick; bands should stop at the last tick)
+  const yTickStep = (() => {
+    const rough = yMax / 10;
+    const pow = Math.pow(10, Math.floor(Math.log10(rough)));
+    const frac = rough / pow;
+    return pow * (frac <= 1.5 ? 1 : frac <= 3 ? 2 : frac <= 7 ? 5 : 10);
+  })();
+  const bandCeiling = Math.floor(yMax / yTickStep) * yTickStep;
+
   const data = timeSeries.seconds.map((s, i) => ({
     second: s,
     output: timeSeries.output[i],
@@ -171,12 +253,14 @@ export function renderRideDetailChart(
 
   // Zone bands (only if FTP is available)
   if (options.showZoneBands !== false && ftp != null) {
-    const zoneBands = POWER_ZONES.map((z) => ({
-      y1: z.minPct * ftp,
-      y2: Math.min(z.maxPct * ftp, yMax),
-      fill: z.color,
-      zone: z.zone,
-    }));
+    const zoneBands = POWER_ZONES
+      .filter((z) => z.minPct * ftp < bandCeiling)
+      .map((z, _i, arr) => ({
+        y1: z.minPct * ftp,
+        y2: z === arr[arr.length - 1] ? yMax : Math.min(z.maxPct * ftp, bandCeiling),
+        fill: z.color,
+        zone: z.zone,
+      }));
 
     marks.push(
       Plot.rect(zoneBands, {
@@ -191,8 +275,8 @@ export function renderRideDetailChart(
 
     // Zone labels on the right (always shown when bands are shown)
     {
-      const zoneLabels = POWER_ZONES.filter((z) => z.minPct * ftp < yMax).map((z) => ({
-        y: ((z.minPct + Math.min(z.maxPct, yMax / ftp)) / 2) * ftp,
+      const zoneLabels = POWER_ZONES.filter((z) => z.minPct * ftp < bandCeiling).map((z) => ({
+        y: ((z.minPct + Math.min(z.maxPct, bandCeiling / ftp)) / 2) * ftp,
         text: z.zone,
       }));
 
@@ -259,25 +343,98 @@ export function renderRideDetailChart(
     }
   }
 
-  // Output line
-  if (options.overlays?.output !== false) {
+  // HR zone bands (uses same scaling as HR overlay line)
+  // We compute the HR scale once here and reuse it for both bands and tooltip
+  let hrScale: ((v: number) => number) | null = null;
+  if (options.hrZones && timeSeries.heartRate.length > 0) {
+    const hrMax = Math.max(...timeSeries.heartRate);
+    if (hrMax > 0) {
+      const { zones } = options.hrZones;
+      // Use hrMax (same as the overlay line) so bands align with the HR line
+      hrScale = scaleLinear().domain([0, hrMax]).range([0, yMax * 0.8]);
+
+      const hrBands = zones
+        .map((boundary, i) => ({
+          y1: hrScale!(boundary),
+          y2: i < zones.length - 1 ? hrScale!(zones[i + 1]) : bandCeiling,
+          fill: HR_ZONE_COLORS[i] ?? HR_ZONE_COLORS[HR_ZONE_COLORS.length - 1],
+          zone: `${i + 1}`,
+        }))
+        .filter((b) => b.y1 < bandCeiling);
+      // Extend the top visible band to fill the plot area
+      if (hrBands.length > 0) hrBands[hrBands.length - 1].y2 = yMax;
+
+      marks.push(
+        Plot.rect(hrBands, {
+          x1: 0,
+          x2: timeSeries.seconds.length - 1,
+          y1: "y1",
+          y2: "y2",
+          fill: "fill",
+          fillOpacity: 0.15,
+        }),
+      );
+
+      // Zone labels on the right edge
+      const hrZoneLabels = hrBands.map((b) => ({
+        y: (b.y1 + b.y2) / 2,
+        text: b.zone,
+        fill: b.fill,
+      }));
+
+      marks.push(
+        Plot.text(hrZoneLabels, {
+          x: timeSeries.seconds.length - 1,
+          y: "y",
+          text: "text",
+          textAnchor: "start",
+          dx: 8,
+          fontSize: 10,
+          fontWeight: "bold",
+          fill: "fill",
+        }),
+      );
+    }
+  }
+
+  // Song boundary lines (below data lines)
+  if (options.songs && options.songs.length > 0) {
+    const songData = options.songs.map((s) => ({ second: s.startSecond }));
+
     marks.push(
-      Plot.lineY(data, {
+      Plot.ruleX(songData, {
         x: "second",
-        y: "output",
-        stroke: options.overlayColors?.output ?? "#e44",
-        strokeWidth: 1.5,
+        stroke: options.darkBackground ? "rgba(255,255,255,0.2)" : "#d1d5db",
+        strokeDasharray: "3 3",
+        strokeWidth: 1,
       }),
     );
   }
 
-  // Additional overlay lines (HR, cadence, resistance) mapped to the output Y domain
+  // Track which overlays are active and their colors/scales for interactive tooltip
   type OverlayKey = "heartRate" | "cadence" | "resistance" | "speed";
-  const overlayDefs: { key: OverlayKey; field: string; defaultColor: string; values: number[] }[] = [
-    { key: "heartRate", field: "heartRate", defaultColor: "#e91e63", values: timeSeries.heartRate },
-    { key: "cadence", field: "cadence", defaultColor: "#2196f3", values: timeSeries.cadence },
-    { key: "resistance", field: "resistance", defaultColor: "#4caf50", values: timeSeries.resistance },
-    { key: "speed", field: "speed", defaultColor: "#ff9800", values: timeSeries.speed },
+  const activeOverlays: { key: string; label: string; unit: string; color: string; values: number[]; yField: string; dotData: { second: number; y: number }[] }[] = [];
+
+  // Output line
+  if (options.overlays?.output !== false) {
+    const outputColor = options.overlayColors?.output ?? "#e44";
+    marks.push(
+      Plot.lineY(data, {
+        x: "second",
+        y: "output",
+        stroke: outputColor,
+        strokeWidth: 1.5,
+      }),
+    );
+    activeOverlays.push({ key: "output", label: "Output", unit: "watts", color: outputColor, values: timeSeries.output, yField: "output", dotData: data.map((d) => ({ second: d.second, y: d.output })) });
+  }
+
+  // Additional overlay lines (HR, cadence, resistance) mapped to the output Y domain
+  const overlayDefs: { key: OverlayKey; field: string; label: string; unit: string; defaultColor: string; values: number[] }[] = [
+    { key: "heartRate", field: "heartRate", label: "Heart Rate", unit: "bpm", defaultColor: "#e91e63", values: timeSeries.heartRate },
+    { key: "cadence", field: "cadence", label: "Cadence", unit: "rpm", defaultColor: "#2196f3", values: timeSeries.cadence },
+    { key: "resistance", field: "resistance", label: "Resistance", unit: "%", defaultColor: "#4caf50", values: timeSeries.resistance },
+    { key: "speed", field: "speed", label: "Speed", unit: "mph", defaultColor: "#ff9800", values: timeSeries.speed },
   ];
 
   for (const overlay of overlayDefs) {
@@ -294,15 +451,30 @@ export function renderRideDetailChart(
       value: scale(d[overlay.field as keyof typeof d] as number),
     }));
 
+    const color = options.overlayColors?.[overlay.key] ?? overlay.defaultColor;
     marks.push(
       Plot.lineY(mappedData, {
         x: "second",
         y: "value",
-        stroke: options.overlayColors?.[overlay.key] ?? overlay.defaultColor,
+        stroke: color,
         strokeWidth: 1.5,
         strokeOpacity: 0.7,
       }),
     );
+    activeOverlays.push({ key: overlay.key, label: overlay.label, unit: overlay.unit, color, values: overlay.values, yField: "value", dotData: mappedData.map((d) => ({ second: d.second, y: d.value })) });
+  }
+
+  // Interactive crosshair marks
+  if (options.interactive) {
+    marks.push(
+      Plot.ruleX(data, Plot.pointerX({ x: "second", stroke: "#888", strokeDasharray: "4 3", strokeWidth: 1 })),
+    );
+    // Highlight dot on each active overlay line
+    for (const ov of activeOverlays) {
+      marks.push(
+        Plot.dot(ov.dotData, Plot.pointerX({ x: "second", y: "y", stroke: ov.color, fill: "white", r: 4, strokeWidth: 2 })),
+      );
+    }
   }
 
   const totalSeconds = timeSeries.seconds.length;
@@ -311,9 +483,11 @@ export function renderRideDetailChart(
   const ticks = Array.from({ length: Math.floor(xMax / tickInterval) + 1 }, (_, i) => i * tickInterval);
   if (xMax % tickInterval !== 0) ticks.push(xMax);
 
+  const hasSongImages = options.songs?.some((s) => s.imageUrl);
   const plot = Plot.plot({
     width,
     height,
+    marginTop: hasSongImages ? 30 : 10,
     marginRight: 36,
     style: options.darkBackground ? { background: "transparent", color: "#e5e7eb" } : undefined,
     x: {
@@ -348,7 +522,151 @@ export function renderRideDetailChart(
     });
   }
 
-  return plot;
+  if (!options.interactive) return plot;
+
+  // Wrap in a container with floating tooltip
+  const fmtTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const xInfo = plot.scale("x");
+  const xRange = xInfo?.range ? Array.from(xInfo.range) as number[] : [0, width];
+  const xDomain = xInfo?.domain ? Array.from(xInfo.domain) as number[] : [0, totalSeconds];
+  const secondToPixel = scaleLinear()
+    .domain(xDomain as [number, number])
+    .range(xRange as [number, number]);
+
+  const container = document.createElement("div");
+  container.style.position = "relative";
+  container.appendChild(plot);
+
+  // Album art thumbnails in the top gutter
+  if (options.songs && options.songs.length > 0) {
+    const yInfo0 = plot.scale("y");
+    const yRange = yInfo0?.range ? Array.from(yInfo0.range) as number[] : [height, 0];
+    const plotTop = yRange[1]; // top of plot area in px
+    const svgEl0 = plot.tagName.toLowerCase() === "svg" ? plot : plot.querySelector("svg");
+    const svgOffsetLeft0 = svgEl0 ? (svgEl0 as HTMLElement).offsetLeft ?? 0 : 0;
+    const svgOffsetTop0 = svgEl0 ? (svgEl0 as HTMLElement).offsetTop ?? 0 : 0;
+    const thumbSize = 24;
+
+    for (const song of options.songs) {
+      if (!song.imageUrl) continue;
+      const px = secondToPixel(song.startSecond);
+      const img = document.createElement("img");
+      img.src = song.imageUrl;
+      img.title = song.artist ? `${song.title} - ${song.artist}` : song.title;
+      img.style.cssText =
+        `position:absolute;pointer-events:none;` +
+        `width:${thumbSize}px;height:${thumbSize}px;border-radius:3px;` +
+        `object-fit:cover;opacity:0.8;` +
+        `left:${svgOffsetLeft0 + px - thumbSize / 2}px;` +
+        `top:${svgOffsetTop0 + plotTop - thumbSize - 4}px;`;
+      container.appendChild(img);
+    }
+  }
+
+  const tooltip = document.createElement("div");
+  tooltip.style.cssText =
+    "position:absolute;display:none;pointer-events:none;" +
+    "background:white;border:1px solid #ddd;border-radius:6px;" +
+    "padding:8px 12px;font-size:13px;font-family:system-ui,sans-serif;" +
+    "box-shadow:0 2px 8px rgba(0,0,0,.15);white-space:nowrap;z-index:10;" +
+    "transform:translate(-50%,-100%);";
+  container.appendChild(tooltip);
+
+  const yInfo = plot.scale("y");
+  const plotAreaBottom = yInfo?.range ? (Array.from(yInfo.range) as number[])[0] : height;
+
+  plot.addEventListener("input", () => {
+    const datum = (plot as unknown as { value: Record<string, unknown> | null }).value;
+    if (!datum || datum.second == null) {
+      tooltip.style.display = "none";
+      return;
+    }
+
+    const second = Number(datum.second);
+    if (second < 0 || second >= totalSeconds) {
+      tooltip.style.display = "none";
+      return;
+    }
+
+    let html = `<div style="font-weight:600;margin-bottom:4px">${fmtTime(second)}</div>`;
+
+    // Current song
+    if (options.songs && options.songs.length > 0) {
+      let currentSong: SongCue | null = null;
+      for (const s of options.songs) {
+        if (s.startSecond <= second) currentSong = s;
+        else break;
+      }
+      if (currentSong) {
+        const songLabel = currentSong.artist
+          ? `${currentSong.title} - ${currentSong.artist}`
+          : currentSong.title;
+        const imgHtml = currentSong.imageUrl
+          ? `<img src="${currentSong.imageUrl}" style="width:32px;height:32px;border-radius:3px;object-fit:cover;flex-shrink:0" />`
+          : "";
+        html +=
+          `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">` +
+          imgHtml +
+          `<div style="color:#6b7280">\u266B ${songLabel}</div>` +
+          `</div>`;
+      }
+    }
+
+    // Current instructor cue
+    if (options.showInstructorCues !== false && cues && cues.length > 0) {
+      const currentCue = cues.find((c) => second >= c.startSecond && second < c.endSecond);
+      if (currentCue) {
+        const pz = POWER_ZONES[currentCue.zone - 1];
+        if (pz) {
+          html +=
+            `<div style="display:flex;align-items:center;gap:5px">` +
+            `<span style="color:${pz.color}">\u25C9 Target ${pz.zone}</span></div>`;
+        }
+      }
+    }
+
+    const hrZoneCfg = options.hrZonesForTooltip ?? options.hrZones;
+    for (const ov of activeOverlays) {
+      const val = second < ov.values.length ? ov.values[second] : null;
+      if (val == null) continue;
+      let suffix = "";
+      if (ov.key === "output" && ftp != null && val > 0) {
+        const pct = val / ftp;
+        const pzIdx = POWER_ZONES.findIndex((z) => pct >= z.minPct && pct < z.maxPct);
+        const pz = pzIdx >= 0 ? POWER_ZONES[pzIdx] : POWER_ZONES[POWER_ZONES.length - 1];
+        suffix = ` <span style="color:${pz.color}">(${pz.zone})</span>`;
+      }
+      if (ov.key === "heartRate" && hrZoneCfg && val > 0) {
+        const { zones } = hrZoneCfg;
+        let zoneIdx = 0;
+        for (let i = zones.length - 1; i >= 0; i--) {
+          if (val >= zones[i]) { zoneIdx = i; break; }
+        }
+        suffix = ` <span style="color:${HR_ZONE_COLORS[zoneIdx] ?? HR_ZONE_COLORS[HR_ZONE_COLORS.length - 1]}">(Z${zoneIdx + 1})</span>`;
+      }
+      html +=
+        `<div style="display:flex;align-items:center;gap:5px">` +
+        `<span style="display:inline-block;width:10px;height:10px;background:${ov.color};border-radius:2px;flex-shrink:0"></span>` +
+        `<span>${ov.label}: <b>${val}</b> ${ov.unit}${suffix}</span></div>`;
+    }
+    tooltip.innerHTML = html;
+    tooltip.style.display = "block";
+
+    const pixelX = secondToPixel(second);
+    const svgEl = plot.tagName.toLowerCase() === "svg" ? plot : plot.querySelector("svg");
+    const svgOffsetLeft = svgEl ? (svgEl as HTMLElement).offsetLeft ?? 0 : 0;
+    const svgOffsetTop = svgEl ? (svgEl as HTMLElement).offsetTop ?? 0 : 0;
+
+    tooltip.style.left = `${svgOffsetLeft + pixelX}px`;
+    tooltip.style.top = `${svgOffsetTop + plotAreaBottom - 8}px`;
+  });
+
+  return container;
 }
 
 // --- Custom chart rendering ---

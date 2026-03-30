@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Workout, PerformanceTimeSeries } from "../types";
 import {
@@ -13,6 +13,7 @@ import {
   type HrZoneConfig,
 } from "../lib/charts";
 import { useSessionStore } from "../stores/sessionStore";
+import { useAnalyzeStore, type AnalyzeOverlays } from "../stores/analyzeStore";
 
 interface AnalyzeTabProps {
   workout: Workout;
@@ -20,15 +21,7 @@ interface AnalyzeTabProps {
   timeSeries: PerformanceTimeSeries;
 }
 
-interface Overlays {
-  output: boolean;
-  heartRate: boolean;
-  cadence: boolean;
-  resistance: boolean;
-  speed: boolean;
-}
-
-const OVERLAY_COLORS: Record<keyof Overlays, string> = {
+const OVERLAY_COLORS: Record<keyof AnalyzeOverlays, string> = {
   output: "#e44",
   heartRate: "#e91e63",
   cadence: "#2196f3",
@@ -36,7 +29,7 @@ const OVERLAY_COLORS: Record<keyof Overlays, string> = {
   speed: "#ff9800",
 };
 
-const OVERLAY_LABELS: Record<keyof Overlays, string> = {
+const OVERLAY_LABELS: Record<keyof AnalyzeOverlays, string> = {
   output: "Output",
   heartRate: "HR",
   cadence: "Cadence",
@@ -44,22 +37,27 @@ const OVERLAY_LABELS: Record<keyof Overlays, string> = {
   speed: "Speed",
 };
 
-const OVERLAY_KEYS: (keyof Overlays)[] = ["output", "heartRate", "cadence", "resistance", "speed"];
+const OVERLAY_KEYS: (keyof AnalyzeOverlays)[] = ["output", "heartRate", "cadence", "resistance", "speed"];
 
 export default function AnalyzeTab({ workout, ftp, timeSeries }: AnalyzeTabProps) {
-  const [overlays, setOverlays] = useState<Overlays>({
-    output: true,
-    heartRate: true,
-    cadence: false,
-    resistance: false,
-    speed: false,
-  });
+  const overlays = useAnalyzeStore((s) => s.overlays);
+  const toggleOverlay = useAnalyzeStore((s) => s.toggleOverlay);
+  const showZoneBands = useAnalyzeStore((s) => s.showZoneBands);
+  const setShowZoneBands = useAnalyzeStore((s) => s.setShowZoneBands);
+  const showInstructorCues = useAnalyzeStore((s) => s.showInstructorCues);
+  const setShowInstructorCues = useAnalyzeStore((s) => s.setShowInstructorCues);
+  const showHrZones = useAnalyzeStore((s) => s.showHrZones);
+  const setShowHrZones = useAnalyzeStore((s) => s.setShowHrZones);
+  const showSongs = useAnalyzeStore((s) => s.showSongs);
+  const setShowSongs = useAnalyzeStore((s) => s.setShowSongs);
+  const initDefaults = useAnalyzeStore((s) => s.initDefaults);
 
   const isPZ = isPowerZoneRide(workout);
   const hasFtp = ftp != null;
 
-  const [showZoneBands, setShowZoneBands] = useState(isPZ && hasFtp);
-  const [showInstructorCues, setShowInstructorCues] = useState(isPZ && hasFtp);
+  // Set sensible defaults on first use
+  useEffect(() => { initDefaults(isPZ, hasFtp); }, []);
+
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const userProfile = useSessionStore((s) => s.userProfile);
@@ -69,20 +67,15 @@ export default function AnalyzeTab({ workout, ftp, timeSeries }: AnalyzeTabProps
 
   const hasHrData = timeSeries.heartRate.length > 0;
   const canShowHrZones = hrZoneConfig != null && hasHrData;
-  const [showHrZones, setShowHrZones] = useState(false); // off by default — zone bands take priority for PZ rides
 
   // Zone bands and HR zones are mutually exclusive
   const toggleZoneBands = () => {
-    setShowZoneBands((v) => {
-      if (!v) setShowHrZones(false); // turning on zone bands → turn off HR zones
-      return !v;
-    });
+    if (!showZoneBands) setShowHrZones(false);
+    setShowZoneBands(!showZoneBands);
   };
   const toggleHrZones = () => {
-    setShowHrZones((v) => {
-      if (!v) setShowZoneBands(false); // turning on HR zones → turn off zone bands
-      return !v;
-    });
+    if (!showHrZones) setShowZoneBands(false);
+    setShowHrZones(!showHrZones);
   };
 
   const cues = useMemo((): InstructorCue[] | null => {
@@ -97,7 +90,6 @@ export default function AnalyzeTab({ workout, ftp, timeSeries }: AnalyzeTabProps
   }, [workout.raw_ride_details_json]);
 
   const hasSongs = songs != null && songs.length > 0;
-  const [showSongs, setShowSongs] = useState(true);
 
   // Escape key exits fullscreen
   useEffect(() => {
@@ -109,12 +101,8 @@ export default function AnalyzeTab({ workout, ftp, timeSeries }: AnalyzeTabProps
     return () => window.removeEventListener("keydown", handler);
   }, [isFullscreen]);
 
-  const toggle = (key: keyof Overlays) => {
-    setOverlays((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
   // Check which overlays have data
-  const hasData: Record<keyof Overlays, boolean> = {
+  const hasData: Record<keyof AnalyzeOverlays, boolean> = {
     output: timeSeries.output.length > 0,
     heartRate: timeSeries.heartRate.length > 0,
     cadence: timeSeries.cadence.length > 0,
@@ -127,7 +115,7 @@ export default function AnalyzeTab({ workout, ftp, timeSeries }: AnalyzeTabProps
       {OVERLAY_KEYS.filter((key) => hasData[key]).map((key) => (
         <button
           key={key}
-          onClick={() => toggle(key)}
+          onClick={() => toggleOverlay(key)}
           className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
             overlays[key]
               ? "text-white"
@@ -157,7 +145,7 @@ export default function AnalyzeTab({ workout, ftp, timeSeries }: AnalyzeTabProps
 
       {hasFtp && cues && cues.length > 0 && (
         <button
-          onClick={() => setShowInstructorCues((v) => !v)}
+          onClick={() => setShowInstructorCues(!showInstructorCues)}
           className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
             showInstructorCues
               ? "bg-gray-700 text-white"
@@ -170,7 +158,7 @@ export default function AnalyzeTab({ workout, ftp, timeSeries }: AnalyzeTabProps
 
       {hasSongs && (
         <button
-          onClick={() => setShowSongs((v) => !v)}
+          onClick={() => setShowSongs(!showSongs)}
           className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
             showSongs
               ? "bg-gray-700 text-white"
@@ -270,7 +258,7 @@ export default function AnalyzeTab({ workout, ftp, timeSeries }: AnalyzeTabProps
 interface AnalyzeChartProps {
   timeSeries: PerformanceTimeSeries;
   ftp: number | null;
-  overlays: Overlays;
+  overlays: AnalyzeOverlays;
   showZoneBands: boolean;
   showInstructorCues: boolean;
   cues: InstructorCue[] | null;

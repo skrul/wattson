@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Workout, WorkoutFilters, FilterCondition, SortSpec } from "../types";
 
-export type DetailTab = "summary" | "stats" | "compare" | "analyze";
+export type DetailTab = "summary" | "stats" | "compare";
 
 interface WorkoutState {
   workouts: Workout[];

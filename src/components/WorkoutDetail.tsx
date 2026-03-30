@@ -3,10 +3,10 @@ import type { Workout } from "../types";
 import { cachedFetchWorkoutDetail, cachedFetchPerformanceGraph, cachedFetchRideDetails } from "../lib/enrichmentCache";
 import { updateWorkoutMetrics, updateRideDetails, getWorkoutsByRideId, getWorkoutById } from "../lib/database";
 import { useWorkoutStore, type DetailTab } from "../stores/workoutStore";
-import RideDetailChart from "./RideDetailChart";
 import CompareTab from "./CompareTab";
 import AnalyzeTab from "./AnalyzeTab";
-import { parsePerformanceGraph, renderMetricChart, type CompareMetric } from "../lib/charts";
+import ShareModal from "./ShareModal";
+import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, renderMetricChart, type CompareMetric } from "../lib/charts";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
 interface WorkoutDetailProps {
@@ -79,6 +79,7 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
   const updateWorkout = useWorkoutStore((s) => s.updateWorkout);
   const activeTab = useWorkoutStore((s) => s.detailTab);
   const setActiveTab = useWorkoutStore((s) => s.setDetailTab);
+  const [shareOpen, setShareOpen] = useState(false);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [metricsError, setMetricsError] = useState<string | null>(null);
   const [sameClassWorkouts, setSameClassWorkouts] = useState<Workout[]>([]);
@@ -89,6 +90,12 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
     () => workout?.raw_performance_graph_json ? parsePerformanceGraph(workout.raw_performance_graph_json) : null,
     [workout?.raw_performance_graph_json],
   );
+
+  const cues = useMemo(() => {
+    if (!workout?.raw_performance_graph_json) return null;
+    const offset = parsePedalingStartOffset(workout.raw_ride_details_json);
+    return parseTargetMetrics(workout.raw_performance_graph_json, offset);
+  }, [workout?.raw_performance_graph_json, workout?.raw_ride_details_json]);
 
   const maxStats = useMemo(() => {
     if (!timeSeries) return null;
@@ -247,7 +254,6 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
   const tabs: { key: DetailTab; label: string }[] = [
     { key: "summary", label: "Summary" },
     { key: "stats", label: "Stats" },
-    ...(hasShareContent ? [{ key: "analyze" as DetailTab, label: "Analyze" }] : []),
     ...(hasCompare ? [{ key: "compare" as DetailTab, label: `Compare (${sameClassWorkouts.length})` }] : []),
   ];
 
@@ -255,7 +261,7 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
   const currentTab = tabs.some((t) => t.key === activeTab) ? activeTab : "summary";
 
   return (
-    <div className="max-w-2xl">
+    <div className="w-full">
       {/* Tab bar */}
       {tabs.length > 1 && (
         <nav className="mb-4 flex gap-2">
@@ -286,19 +292,34 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
           <p className="text-sm text-gray-500">
             {formatDetailDate(workout.date)} at {formatDetailTime(workout.date)}
           </p>
-          <h2 className="mt-1 flex items-center gap-1.5 text-xl font-bold">
-            {workout.title}
-            <button
-              title="View on Peloton"
-              className="text-gray-400 hover:text-gray-600"
-              onClick={() => openUrl(`https://members.onepeloton.com/profile/workouts/${workout.id}`)}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clipRule="evenodd" />
-                <path fillRule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </h2>
+          <div className="mt-1 flex items-center justify-between">
+            <h2 className="flex items-center gap-1.5 text-xl font-bold">
+              {workout.title}
+              <button
+                title="View on Peloton"
+                className="text-gray-400 hover:text-gray-600"
+                onClick={() => openUrl(`https://members.onepeloton.com/profile/workouts/${workout.id}`)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                  <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </h2>
+            {hasShareContent && (
+              <button
+                onClick={() => setShareOpen(true)}
+                className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 8V13C4 13.5523 4.44772 14 5 14H11C11.5523 14 12 13.5523 12 13V8" />
+                  <path d="M8 2V10" />
+                  <path d="M5 5L8 2L11 5" />
+                </svg>
+                Share
+              </button>
+            )}
+          </div>
           <p className="mt-1 text-sm text-gray-600">
             {discipline} Workout
             {workout.instructor && <> · {workout.instructor}</>}
@@ -308,10 +329,20 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
           </p>
         </div>
         {hasShareContent ? (
-          <RideDetailChart workout={workout} ftp={ftp} />
+          <AnalyzeTab workout={workout} ftp={ftp} timeSeries={timeSeries!} />
         ) : workout.discipline === "cycling" && !showLoading && workout.raw_performance_graph_json != null ? (
           <p className="text-sm text-gray-400">No performance data available for this ride.</p>
         ) : null}
+        {shareOpen && hasShareContent && (
+          <ShareModal
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            workout={workout}
+            ftp={ftp}
+            timeSeries={timeSeries!}
+            cues={cues}
+          />
+        )}
         </>
       )}
 
@@ -350,10 +381,6 @@ export default function WorkoutDetail({ workout, accessToken }: WorkoutDetailPro
           <div ref={metricChartsRef} className="mt-6 flex flex-col gap-4" />
         )}
         </>
-      )}
-
-      {currentTab === "analyze" && hasShareContent && (
-        <AnalyzeTab workout={workout} ftp={ftp} timeSeries={timeSeries!} />
       )}
 
       {currentTab === "compare" && hasCompare && (

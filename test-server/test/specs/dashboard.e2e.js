@@ -483,17 +483,42 @@ describe("Dashboard editing", () => {
       expect(bottomWidget.text).toContain("Bottom Section");
     });
 
-    it("should preserve widget order after page refresh", async () => {
-      // Use browser.refresh() instead of location.reload() — tauri-wd manages
-      // the WebDriver lifecycle and reconnects to the webview plugin properly.
-      await browser.refresh();
-      await browser.pause(3000);
+    it("should preserve widget order after reload from DB", async () => {
+      // Instead of a page reload (which kills the tauri-wd webview plugin on CI),
+      // clear the Zustand store in memory and force a fresh loadDashboard() from DB.
+      // This tests the same persistence guarantee without breaking the WebDriver session.
+      const cleared = await browser.execute(() => {
+        const isVis = (el) => getComputedStyle(el).visibility !== "hidden";
+        const widgetEl = Array.from(document.querySelectorAll(".group.relative.h-full.select-none")).find(isVis);
+        if (!widgetEl) return false;
+        const fiberKey = Object.keys(widgetEl).find(k => k.startsWith("__reactFiber$"));
+        if (!fiberKey) return false;
+        let fiber = widgetEl[fiberKey];
+        while (fiber) {
+          const val = fiber.memoizedProps?.value;
+          if (val && typeof val === "function" && typeof val.getState === "function") {
+            const state = val.getState();
+            if (state.loadDashboard) {
+              // Clear in-memory widgets, then reload from DB
+              val.setState({ widgets: [], loaded: false });
+              state.loadDashboard();
+              return true;
+            }
+          }
+          fiber = fiber.return;
+        }
+        return false;
+      });
+      expect(cleared).toBe(true);
 
-      await waitFor("h1=Wattson", 15_000);
-      // Re-set skip-confirm flag after page reload
-      await browser.execute(() => { window.__WATTSON_SKIP_CONFIRM__ = true; });
-      await clickButton("My Test Dashboard");
-      await browser.pause(1000);
+      // Wait for widgets to reappear from DB
+      await browser.waitUntil(async () => {
+        return browser.execute(() => {
+          const isVis = (el) => getComputedStyle(el).visibility !== "hidden";
+          return Array.from(document.querySelectorAll(".group.relative.h-full.select-none"))
+            .filter(isVis).length === 5;
+        });
+      }, { timeout: 10_000, timeoutMsg: "Widgets did not reload from DB" });
 
       const orderAfter = await browser.execute(() => {
         const isVis = (el) => getComputedStyle(el).visibility !== "hidden";

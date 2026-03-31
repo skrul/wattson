@@ -77,24 +77,24 @@ export const config = {
       throw new Error(`Tauri build failed with exit code ${result.status}`);
     }
 
-    // Delete the app's databases for a clean start
+  },
+
+  // Start the fake server and tauri-wd before each session.
+  // Also delete databases so each spec file starts with a clean slate.
+  beforeSession: () => {
     const appDataDir = getAppDataDir();
     for (const dbName of ["wattson.db", "enrichment_cache.db"]) {
       const dbPath = path.join(appDataDir, dbName);
       if (fs.existsSync(dbPath)) {
-        console.log(`Deleting existing database: ${dbPath}`);
+        console.log(`Deleting database for clean session: ${dbPath}`);
         fs.unlinkSync(dbPath);
       }
-      // Also delete WAL/SHM files
       for (const suffix of ["-wal", "-shm"]) {
         const p = dbPath + suffix;
         if (fs.existsSync(p)) fs.unlinkSync(p);
       }
     }
-  },
 
-  // Start the fake server and tauri-wd before each session
-  beforeSession: () => {
     // Start fake Peloton server
     fakeServer = spawn("node", ["server.js"], {
       cwd: __dirname,

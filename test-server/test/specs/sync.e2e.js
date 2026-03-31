@@ -89,9 +89,9 @@ async function verifyEnrichmentInUI() {
   });
   await browser.pause(500);
 
-  // 1. Summary tab: verify the workout detail and shareable chart rendered
+  // 1. Summary tab: verify the workout detail and share button rendered
   await waitForText("Duration:", 5_000);
-  await waitForText("Shareable Chart", 5_000);
+  await waitForText("Share", 5_000);
 
   // 2. Click the Stats tab
   await browser.execute(() => {

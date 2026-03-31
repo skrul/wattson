@@ -174,8 +174,10 @@ describe("Dashboard editing", () => {
   // ---------------------------------------------------------------
   describe("Scenario 1b: Rename a dashboard", () => {
     it("should open Manage Dashboards and click the dashboard name to edit", async () => {
+      // Wait for the empty dashboard to render with the Edit button
+      await waitForText("Edit", 5_000);
       await clickButton("Edit");
-      await waitForText("Done");
+      await waitForText("Done", 5_000);
 
       await clickButton("Manage Dashboards");
       await waitForText("Manage Dashboards");

@@ -1,6 +1,6 @@
 # Wattson
 
-A free, open-source desktop app for analyzing your Peloton workout data. Sync your rides, build custom dashboards, compare repeated rides, and export shareable charts — all locally on your machine with no server or cloud account required.
+A free, open-source desktop app for analyzing your Peloton workout data. Sync your rides, build custom dashboards, compare repeated rides, and share charts — all locally on your machine with no server or cloud account required.
 
 **Download:** [macOS (Apple Silicon)](https://github.com/skrul/wattson/releases/latest/download/Wattson_0.1.0_aarch64.dmg) | [macOS (Intel)](https://github.com/skrul/wattson/releases/latest/download/Wattson_0.1.0_x64.dmg) | [Windows](https://github.com/skrul/wattson/releases/latest/download/Wattson_0.1.0_x64-setup.exe) | [Linux (.deb)](https://github.com/skrul/wattson/releases/latest/download/Wattson_0.1.0_amd64.deb) | [Linux (.AppImage)](https://github.com/skrul/wattson/releases/latest/download/Wattson_0.1.0_amd64.AppImage)
 
@@ -9,11 +9,10 @@ A free, open-source desktop app for analyzing your Peloton workout data. Sync yo
 - **Sync workouts** from your Peloton account with automatic background enrichment
 - **Custom dashboards** — drag-and-drop widgets including charts, metrics, activity grids, personal records, workout lists, and more
 - **Filter and sort** by date, duration, output, instructor, class type, and more
-- **Custom charts** — build time-series and grouped charts with the built-in chart builder; click data points to navigate to individual workouts
+- **Custom charts** — build time-series and grouped charts with the built-in chart builder
 - **Compare rides** — overlay multiple attempts of the same class to see progress over time
-- **Per-ride detail** — view output, cadence, resistance, and heart rate curves for any ride
-- **Studio** — export stylized performance charts as PNG with customizable overlays, stats, and color themes
-- **Export** charts as PNG
+- **Per-ride detail** — interactive charts with toggleable overlays for power zones, HR zones, instructor cues, and song markers
+- **Share** — export customized performance charts as PNG with a WYSIWYG preview, aspect ratio picker, and style themes
 - **Auto-update** — the app checks for new versions on launch
 
 All data stays on your machine in a local SQLite database. Credentials are stored in your system keychain (macOS Keychain, Windows Credential Manager).

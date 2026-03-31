@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { confirm } from "@tauri-apps/plugin-dialog";
+import { confirm } from "../../lib/confirm";
 import type { DashboardWidget } from "../../types";
 import { useDashboardContext } from "../../stores/DashboardContext";
 import { WidgetToolbarContext } from "./WidgetToolbarContext";

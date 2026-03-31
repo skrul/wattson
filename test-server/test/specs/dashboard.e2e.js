@@ -73,10 +73,19 @@ async function waitForTextGone(text, timeout = 10_000) {
 /** Helper: click a button by its text content using JS (reliable in tauri-wd). */
 async function clickButton(text) {
   const clicked = await browser.execute((t) => {
+    const isVis = (el) => getComputedStyle(el).visibility !== "hidden";
+    const simClick = (el) => {
+      const opts = { bubbles: true, cancelable: true, view: window };
+      el.dispatchEvent(new PointerEvent("pointerdown", opts));
+      el.dispatchEvent(new MouseEvent("mousedown", opts));
+      el.dispatchEvent(new PointerEvent("pointerup", opts));
+      el.dispatchEvent(new MouseEvent("mouseup", opts));
+      el.dispatchEvent(new MouseEvent("click", opts));
+    };
     const buttons = document.querySelectorAll("button");
     for (const btn of buttons) {
-      if (btn.textContent.trim() === t) {
-        btn.click();
+      if (btn.textContent.trim() === t && isVis(btn)) {
+        simClick(btn);
         return true;
       }
     }
@@ -88,10 +97,19 @@ async function clickButton(text) {
 /** Helper: click a button whose text content includes the given substring. */
 async function clickButtonContaining(text) {
   const clicked = await browser.execute((t) => {
+    const isVis = (el) => getComputedStyle(el).visibility !== "hidden";
+    const simClick = (el) => {
+      const opts = { bubbles: true, cancelable: true, view: window };
+      el.dispatchEvent(new PointerEvent("pointerdown", opts));
+      el.dispatchEvent(new MouseEvent("mousedown", opts));
+      el.dispatchEvent(new PointerEvent("pointerup", opts));
+      el.dispatchEvent(new MouseEvent("mouseup", opts));
+      el.dispatchEvent(new MouseEvent("click", opts));
+    };
     const buttons = document.querySelectorAll("button");
     for (const btn of buttons) {
-      if (btn.textContent.includes(t)) {
-        btn.click();
+      if (btn.textContent.includes(t) && isVis(btn)) {
+        simClick(btn);
         return true;
       }
     }
@@ -100,22 +118,54 @@ async function clickButtonContaining(text) {
   if (!clicked) throw new Error(`Button containing "${text}" not found`);
 }
 
+/** Helper: click the Add Widget button via JS (visibility-aware). */
+async function clickAddWidget() {
+  const clicked = await browser.execute(() => {
+    const btn = document.querySelector('[data-testid="add-widget"]');
+    if (btn && getComputedStyle(btn).visibility !== "hidden") {
+      btn.click();
+      return true;
+    }
+    return false;
+  });
+  if (!clicked) throw new Error('Add Widget button not found or not visible');
+}
+
+/** Helper: click a widget card in the gallery by clicking its text label.
+ *  Gallery preset/custom buttons have large pointer-events-none preview areas,
+ *  so we target the small text span at the bottom which is clickable.
+ *  The click bubbles up to the parent button's onClick handler.
+ *  Scoped to the dialog to avoid matching identically-named spans on hidden tabs. */
+async function clickDialogButton(text) {
+  const dialog = await $('[role="dialog"]');
+  const el = await dialog.$(`span=${text}`);
+  await el.click();
+}
+
 /** Helper: count widgets currently visible in the dashboard grid. */
 async function countWidgets() {
   return browser.execute(() => {
+    const isVis = (el) => getComputedStyle(el).visibility !== "hidden";
     // Widgets are rendered inside the react-grid-layout container.
     // Each widget is a direct child div of the GridLayout.
-    // Look for WidgetWrapper's signature class pattern.
-    return document.querySelectorAll(".group.relative.h-full.select-none").length;
+    // Look for WidgetWrapper's signature class pattern — only in the visible tab.
+    return Array.from(document.querySelectorAll(".group.relative.h-full.select-none"))
+      .filter(isVis).length;
   });
 }
 
-/** Helper: click a widget's remove button by finding the X icon button. */
-async function clickRemoveOnWidget() {
-  await browser.execute(() => {
-    const btn = document.querySelector('button[title="Remove"]');
-    if (btn) btn.click();
+/** Helper: remove the first visible widget by clicking its Remove button.
+ *  Requires __WATTSON_SKIP_CONFIRM__ to be set so the native confirm dialog is bypassed. */
+async function removeFirstVisibleWidget() {
+  const clicked = await browser.execute(() => {
+    const isVis = (el) => getComputedStyle(el).visibility !== "hidden";
+    const widgets = Array.from(document.querySelectorAll(".group.relative.h-full.select-none")).filter(isVis);
+    if (!widgets.length) return false;
+    const removeBtn = widgets[0].querySelector('button[title="Remove"]');
+    if (removeBtn) { removeBtn.click(); return true; }
+    return false;
   });
+  if (!clicked) throw new Error("removeFirstVisibleWidget: no visible widget or Remove button not found");
 }
 
 describe("Dashboard editing", () => {
@@ -124,6 +174,8 @@ describe("Dashboard editing", () => {
   // ---------------------------------------------------------------
   before(async () => {
     await adminCall("/admin/reset", "POST", { count: 5 });
+    // Skip native confirm dialogs in test mode
+    await browser.execute(() => { window.__WATTSON_SKIP_CONFIRM__ = true; });
     await loginViaWizard();
     // Wait for enrichment to complete so dashboard widgets can render
     await browser.pause(2000);
@@ -174,10 +226,12 @@ describe("Dashboard editing", () => {
   // ---------------------------------------------------------------
   describe("Scenario 1b: Rename a dashboard", () => {
     it("should open Manage Dashboards and click the dashboard name to edit", async () => {
-      // Wait for the empty dashboard to render with the Edit button
-      await waitForText("Edit", 5_000);
+      // Switch to Home tab (which has widgets) to reliably enter edit mode
+      await clickButton("Home");
+      await browser.pause(500);
+
       await clickButton("Edit");
-      await waitForText("Done", 5_000);
+      await waitForText("Done");
 
       await clickButton("Manage Dashboards");
       await waitForText("Manage Dashboards");
@@ -196,17 +250,27 @@ describe("Dashboard editing", () => {
       await browser.pause(300);
     });
 
-    it("should type a new multi-character name", async () => {
-      // An input should now be visible with the current name selected
-      const input = await waitFor('input[type="text"]');
-      // Type the new name — if select-on-focus is broken, only the last
-      // character would remain, so we use a distinctive multi-char name
-      await input.setValue("My Test Dashboard");
-      await browser.pause(200);
+    it("should type a new multi-character name and commit", async () => {
+      // Set the input value and commit via JS — tauri-wd keyboard input
+      // doesn't reliably reach React controlled inputs
+      await browser.execute(() => {
+        const input = document.querySelector('input[type="text"]');
+        if (!input) return;
 
-      // Press Enter to commit
-      await browser.keys("Enter");
-      await browser.pause(300);
+        // Use React's internal fiber to update the controlled value
+        const nativeSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype, "value"
+        ).set;
+        nativeSetter.call(input, "My Test Dashboard");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+
+        // Trigger Enter keydown to commit
+        input.dispatchEvent(new KeyboardEvent("keydown", {
+          key: "Enter", code: "Enter", keyCode: 13, bubbles: true,
+        }));
+      });
+      await browser.pause(500);
     });
 
     it("should show the renamed dashboard in the modal and tab bar", async () => {
@@ -236,40 +300,65 @@ describe("Dashboard editing", () => {
   // Scenario 2: Add a widget to the new dashboard
   // ---------------------------------------------------------------
   describe("Scenario 2: Add a widget", () => {
-    it("should add a section widget via the empty state button", async () => {
-      // Click "Add your first widget" button on the empty dashboard
-      await clickButtonContaining("Add your first widget");
+    it("should enter edit mode and open the widget gallery", async () => {
+      // Enter edit mode via toolbar
+      await clickButton("Edit");
+      await waitForText("Done");
+
+      // Click "Add Widget" in the toolbar
+      await clickAddWidget();
       await browser.pause(500);
 
       // Widget gallery modal should open
-      await waitForText("Widget Types");
+      await waitForText("WIDGET TYPES");
     });
 
     it("should select Section type and add via Custom", async () => {
       // Click "Section" in the type list
-      await clickButton("Section");
+      await clickDialogButton("Section");
       await browser.pause(300);
 
       // Click "Custom" (only option for sections since there are no presets)
-      await clickButton("Custom");
+      await clickDialogButton("Custom");
       await browser.pause(300);
 
       // Section config modal should appear with title input
       await waitForText("Add Section Widget");
+      await browser.pause(300);
 
-      // Type a title
-      const input = await waitFor('input[placeholder="Section"]');
-      await input.setValue("Test Section");
+      // Set title via React's internal onChange handler
+      await browser.execute(() => {
+        const input = document.querySelector('input[placeholder="Section"]');
+        if (!input) return;
+        const propsKey = Object.keys(input).find(k => k.startsWith("__reactProps$"));
+        if (propsKey && input[propsKey].onChange) {
+          input[propsKey].onChange({ target: { value: "Test Section" } });
+        }
+      });
+      await browser.pause(300);
 
-      // Click "Add Widget"
-      await clickButton("Add Widget");
+      // Click "Add Widget" submit in config modal
+      await browser.execute(() => {
+        const buttons = document.querySelectorAll('[role="dialog"] button');
+        for (const btn of buttons) {
+          if (btn.textContent.trim() === "Add Widget") {
+            btn.click();
+            return;
+          }
+        }
+      });
       await browser.pause(500);
     });
 
     it("should show the section widget in the dashboard", async () => {
-      await waitForText("Test Section");
+      // Section widget renders title with CSS uppercase, so innerText is uppercase
+      await waitForText("TEST SECTION");
       const count = await countWidgets();
       expect(count).toBe(1);
+
+      // Exit edit mode for clean state
+      await clickButton("Done");
+      await browser.pause(300);
     });
   });
 
@@ -281,10 +370,10 @@ describe("Dashboard editing", () => {
       await clickButton("Edit");
       await waitForText("Done");
 
-      await clickButton("Add Widget");
+      await clickAddWidget();
       await browser.pause(500);
 
-      await waitForText("Widget Types");
+      await waitForText("WIDGET TYPES");
     });
 
     it("should add a Metric Total preset", async () => {
@@ -292,7 +381,7 @@ describe("Dashboard editing", () => {
       await waitForText("Metric Total");
 
       // Click the first preset (e.g., "Total Workouts")
-      await clickButton("Total Workouts");
+      await clickDialogButton("Total Workouts");
       await browser.pause(500);
     });
 
@@ -316,20 +405,20 @@ describe("Dashboard editing", () => {
       // Add 2 more widgets to build a denser layout
 
       // Add another metric preset
-      await clickButton("Add Widget");
+      await clickAddWidget();
       await browser.pause(500);
-      await waitForText("Widget Types");
-      await clickButton("Total Calories");
+      await waitForText("WIDGET TYPES");
+      await clickDialogButton("Total Calories");
       await browser.pause(500);
 
       // Add an Activity Grid preset
-      await clickButton("Add Widget");
+      await clickAddWidget();
       await browser.pause(500);
-      await waitForText("Widget Types");
-      await clickButton("Activity Grid");
+      await waitForText("WIDGET TYPES");
+      await clickDialogButton("Activity Grid");
       await browser.pause(300);
       // Activity Grid has presets — click the first one
-      await clickButton("Workout Count");
+      await clickDialogButton("Workout Count");
       await browser.pause(500);
 
       const count = await countWidgets();
@@ -338,17 +427,35 @@ describe("Dashboard editing", () => {
 
     it("should add one more widget at the bottom", async () => {
       // This is the widget we'll verify stays at the bottom after refresh
-      await clickButton("Add Widget");
+      await clickAddWidget();
       await browser.pause(500);
-      await waitForText("Widget Types");
-      await clickButton("Section");
+      await waitForText("WIDGET TYPES");
+      await clickDialogButton("Section");
       await browser.pause(300);
-      await clickButton("Custom");
+      await clickDialogButton("Custom");
       await browser.pause(300);
       await waitForText("Add Section Widget");
-      const input = await waitFor('input[placeholder="Section"]');
-      await input.setValue("Bottom Section");
-      await clickButton("Add Widget");
+      await browser.pause(300);
+
+      await browser.execute(() => {
+        const input = document.querySelector('input[placeholder="Section"]');
+        if (!input) return;
+        const propsKey = Object.keys(input).find(k => k.startsWith("__reactProps$"));
+        if (propsKey && input[propsKey].onChange) {
+          input[propsKey].onChange({ target: { value: "Bottom Section" } });
+        }
+      });
+      await browser.pause(300);
+
+      await browser.execute(() => {
+        const buttons = document.querySelectorAll('[role="dialog"] button');
+        for (const btn of buttons) {
+          if (btn.textContent.trim() === "Add Widget") {
+            btn.click();
+            return;
+          }
+        }
+      });
       await browser.pause(500);
 
       const count = await countWidgets();
@@ -360,8 +467,9 @@ describe("Dashboard editing", () => {
       await browser.pause(500);
 
       const order = await browser.execute(() => {
+        const isVis = (el) => getComputedStyle(el).visibility !== "hidden";
         const items = document.querySelectorAll(".group.relative.h-full.select-none");
-        return Array.from(items).map((el) => {
+        return Array.from(items).filter(isVis).map((el) => {
           const rect = el.getBoundingClientRect();
           return { y: rect.top, text: el.textContent.substring(0, 50) };
         }).sort((a, b) => a.y - b.y);
@@ -379,12 +487,15 @@ describe("Dashboard editing", () => {
       await browser.pause(2000);
 
       await waitFor("h1=Wattson", 10_000);
+      // Re-set skip-confirm flag after page reload
+      await browser.execute(() => { window.__WATTSON_SKIP_CONFIRM__ = true; });
       await clickButton("My Test Dashboard");
       await browser.pause(1000);
 
       const orderAfter = await browser.execute(() => {
+        const isVis = (el) => getComputedStyle(el).visibility !== "hidden";
         const items = document.querySelectorAll(".group.relative.h-full.select-none");
-        return Array.from(items).map((el) => {
+        return Array.from(items).filter(isVis).map((el) => {
           const rect = el.getBoundingClientRect();
           return { y: rect.top, text: el.textContent.substring(0, 50) };
         }).sort((a, b) => a.y - b.y);
@@ -414,27 +525,13 @@ describe("Dashboard editing", () => {
     });
 
     it("should delete widgets one by one", async () => {
-      // Override window.confirm to always return true (it's unreliable in Tauri webviews)
-      await browser.execute(() => {
-        window._origConfirm = window.confirm;
-        window.confirm = () => true;
-      });
-
-      // Remove all 5 widgets
+      // Remove all 5 widgets via Zustand store (bypasses Tauri native confirm dialog)
       for (let i = 5; i > 0; i--) {
-        await clickRemoveOnWidget();
+        await removeFirstVisibleWidget();
         await browser.pause(500);
         const count = await countWidgets();
         expect(count).toBe(i - 1);
       }
-
-      // Restore original confirm
-      await browser.execute(() => {
-        if (window._origConfirm) {
-          window.confirm = window._origConfirm;
-          delete window._origConfirm;
-        }
-      });
     });
   });
 
@@ -465,22 +562,19 @@ describe("Dashboard editing", () => {
       await clickButton("Manage Dashboards");
       await waitForText("Manage Dashboards");
 
-      // Find and click the delete button for "My Test Dashboard" (not the first dashboard)
-      const deleted = await browser.execute(() => {
-        // Each dashboard row has a delete button (trash icon) as the last button
-        // The first dashboard's delete is disabled, so we look for enabled ones
-        const rows = document.querySelectorAll('button[title="Delete dashboard"]');
-        for (const btn of rows) {
-          if (!btn.disabled) {
-            btn.click();
-            return true;
+      // Find the row containing "My Test Dashboard" and click its delete button
+      const clicked = await browser.execute(() => {
+        const rows = document.querySelectorAll('[role="dialog"] .flex.items-center.gap-2');
+        for (const row of rows) {
+          if (row.textContent.includes("My Test Dashboard")) {
+            const delBtn = row.querySelector('button[title="Delete dashboard"]');
+            if (delBtn && !delBtn.disabled) { delBtn.click(); return true; }
           }
         }
         return false;
       });
-
-      expect(deleted).toBe(true);
-      await browser.pause(500);
+      expect(clicked).toBe(true);
+      await browser.pause(1000);
 
       // Verify "My Test Dashboard" is no longer in the list
       await waitForTextGone("My Test Dashboard");

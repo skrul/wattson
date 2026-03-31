@@ -37,6 +37,26 @@ Dropdowns inside scrollable modals (`overflow-y-auto`) have two recurring issues
 
 See `ChartFilterBar.tsx` `FilterChip` for the reference implementation combining both fixes.
 
+## E2E Testing (WebdriverIO + tauri-wd)
+
+Tests live in `test-server/test/specs/`. Run with `npx wdio run wdio.conf.js --spec test/specs/<file>` from the `test-server/` directory.
+
+### Tauri native dialogs can't be automated
+
+`confirm()` from `@tauri-apps/plugin-dialog` opens an OS-level dialog that WebDriver cannot interact with. **Always use `src/lib/confirm.ts`** (our wrapper) instead of importing directly from the plugin. The wrapper checks `window.__WATTSON_SKIP_CONFIRM__` and auto-confirms in test mode. Tests set this flag in their `before` hook (and after any `location.reload()`).
+
+### CSS `text-transform` affects `innerText`
+
+`waitForText()` checks `document.body.innerText`, which reflects CSS transforms. If an element has `uppercase`, you must match the uppercase text (e.g. `waitForText("TEST SECTION")` not `waitForText("Test Section")`). `textContent` is unaffected but `innerText` is what the user sees.
+
+### All dashboard tabs stay mounted with `visibility: hidden`
+
+`App.tsx` keeps inactive dashboard tabs in the DOM with `visibility: hidden`. Element selectors like `$("span=Total Workouts")` will match elements on hidden tabs. **Always scope selectors** — use `$('[role="dialog"]').$('span=...')` for modals, or filter with `getComputedStyle(el).visibility !== "hidden"` in `browser.execute`.
+
+### tauri-wd + React controlled inputs
+
+WDIO's `setValue()` doesn't reliably trigger React's synthetic change events through tauri-wd. For controlled inputs, use `browser.execute` to call `input.__reactProps$.onChange({ target: { value: "..." } })` directly.
+
 ## Architecture Docs
 
 - **[Sync & Enrichment](docs/SYNC.md)** — Data flow from Peloton API through sync, enrichment backfill, and on-demand loading. Covers the state machine, store↔DB data gap, and key invariants.

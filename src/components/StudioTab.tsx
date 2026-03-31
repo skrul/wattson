@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { confirm } from "@tauri-apps/plugin-dialog";
+import { confirm } from "../lib/confirm";
 import type { Workout } from "../types";
 import { getShareableWorkouts } from "../lib/database";
 import { parsePerformanceGraph, parseTargetMetrics, parsePedalingStartOffset, isPowerZoneRide } from "../lib/charts";

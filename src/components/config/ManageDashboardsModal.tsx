@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
-import { confirm } from "@tauri-apps/plugin-dialog";
+import { confirm } from "../../lib/confirm";
 import { useDashboardRegistryStore } from "../../stores/dashboardRegistryStore";
 
 interface Props {

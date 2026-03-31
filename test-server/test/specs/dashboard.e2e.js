@@ -22,7 +22,8 @@ async function waitFor(selector, timeout = 10_000) {
 
 /** Helper: wait for the setup wizard dialog and fill in credentials. */
 async function loginViaWizard() {
-  await waitFor("h2=Welcome to Wattson", 10_000);
+  // 30s timeout — CI runners can be slow to start the Tauri app
+  await waitFor("h2=Welcome to Wattson", 30_000);
 
   const emailInput = await waitFor('input[placeholder="Peloton email"]');
   await emailInput.setValue(TEST_EMAIL);
@@ -483,10 +484,12 @@ describe("Dashboard editing", () => {
     });
 
     it("should preserve widget order after page refresh", async () => {
-      await browser.execute(() => location.reload());
-      await browser.pause(2000);
+      // Use browser.refresh() instead of location.reload() — tauri-wd manages
+      // the WebDriver lifecycle and reconnects to the webview plugin properly.
+      await browser.refresh();
+      await browser.pause(3000);
 
-      await waitFor("h1=Wattson", 10_000);
+      await waitFor("h1=Wattson", 15_000);
       // Re-set skip-confirm flag after page reload
       await browser.execute(() => { window.__WATTSON_SKIP_CONFIRM__ = true; });
       await clickButton("My Test Dashboard");

@@ -22,8 +22,8 @@ async function waitFor(selector, timeout = 10_000) {
 
 /** Helper: wait for the setup wizard dialog and fill in credentials. */
 async function loginViaWizard() {
-  // Wait for the wizard dialog's heading
-  await waitFor("h2=Welcome to Wattson", 10_000);
+  // Wait for the wizard dialog's heading (30s — CI runners can be slow to start)
+  await waitFor("h2=Welcome to Wattson", 30_000);
 
   const emailInput = await waitFor('input[placeholder="Peloton email"]');
   await emailInput.setValue(TEST_EMAIL);
@@ -42,7 +42,7 @@ async function loginViaWizard() {
   await getStartedBtn.click();
 
   // Wait for main app
-  await waitFor("h1=Wattson", 5_000);
+  await waitFor("h1=Wattson", 15_000);
 }
 
 /**

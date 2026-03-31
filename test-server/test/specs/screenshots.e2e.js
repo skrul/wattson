@@ -51,7 +51,10 @@ function prompt(message) {
   });
 }
 
-const SCREENSHOTS = ["home", "workouts", "filter", "compare", "insights", "studio"];
+const SCREENSHOTS = ["home", "workouts", "compare", "share", "insights", "studio"];
+
+/** Screenshots that need a delay after Enter (e.g. to hold a tooltip visible). */
+const DELAY_AFTER_ENTER = { workouts: 2000 };
 
 describe("Screenshot capture", () => {
   before(async () => {
@@ -75,7 +78,10 @@ describe("Screenshot capture", () => {
 
   for (const name of SCREENSHOTS) {
     it(name, async () => {
-      await prompt(`  [${name}] Set up the screen, then press Enter to capture... `);
+      const delay = DELAY_AFTER_ENTER[name];
+      const hint = delay ? ` (${delay / 1000}s delay after Enter)` : "";
+      await prompt(`  [${name}] Set up the screen, then press Enter to capture${hint}... `);
+      if (delay) await browser.pause(delay);
       captureScreenshot(name);
     });
   }

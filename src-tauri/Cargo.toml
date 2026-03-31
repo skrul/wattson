@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Peloton Ride Analyzer"
 authors = ["you"]
 edition = "2021"
+default-run = "wattson"
 
 [lib]
 name = "wattson_lib"

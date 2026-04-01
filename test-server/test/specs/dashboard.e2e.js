@@ -31,11 +31,49 @@ async function loginViaWizard() {
   const passwordInput = await $('input[placeholder="Password"]');
   await passwordInput.setValue(TEST_PASSWORD);
 
+  // Verify inputs have values before clicking Sign In
+  const emailValue = await emailInput.getValue();
+  const passwordValue = await passwordInput.getValue();
+  console.log(`[login] email value: "${emailValue}", password length: ${passwordValue?.length}`);
+
   const signInBtn = await $("button=Sign In");
   await signInBtn.click();
 
-  // 90s — Ubuntu CI sync + enrichment can be slow
-  await waitFor("h2=You're All Set!", 90_000);
+  // Poll for either success or error, dumping page text periodically for diagnostics
+  let found = false;
+  const start = Date.now();
+  while (Date.now() - start < 90_000) {
+    const pageState = await browser.execute(() => {
+      const text = document.body?.innerText ?? "";
+      return {
+        hasAllSet: text.includes("You're All Set!"),
+        hasError: text.includes("Error") || text.includes("error") || text.includes("failed") || text.includes("Failed"),
+        hasWelcome: text.includes("Welcome to Wattson"),
+        hasSignIn: text.includes("Sign In"),
+        snippet: text.substring(0, 500),
+      };
+    });
+
+    if (pageState.hasAllSet) {
+      found = true;
+      break;
+    }
+
+    // Log page state every 10s to diagnose what the wizard is showing
+    const elapsed = Date.now() - start;
+    if (elapsed % 10_000 < 600) {
+      console.log(`[login] ${Math.round(elapsed/1000)}s elapsed — page state:`, JSON.stringify(pageState));
+    }
+
+    await browser.pause(500);
+  }
+
+  if (!found) {
+    // Final dump before failing
+    const finalText = await browser.execute(() => document.body?.innerText ?? "");
+    console.log("[login] TIMEOUT — final page text:", finalText.substring(0, 1000));
+    throw new Error("loginViaWizard: 'You're All Set!' never appeared after 90s");
+  }
 
   const getStartedBtn = await $("button=Get Started");
   await getStartedBtn.click();

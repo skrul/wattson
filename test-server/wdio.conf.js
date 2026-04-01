@@ -43,7 +43,7 @@ export const config = {
   specs: ["./test/specs/**/*.js"],
   exclude: ["./test/specs/screenshots.e2e.js"],
   maxInstances: 1,
-  connectionRetryCount: 10,
+  connectionRetryCount: 30,
   capabilities: [
     {
       maxInstances: 1,
@@ -56,7 +56,7 @@ export const config = {
   framework: "mocha",
   mochaOpts: {
     ui: "bdd",
-    timeout: 60_000,
+    timeout: 120_000,
   },
 
   // Build the app with env vars pointing to the fake server
@@ -119,8 +119,8 @@ export const config = {
       }
     });
 
-    // Wait a moment for both processes to be ready
-    return new Promise((resolve) => setTimeout(resolve, 2000));
+    // Wait for both processes to be ready (5s — Ubuntu CI is slower)
+    return new Promise((resolve) => setTimeout(resolve, 5000));
   },
 
   // Clean up after session

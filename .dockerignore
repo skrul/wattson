@@ -1,0 +1,7 @@
+node_modules
+test-server/node_modules
+src-tauri/target
+dist
+.claude
+.git
+*.md

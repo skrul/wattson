@@ -16,10 +16,12 @@ const binaryName = process.platform === "win32" ? "wattson.exe" : "wattson";
 const binaryPath = path.resolve(projectRoot, "src-tauri", "target", "debug", binaryName);
 
 // Tauri app data directory (where sqlite:wattson.db lives)
+// On Linux, Tauri 2 resolves app_data_dir to $XDG_CONFIG_HOME/<id> (~/.config/),
+// NOT $XDG_DATA_HOME (~/.local/share/) which is used for WebKitGTK webview data.
 function getAppDataDir() {
   switch (process.platform) {
     case "linux":
-      return path.join(os.homedir(), ".local", "share", TEST_APP_ID);
+      return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"), TEST_APP_ID);
     case "darwin":
       return path.join(os.homedir(), "Library", "Application Support", TEST_APP_ID);
     case "win32":
@@ -27,6 +29,15 @@ function getAppDataDir() {
     default:
       return "";
   }
+}
+
+// WebKitGTK webview data directory (localStorage, caches, etc.)
+// Only relevant on Linux — cleaned between sessions to prevent state leaks.
+function getWebViewDataDir() {
+  if (process.platform === "linux") {
+    return path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share"), TEST_APP_ID);
+  }
+  return "";
 }
 
 // Disable system keychain in the app — credentials stay in-memory during tests.
@@ -43,7 +54,7 @@ export const config = {
   specs: ["./test/specs/**/*.js"],
   exclude: ["./test/specs/screenshots.e2e.js"],
   maxInstances: 1,
-  connectionRetryCount: 30,
+  connectionRetryCount: 10,
   capabilities: [
     {
       maxInstances: 1,
@@ -80,7 +91,7 @@ export const config = {
   },
 
   // Start the fake server and tauri-wd before each session.
-  // Also delete databases so each spec file starts with a clean slate.
+  // Also delete databases and webview data so each spec file starts with a clean slate.
   beforeSession: () => {
     const appDataDir = getAppDataDir();
     for (const dbName of ["wattson.db", "enrichment_cache.db"]) {
@@ -93,6 +104,14 @@ export const config = {
         const p = dbPath + suffix;
         if (fs.existsSync(p)) fs.unlinkSync(p);
       }
+    }
+
+    // On Linux, WebKitGTK persists localStorage to disk under ~/.local/share/<id>/.
+    // Delete the webview data dir to prevent state leaks between sessions.
+    const webViewDir = getWebViewDataDir();
+    if (webViewDir && fs.existsSync(webViewDir)) {
+      console.log(`Deleting WebKitGTK data for clean session: ${webViewDir}`);
+      fs.rmSync(webViewDir, { recursive: true, force: true });
     }
 
     // Start fake Peloton server

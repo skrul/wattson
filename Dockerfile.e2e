@@ -1,0 +1,81 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# System dependencies matching CI workflow
+RUN apt-get update && apt-get install -y \
+    # Tauri/WebKitGTK build deps
+    libwebkit2gtk-4.1-dev \
+    libappindicator3-dev \
+    librsvg2-dev \
+    patchelf \
+    # Display server
+    xvfb \
+    # Build essentials
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    curl \
+    wget \
+    git \
+    # Runtime deps for WebKitGTK (needed even with -dev packages)
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    libgstreamer1.0-0 \
+    # D-Bus (needed for Tauri)
+    dbus \
+    libdbus-1-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 20
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install pnpm 9
+RUN npm install -g pnpm@9
+
+# Install Rust stable
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install tauri-wd (takes a few minutes to compile)
+RUN cargo install tauri-webdriver-automation
+
+# Set working directory
+WORKDIR /app
+
+# Copy dependency files first for better layer caching
+COPY package.json pnpm-lock.yaml ./
+COPY src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/
+# Cargo needs these to resolve the workspace
+COPY src-tauri/src src-tauri/src
+COPY src-tauri/build.rs src-tauri/build.rs
+COPY src-tauri/capabilities src-tauri/capabilities
+COPY src-tauri/icons src-tauri/icons
+COPY src-tauri/tauri.conf.json src-tauri/tauri.conf.test.json src-tauri/
+
+# Install JS dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy test-server and install its deps
+COPY test-server/package.json test-server/package-lock.json test-server/
+RUN cd test-server && npm ci
+
+# Copy the rest of the source
+COPY . .
+
+# Environment for tests
+ENV WATTSON_NO_KEYCHAIN=1
+ENV VITE_ENRICHMENT_DELAY_MS=0
+ENV DISPLAY=:99
+
+# Build the Tauri app with fake server env vars
+RUN VITE_API_BASE=http://localhost:3001 \
+    VITE_AUTH_URL=http://localhost:3001/oauth/token \
+    VITE_ENRICHMENT_DELAY_MS=0 \
+    pnpm tauri build --debug --no-bundle --config src-tauri/tauri.conf.test.json
+
+# Default: start Xvfb and drop into a shell for interactive debugging
+CMD ["bash"]

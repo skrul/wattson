@@ -20,16 +20,31 @@ async function waitFor(selector, timeout = 10_000) {
   return el;
 }
 
+/**
+ * Helper: set a React controlled input value via JS.
+ * WebDriver sendKeys/setValue doesn't reliably update React state on WebKit2GTK.
+ */
+async function setInputValue(selector, value) {
+  await browser.execute((sel, val) => {
+    const input = document.querySelector(sel);
+    if (!input) throw new Error(`Input not found: ${sel}`);
+    const nativeSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, "value"
+    ).set;
+    nativeSetter.call(input, val);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, selector, value);
+}
+
 /** Helper: wait for the setup wizard dialog and fill in credentials. */
 async function loginViaWizard() {
   // 90s — Ubuntu CI with Xvfb can take 30-60s just to open the Tauri window
   await waitFor("h2=Welcome to Wattson", 90_000);
 
-  const emailInput = await waitFor('input[placeholder="Peloton email"]');
-  await emailInput.setValue(TEST_EMAIL);
-
-  const passwordInput = await $('input[placeholder="Password"]');
-  await passwordInput.setValue(TEST_PASSWORD);
+  // Use JS to set input values — WebDriver setValue is unreliable on WebKit2GTK
+  await setInputValue('input[placeholder="Peloton email"]', TEST_EMAIL);
+  await setInputValue('input[placeholder="Password"]', TEST_PASSWORD);
 
   const signInBtn = await $("button=Sign In");
   await signInBtn.click();

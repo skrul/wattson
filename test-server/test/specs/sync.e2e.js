@@ -35,7 +35,7 @@ async function loginViaWizard() {
   await signInBtn.click();
 
   // Wait for sync + success
-  await waitFor("h2=You're All Set!", 30_000);
+  await waitFor("h2=You're All Set!", 60_000);
 
   // Dismiss the wizard
   const getStartedBtn = await $("button=Get Started");

@@ -34,7 +34,7 @@ async function loginViaWizard() {
   const signInBtn = await $("button=Sign In");
   await signInBtn.click();
 
-  await waitFor("h2=You're All Set!", 30_000);
+  await waitFor("h2=You're All Set!", 60_000);
 
   const getStartedBtn = await $("button=Get Started");
   await getStartedBtn.click();
@@ -173,11 +173,13 @@ describe("Dashboard editing", () => {
   // ---------------------------------------------------------------
   // Setup: login and wait for initial sync
   // ---------------------------------------------------------------
-  before(async () => {
+  before(async function () {
+    this.timeout(120_000); // 2 min — Ubuntu CI with Xvfb is slow
     await adminCall("/admin/reset", "POST", { count: 5 });
-    // Skip native confirm dialogs in test mode
-    await browser.execute(() => { window.__WATTSON_SKIP_CONFIRM__ = true; });
     await loginViaWizard();
+    // Skip native confirm dialogs in test mode (set AFTER login so the
+    // browser.execute doesn't block on "no window" retries during app startup)
+    await browser.execute(() => { window.__WATTSON_SKIP_CONFIRM__ = true; });
     // Wait for enrichment to complete so dashboard widgets can render
     await browser.pause(2000);
   });

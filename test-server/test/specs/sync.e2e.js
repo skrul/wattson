@@ -22,8 +22,8 @@ async function waitFor(selector, timeout = 10_000) {
 
 /** Helper: wait for the setup wizard dialog and fill in credentials. */
 async function loginViaWizard() {
-  // Wait for the wizard dialog's heading (30s — CI runners can be slow to start)
-  await waitFor("h2=Welcome to Wattson", 30_000);
+  // 90s — Ubuntu CI with Xvfb can take 30-60s just to open the Tauri window
+  await waitFor("h2=Welcome to Wattson", 90_000);
 
   const emailInput = await waitFor('input[placeholder="Peloton email"]');
   await emailInput.setValue(TEST_EMAIL);

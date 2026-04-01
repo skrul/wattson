@@ -173,15 +173,22 @@ describe("Dashboard editing", () => {
   // ---------------------------------------------------------------
   // Setup: login and wait for initial sync
   // ---------------------------------------------------------------
-  before(async function () {
-    this.timeout(120_000); // 2 min — Ubuntu CI with Xvfb is slow
-    await adminCall("/admin/reset", "POST", { count: 5 });
-    await loginViaWizard();
-    // Skip native confirm dialogs in test mode (set AFTER login so the
-    // browser.execute doesn't block on "no window" retries during app startup)
-    await browser.execute(() => { window.__WATTSON_SKIP_CONFIRM__ = true; });
-    // Wait for enrichment to complete so dashboard widgets can render
-    await browser.pause(2000);
+  // Setup: login and wait for initial sync (each step in its own `it` block
+  // so mocha's per-test timeout applies individually — important for slow
+  // Ubuntu CI where the Tauri app window takes a long time to open)
+  // ---------------------------------------------------------------
+  describe("Setup", () => {
+    it("should reset fake server", async () => {
+      await adminCall("/admin/reset", "POST", { count: 5 });
+    });
+
+    it("should complete login via setup wizard", async () => {
+      await loginViaWizard();
+      // Skip native confirm dialogs in test mode
+      await browser.execute(() => { window.__WATTSON_SKIP_CONFIRM__ = true; });
+      // Wait for enrichment to complete so dashboard widgets can render
+      await browser.pause(2000);
+    });
   });
 
   // ---------------------------------------------------------------

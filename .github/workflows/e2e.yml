@@ -14,9 +14,7 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-          # Ubuntu disabled: tauri-wd + WebKit2GTK + Xvfb is too unreliable
-          # (window never opens within timeout). Re-enable when tauri-wd improves.
-          # - platform: ubuntu-22.04
+          - platform: ubuntu-22.04
           - platform: windows-latest
 
     runs-on: ${{ matrix.platform }}

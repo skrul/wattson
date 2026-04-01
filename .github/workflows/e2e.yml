@@ -14,7 +14,8 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-          - platform: ubuntu-22.04
+          # ubuntu-22.04 disabled: tauri-wd + WebKit2GTK has unreliable
+          # WebDriver sendKeys and other flaky interactions under Xvfb
           - platform: windows-latest
 
     runs-on: ${{ matrix.platform }}

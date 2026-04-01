@@ -34,8 +34,8 @@ async function loginViaWizard() {
   const signInBtn = await $("button=Sign In");
   await signInBtn.click();
 
-  // Wait for sync + success
-  await waitFor("h2=You're All Set!", 60_000);
+  // 90s — Ubuntu CI sync + enrichment can be slow
+  await waitFor("h2=You're All Set!", 90_000);
 
   // Dismiss the wizard
   const getStartedBtn = await $("button=Get Started");
